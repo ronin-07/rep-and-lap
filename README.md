@@ -1,6 +1,6 @@
 # Rep & Lap V2
 
-A responsive, local-first Push–Pull–Legs + Swimming tracker with a body-weight journal, goal tracking, theme toggle, adjustable working sets, progress charts, JSON/CSV exports and optional Supabase cross-device synchronization.
+A responsive, local-first Push–Pull–Legs + Swimming tracker with a body-weight journal, goal tracking, theme toggle, adjustable working sets, progress charts, JSON/CSV exports and optional automatic Supabase cross-device synchronization with Google sign-in.
 
 ## Open locally
 
@@ -16,7 +16,7 @@ Open `index.html` in your browser. It saves data on the same browser/device and 
 
 ## Optional cloud sync
 
-Read `SETUP-SUPABASE.md`, execute `supabase-schema.sql` in your own Supabase project, and put only its **publishable key** and project URL in `supabase-config.js`. Email magic-link sign-in then links devices. No server or paid GitHub hosting is required; backend free-tier limits still apply.
+Read `SETUP-SUPABASE.md`, execute `supabase-schema.sql` in your own Supabase project, and put only its **publishable key** and project URL in `supabase-config.js`. Google OAuth sign-in then links devices automatically; email magic-link sign-in remains as a fallback. Client sessions persist in browser storage. No server or paid GitHub hosting is required; backend free-tier limits still apply.
 
 ## Notes
 

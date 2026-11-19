@@ -166,12 +166,12 @@
      <div class="rest-day" style="margin-top:20px"><div class="rest-icon">${ico('spark',18)}</div><div><strong>Small efforts become big numbers</strong><p>Keep logging. Trends get more useful once you've completed a few weeks.</p></div></div>`;}
   function settings(){
    const entries=Object.values(data.weeks).filter(w=>Object.keys(w.gym||{}).length||Object.keys(w.swim||{}).length||Object.values(w.done||{}).some(Boolean)).length;
-   const cloudMessage=!configured?'Cloud syncing needs your Supabase project URL and publishable key in supabase-config.js.':cloud.user?`Connected · ${escapeHTML(cloud.user.email||'Signed in')}`:'Cloud is configured but not connected. Sign in using an email magic link.';
+   const cloudMessage=!configured?'Cloud syncing needs your Supabase project URL and publishable key in supabase-config.js.':cloud.user?`Signed in as ${escapeHTML(cloud.user.email||'your account')}. Automatic synchronization is active while online.`:'Sign in with Google once. Supabase remembers your session in this browser and automatically syncs workouts when online.';
    return `${heading('PREFERENCES & DATA','Make it yours.','Theme, backups and optional cross-device synchronization.',false)}
      <div class="settings-note">${ico('shield',17)} Your data is saved locally by default. Cloud sync is optional and requires an authenticated Supabase project. Never put a secret or service-role key in your website files.</div>
      <div class="settings-list">
        <article class="setting-card"><h3>Appearance</h3><p>Choose a clean light theme or a deep, low-glare dark mode. Motion effects respect reduced-motion settings.</p><div class="actions"><button class="outline-btn" type="button" data-action="toggle-theme">${ico(theme==='dark'?'sun':'moon',16)} Switch to ${theme==='dark'?'light':'dark'} mode</button></div></article>
-       <article class="setting-card"><h3>Cloud sync (optional)</h3><p>${cloudMessage}<br><strong>Status:</strong> ${escapeHTML(cloud.state)}. This is separate from your Google Sheet.</p><div class="actions">${configured?cloud.user?`<button class="primary-btn" type="button" data-action="sync-now">${ico('cloud',15)} Sync now</button><button class="outline-btn" type="button" data-action="sign-out">Sign out</button>`:`<div class="field" style="flex:1;min-width:165px"><label for="sync-email">Email for magic link</label><input type="email" id="sync-email" placeholder="you@example.com" autocomplete="email" /></div><button class="primary-btn" data-action="send-magic" type="button">Send sign-in link</button>`:'<span class="setup-hint">See SETUP-SUPABASE.md included with the site package.</span>'}</div></article>
+       <article class="setting-card"><h3>Cloud sync (optional)</h3><p>${cloudMessage}<br><strong>Status:</strong> ${escapeHTML(cloud.state)}. This is separate from your Google Sheet.</p><div class="actions">${configured?cloud.user?`<button class="outline-btn" type="button" data-action="sync-now">${ico('cloud',15)} Sync now</button><button class="outline-btn" type="button" data-action="sign-out">Sign out</button>`:`<button class="google-signin-btn" type="button" data-action="sign-in-google"><span class="google-letter" aria-hidden="true">G</span><span>Continue with Google</span></button><details class="email-fallback"><summary>Prefer email? Use a one-time sign-in link</summary><div class="email-fallback-form"><label class="visually-hidden" for="sync-email">Email address</label><input type="email" id="sync-email" placeholder="you@example.com" autocomplete="email" /><button class="outline-btn" data-action="send-magic" type="button">Send link</button></div></details>`:'<span class="setup-hint">See SETUP-SUPABASE.md included with the site package.</span>'}</div></article>
        <article class="setting-card"><h3>Back up your tracker</h3><p>Download JSON with workout sets, swimming, weigh-ins, personal goals and preferences. Restore it on another device.</p><div class="actions"><button class="primary-btn" type="button" data-action="export-json">${ico('download',15)} Download backup</button><button class="outline-btn" type="button" data-action="import-json">${ico('upload',15)} Restore backup</button></div></article>
        <article class="setting-card"><h3>Export CSV logs</h3><p>Download spreadsheet-friendly data for sets, swimming, weekly consistency and body-weight entries.</p><div class="actions"><button class="outline-btn" type="button" data-action="export-csv" data-csv="gym">Gym CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="swim">Swim CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="checklist">Checklist CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="weight">Body weight CSV</button></div></article>
        <article class="setting-card"><h3>Original Google Sheet</h3><p>The original workout workbook is available for reporting, but this website does not automatically write into it.</p><div class="actions"><a href="${SHEET_URL}" class="primary-btn" target="_blank" rel="noopener noreferrer">${ico('external',15)} Open Google Sheet</a></div></article>
@@ -241,6 +241,22 @@
       render();
     }catch(error){cloud.state='Cloud setup error';notify(error.message||'Unable to connect to cloud');render();}
   }
+  async function signInWithGoogle(){
+    if(!cloud.client){notify('Configure Supabase first');return;}
+    if(location.protocol!=='https:' && location.hostname!=='localhost'){
+      notify('Open the published HTTPS website to sign in with Google');return;
+    }
+    try{
+      // GitHub Pages callback is the project root; this URL must be allowlisted in Supabase Auth.
+      const redirectTo = new URL('./', location.href).href;
+      const {error}=await cloud.client.auth.signInWithOAuth({
+        provider:'google',
+        options:{redirectTo}
+      });
+      if(error)throw error;
+      // supabase-js redirects to Google; return completes automatically using detectSessionInUrl.
+    }catch(error){notify(error.message||'Google sign-in failed. Check the Google provider settings.');}
+  }
   async function sendMagicLink(){
     if(!cloud.client){notify('Configure Supabase first');return;}
     const email=document.getElementById('sync-email')?.value?.trim();if(!email||!email.includes('@')){notify('Enter a valid email');return;}
@@ -281,6 +297,7 @@
       data.targetWeight=v;save('preferences');render();notify('Target saved');return;
     }
     if(a==='toggle-theme'){theme=theme==='dark'?'light':'dark';applyTheme();render();return;}
+    if(a==='sign-in-google'){signInWithGoogle();return;}
     if(a==='send-magic'){sendMagicLink();return;}
     if(a==='sync-now'){syncAll();return;}
     if(a==='sign-out'){cloud.client?.auth.signOut().then(()=>{cloud.user=null;cloud.state='Not connected';render();notify('Signed out');});return;}
