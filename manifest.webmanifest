@@ -1,0 +1,12 @@
+{
+  "name": "Rep & Lap — Training Tracker",
+  "short_name": "Rep & Lap",
+  "description": "Private weekly push–pull–legs and swimming tracking.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#11182b",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
