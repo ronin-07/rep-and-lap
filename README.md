@@ -1,35 +1,30 @@
-# Rep & Lap — Training Tracker Website
+# Rep & Lap V2
 
-A responsive, account-free training site for 3 gym days (Push / Pull / Legs) and 3 swimming days every week.
+A responsive, local-first Push–Pull–Legs + Swimming tracker with a body-weight journal, goal tracking, theme toggle, adjustable working sets, progress charts, JSON/CSV exports and optional Supabase cross-device synchronization.
 
-## Start
+## Open locally
 
-Open `index.html` in a modern browser, or deploy the folder to any static host (GitHub Pages, Netlify, Cloudflare Pages, etc.). For local development you can run:
+Open `index.html` in your browser. It saves data on the same browser/device and works without an account. For a local web server during development, use `python -m http.server 8000` from this directory and visit `http://localhost:8000`.
 
-```bash
-python -m http.server 8080
-```
+## Deploy to GitHub Pages
 
-Then open `http://localhost:8080`.
+1. Create or open your `rep-and-lap` repository.
+2. Upload the **contents** of this folder to the repository root. `index.html` must be directly at the root, alongside `app.js`, `styles.css`, `icon.svg`, `sw.js`, `manifest.webmanifest`, and `supabase-config.js`.
+3. In repository **Settings → Pages**, select **Deploy from a branch → main → /(root)**.
+4. Open `https://YOUR-USERNAME.github.io/rep-and-lap/` when deployment completes.
+5. On updates, replace the published files and commit. The service worker uses a versioned cache to upgrade offline resources.
 
-## Features
+## Optional cloud sync
 
-- Monday–Saturday six-session checklist and Sunday recovery day
-- 18 gym exercises with *individual* weights, reps, and RIR, plus weekly volume calculations
-- Three swimming sessions with distance, longest continuous freestyle, breaststroke level, sculling/treading time, rest intervals, drills, notes and effort
-- Progress charts for gym volume, swimming distance, workout consistency and freestyle endurance
-- Original Google Sheet link in the sidebar and Settings tab
-- Offline-capable progressive web app when hosted over HTTPS, after initial visit
-- Local browser storage, JSON backup/restore and CSV export for manual use with spreadsheets
+Read `SETUP-SUPABASE.md`, execute `supabase-schema.sql` in your own Supabase project, and put only its **publishable key** and project URL in `supabase-config.js`. Email magic-link sign-in then links devices. No server or paid GitHub hosting is required; backend free-tier limits still apply.
 
-## Privacy and synchronization
+## Notes
 
-Workout entries are saved in this browser's local storage. They do **not** automatically sync to the Google Sheet or other devices. Use Settings > Download backup to preserve your data, and Settings > Restore backup to import it in another browser/device. No account or external services are required.
-
-## Original Google Sheet
-
-[Gym + Swimming Weekly Training Tracker](https://docs.google.com/spreadsheets/d/1wXWgc62YyYDiqV9XPjyDYlgbsHwoxJQeUpl6htIvSew/edit?usp=drivesdk)
-
-## Deployment
-
-To make a live public URL: unzip the folder and drag the folder into Netlify's deployment page, or commit files into a GitHub repository and enable GitHub Pages. The PWA worker requires HTTPS or localhost.
+- Uses browser `localStorage` for local tracking and offline access.
+- First run automatically reads existing V1 local data when opened on the **same origin** (same exact website address). Browser storage isn't automatically shared between a file and a GitHub Pages URL.
+- If you switch origin, use a **V1 JSON export** from the old site and **Restore backup** in V2 Settings. Your old workout data is preserved. RIR values from V1 may remain in old backups, but V2 does not display or use RIR.
+- Exercise +/− controls update the current week and the default for future weeks. Existing logged weeks retain their chosen number of sets.
+- Dumbbell weights are logged **per dumbbell**; volume uses displayed weight × reps (not two-dumbbell tonnage).
+- The original Google Sheet remains linked, but it doesn't automatically sync to the website.
+- The gradient backgrounds use CSS only; no image assets or tracking scripts are needed. Remote Supabase JS client is optional.
+- Avoid simultaneous edits to the exact same session from different devices; the last update wins. Back up data regularly.

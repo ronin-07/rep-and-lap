@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Rep & Lap — Your training tracker</title>
+  <title>Rep & Lap V2 — Your training tracker</title>
 </head>
 <body>
   <div class="app-shell">
@@ -24,21 +24,23 @@
         <div class="coach-stripes"><i></i><i></i><i></i><i></i><i></i><i></i></div>
       </div>
       <a class="sidebar-sheet" href="https://docs.google.com/spreadsheets/d/1wXWgc62YyYDiqV9XPjyDYlgbsHwoxJQeUpl6htIvSew/edit?usp=drivesdk" target="_blank" rel="noopener noreferrer">Original Google Sheet <span>↗</span></a>
-      <div class="sidebar-footer">LOCAL-FIRST · PRIVATE BY DEFAULT</div>
+      <div class="sidebar-footer">LOCAL-FIRST · OPTIONAL CLOUD SYNC</div>
     </aside>
 
     <div class="main-wrap">
       <header class="topbar">
         <div class="breadcrumb"><span class="breadcrumb-dot"></span><span id="breadcrumbName">Overview</span><span class="breadcrumb-muted">/ Training space</span></div>
-        <div class="top-actions"><span class="saved-state" id="saveState"><span class="save-indicator"></span> Saved on this device</span><button id="headerToday" class="today-btn" type="button">This week</button></div>
+        <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button><span class="saved-state" id="saveState"><span class="save-indicator"></span> Saved on this device</span><button id="headerToday" class="today-btn" type="button">This week</button></div>
       </header>
       <main id="app" class="content" tabindex="-1"></main>
-      <footer class="footer">Progress over perfection. <span>Rep & Lap · v1</span></footer>
+      <footer class="footer">Progress over perfection. <span>Rep & Lap · v2</span></footer>
     </div>
     <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation"></nav>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <input id="importFile" type="file" accept=".json,application/json" hidden />
+  <script src="supabase-config.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
