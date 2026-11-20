@@ -4,8 +4,8 @@
   "description": "Gym, swimming, water and body weight tracking with optional cloud sync.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f6f8fc",
-  "theme_color": "#11182b",
+  "background_color": "#080e1c",
+  "theme_color": "#080e1c",
   "icons": [
     {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ]

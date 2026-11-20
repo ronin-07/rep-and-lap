@@ -1,21 +1,35 @@
-# Rep & Lap V2.1 — Gym, Swim, Body Weight & Hydration
+# Rep & Lap — V2.2 + V2.3
 
-A mobile-friendly, local-first fitness tracker for the **3-day Push–Pull–Legs + 3-day swimming** schedule, now with a hydration journal and faster gym logging.
+A mobile-first fitness tracker for **three gym days (Push / Pull / Legs)**, **three swimming sessions**, daily water intake and body weight. Works offline-first in your browser, with optional authenticated automatic synchronization using Supabase and Google sign-in.
 
-## What's new in V2.1
+## What's in this combined release
 
-- **Water log:** quick-add 150 / 250 / 500 / 750 mL, custom amount per drink, daily history, delete mistakes, 7-day chart, and a progress ring.
-- **Suggested daily beverage goals:** 2,500 mL on Mon–Wed gym days, 2,400 mL on Thu–Sat swim days, 2,000 mL on Sunday rest day. These are **illustrative, schedule-based starting points**, not medical prescriptions. The amount excludes water in food; use thirst, sweating and circumstances to guide hydration. Do **not** force yourself to hit a target.
-- **Gym upgrades:** your latest previous logged exercise sets, reusable previous **weight** (without auto-claiming reps), explicit Log set button, and a configurable 1 / 1.5 / 2 / 3 minute rest timer.
-- **Exercise history:** weekly top-set load chart and heaviest recorded set for each of the 18 planned exercises.
-- **Sync-friendly water records:** every drink is a separate uniquely keyed record, so adding drinks on two devices is more robust than overwriting one daily total.
-- Includes V2's themes, Google sign-in / Supabase option, swimming, weigh-ins, charts, PWA support, and JSON/CSV export.
+### V2.2 — Visual redesign
 
-**Deferred to V3:** custom water goal settings and calorie tracking. V2.1 does not include them.
+- **Premium dark-first dashboard** with deep navy, subtle purple/teal gradients, restrained glass cards, and a consistent light theme toggle.
+- **Better information hierarchy:** the chosen day's workout, a 6-session weekly completion ring, quick water/gym/weight snapshots, weekly sessions, recent PRs, and a seven-week activity heatmap.
+- **Four primary mobile tabs:** Home · Workout · Progress · Profile. Desktop keeps a sidebar with these sections plus direct links to the detailed trackers.
+- **Microanimations:** progress-ring and chart reveals, hover/tap feedback, a light confetti celebration for completing workouts, and a trophy celebration for beating an existing heaviest-set PR. Dismiss with the button or Escape.
+- Respects `prefers-reduced-motion`; no autoplay sound, background video, or accounts required for local use.
 
-## Website files to publish to GitHub Pages
+### V2.3 — Swimming and weight insights
 
-Upload these seven files directly to the repository root (not a nested folder):
+- **Swimming:** 25 m / 50 m pool-size selector, one-tap length counter, automatic total distance based on logged lengths, and structured interval sets (`repeats × lengths`, rest seconds).
+- Intervals are logged **separately** from the session's total distance to avoid accidental double-counting. The session's total distance can still be typed manually; the length counter updates it when used.
+- **Body weight:** 7-day calendar-window rolling average on the weight chart (uses available weigh-ins within the previous seven days), plus existing weigh-in history and target weight.
+- Keeps breaststroke, sculling, treading water, swimming milestones and all existing V2.1 functionality.
+
+### Existing V2.1 features retained
+
+- Push / Pull / Legs program, flexible set counts, logged weight × reps for each set, previous workout comparison, rest timer, exercise history/PRs.
+- Swimming log/drill checklist, body-weight log, water quick-add and schedule-based suggested drink amounts, data backup and CSV exports.
+- Optional Google OAuth through Supabase, automatic online sync and local-first storage.
+
+**Still deferred to V3:** custom water-goal controls and calorie/macro tracking. No user-configurable water goal or calorie tracker is included here.
+
+## Publish to GitHub Pages
+
+For a fresh deployment, place **these seven files in the repository root**, not in an extra folder:
 
 ```
 index.html
@@ -27,43 +41,41 @@ sw.js
 supabase-config.js
 ```
 
-`index.html` must be at the root. Do not upload PNG previews or the ZIP itself for GitHub Pages deployment.
+The ZIP also includes `README.md`, `SETUP-SUPABASE.md`, `supabase-schema.sql`, and `MIGRATE-V2-TO-V2.1.sql` as optional setup documentation. These are not required to serve the site.
 
-### Before replacing V2
+1. On your current live Rep & Lap site, open **Profile → Settings → Download backup** and save your JSON backup before upgrading.
+2. If Supabase worked in V2.1, **no additional SQL migration is required** for the V2.2/V2.3 features. The swimming pool/interval fields are stored inside the existing session JSON records.
+3. Unzip the package into your local Git repository. **Keep your existing configured `supabase-config.js`**; the ZIP includes an intentionally blank example and will otherwise disconnect cloud sync.
+4. Commit and push:
 
-1. Open V2 Settings and **Download backup** (JSON).
-2. If you already use V2 Supabase sync: run `MIGRATE-V2-TO-V2.1.sql` in Supabase **SQL Editor** before adding water online. This expands the allowed record keys without deleting existing records.
-3. If you have *not* set up the database yet: use `supabase-schema.sql` instead.
-4. Copy the seven website files from this folder over the same files in your Git repo. **Keep your already-configured `supabase-config.js`** if it contains your actual project URL and publishable API key. This ZIP's file is a blank example.
-5. Commit and push to `main`, then open your GitHub Pages URL and refresh after the deployment. The new service-worker cache name helps browsers receive V2.1; if you see V2, reload once more or clear the site's cached files.
+   ```bash
+   git add index.html app.js styles.css icon.svg manifest.webmanifest sw.js
+   git commit -m "Release Rep and Lap V2.2 and V2.3"
+   git push origin main
+   ```
 
-```bash
-git status
-git add index.html app.js styles.css icon.svg manifest.webmanifest sw.js supabase-config.js
-git commit -m "Release Rep and Lap V2.1 hydration and gym upgrades"
-git push origin main
-```
+5. Wait for GitHub Pages to deploy, refresh once, then verify the four bottom tabs and the new home screen.
 
-### Water recommendation context
+**Do not publish secrets.** Only the Supabase Project URL and **publishable** key may go in `supabase-config.js`. Database passwords, Google OAuth client secrets and Supabase secret/service-role keys do not belong in static files. The existing RLS policies are required for secure access.
 
-The European Food Safety Authority reference of 2.5 L/day for adult men is **total water** from food plus drinks under moderate conditions. The UI's simple beverage suggestions are separate heuristic app defaults, **not** individualized from body mass, not mandatory, and may be unsuitable for individuals under medical fluid restrictions. Sweat loss, weather and exercise intensity change needs. Avoid overdrinking; drink according to thirst.
+### If you are upgrading from V2 or V1 instead
 
-References:
-- EFSA 2010: <https://doi.org/10.2903/j.efsa.2010.1459>
-- Nordic Nutrition Recommendations 2023: <https://pub.norden.org/nord2023-003/energy>
-- NATA 2017 on fluid replacement: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5634236/>
+Run `MIGRATE-V2-TO-V2.1.sql` in Supabase SQL Editor if you have an earlier database schema without water record keys. If starting from scratch, run `supabase-schema.sql`. Follow the separate `SETUP-SUPABASE.md` for Google OAuth configuration.
 
-## Data & privacy
+## Local first & synchronization behavior
 
-- Records are saved locally in your browser immediately. **Google sign-in requires your own Supabase project to be configured.** The website does not automatically communicate with Google Sheets.
-- Signed-in users automatically retry cloud sync online on changes, returning to the app, and periodic refresh. Browser local storage keeps a backup and lets you log offline.
-- Every water entry has its own record key in Supabase; deletion creates a synced tombstone to prevent deleted entries reappearing.
-- Remote sync uses record-level **last-write-wins** for training sessions, weight entries and preferences. Avoid editing the exact same exercise on multiple devices simultaneously. A real-time conflict resolution system is a future enhancement.
-- Do not place Supabase secret/service-role keys, Google OAuth client secrets, or database passwords in `supabase-config.js`. Only the **publishable key** and project URL belong there.
-- Backup using Settings → Download backup before reinstalling, switching domains, or clearing browser data.
+- **No login needed:** data is kept in the current browser's local storage.
+- **Same workout history across devices:** configure Supabase, sign in with the same Google account on each browser, and permit network access. The app syncs on data changes, returning online, app visibility and periodic checks.
+- **Sync is not truly real-time multi-user collaboration:** two devices editing the exact same session at nearly the same time can overwrite each other (last-write-wins). Export JSON backups regularly.
+- Local storage is tied to the website origin; opening a standalone `file://` version, a localhost copy and the live GitHub Pages site creates separate browser storage.
+- A static GitHub Pages site cannot issue secure `HttpOnly` cookie sessions itself; Supabase JS persists and refreshes its auth session in browser storage for this setup.
 
-## Local development
+## Health and training note
 
-Open `index.html` in your browser, or run a simple local static server, e.g. `python -m http.server 8000`. Google OAuth redirects should be tested on the published HTTPS site.
+The daily water amounts are general app suggestions, not personal fluid prescriptions. Drink according to thirst and consider heat, exercise and sweat. The chart's weight average uses the last **seven calendar days**, not the last seven logged measurements. Swimming deep-water skills should be practised with suitable supervision.
 
-For Google OAuth, see `SETUP-SUPABASE.md`.
+## Testing
+
+Local browser interaction tests covered: navigation, mobile layouts, set entry and completion, previous-load persistence, extra sets, timer, PR celebration, water entries, pool length / distance and interval entries, weigh-ins, light/dark preference, and reduced-motion mode. Layout checks were performed at 320, 390, 768, 1024 and 1440 px without page-level horizontal overflow.
+
+Live Google OAuth and Supabase synchronization still need to be verified against your configured Supabase project and deployed GitHub Pages domain.

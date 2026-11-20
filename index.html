@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101629" />
-  <meta name="description" content="Track push–pull–legs, swimming, weight and water with optional Google sign-in and cloud sync." />
+  <meta name="theme-color" content="#080e1c" />
+  <meta name="description" content="A polished mobile-first workout tracker for push–pull–legs, swimming, water and weight, with optional Google sign-in and cloud sync." />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Rep & Lap V2.1 — Training + Hydration</title>
+  <title>Rep & Lap V2.2 + V2.3 — Training redesigned</title>
 </head>
 <body>
   <div class="app-shell">
@@ -16,6 +16,8 @@
       <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><div><strong>rep<span>&</span>lap</strong><small>TRAINING HQ</small></div></div>
       <div class="nav-group-label">WORKSPACE</div>
       <nav class="side-nav" id="sideNav" aria-label="Views"></nav>
+      <div class="nav-group-label nav-group-secondary">TRACKERS</div>
+      <nav class="side-nav secondary-nav" id="secondaryNav" aria-label="Tracking tools"></nav>
       <div class="sidebar-spacer"></div>
       <div class="sidebar-coach">
         <div class="coach-icon" aria-hidden="true">✦</div>
@@ -33,7 +35,7 @@
         <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button><button class="theme-toggle settings-shortcut" id="headerSettings" type="button" aria-label="Settings" title="Settings">⚙</button><span class="saved-state" id="saveState"><span class="save-indicator"></span> Saved on this device</span><button id="headerToday" class="today-btn" type="button">This week</button></div>
       </header>
       <main id="app" class="content" tabindex="-1"></main>
-      <footer class="footer">Progress over perfection. <span>Rep & Lap · v2.1</span></footer>
+      <footer class="footer">Progress over perfection. <span>Rep & Lap · v2.2 + v2.3</span></footer>
     </div>
     <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation"></nav>
   </div>
@@ -42,6 +44,10 @@
     <div class="rest-clock" id="restCountdown" aria-live="off">01:30</div>
     <div class="rest-dock-buttons"><button type="button" data-action="extend-rest">+15s</button><button type="button" data-action="stop-rest">End</button></div>
     <div class="rest-progress"><span id="restProgress"></span></div>
+  </div>
+  <div id="celebration" class="celebration" role="dialog" aria-modal="true" aria-labelledby="celebrationTitle" hidden>
+    <div class="celebration-shade" data-action="close-celebration"></div>
+    <div class="celebration-card"><div id="confetti" class="confetti" aria-hidden="true"></div><div id="celebrationEmblem" class="celebration-emblem"></div><div class="eyebrow">A MOMENT WORTH CELEBRATING</div><h2 id="celebrationTitle">Workout complete.</h2><p id="celebrationCopy">Another step forward.</p><button class="primary-btn" type="button" id="closeCelebration" data-action="close-celebration">Keep going ${'<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>'}</button></div>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <input id="importFile" type="file" accept=".json,application/json" hidden />
