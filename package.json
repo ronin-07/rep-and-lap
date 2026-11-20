@@ -30,6 +30,6 @@
     "prettier": "^3.6.0"
   },
   "engines": {
-    "node": "22.x"
+    "node": "26.x"
   }
 }
