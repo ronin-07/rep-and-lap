@@ -24,7 +24,7 @@ service cloud.firestore {
         && d.exercise is string && d.exercise.size() > 0 && d.exercise.size() <= 160
         && d.index is int && d.index >= 0 && d.index <= 30
         && d.value is map
-        && d.value.keys().hasOnly(['id', 'kg', 'reps', 'done', 'deleted'])
+        && d.value.keys().hasOnly(['id', 'kg', 'reps', 'done', 'deleted', 'rir', 'rpe'])
         && d.value.get('id', '') == d.setId
         && ((d.value.get('kg', 0) is number && d.value.get('kg', 0) >= 0 && d.value.get('kg', 0) <= 1200)
           || (d.value.get('kg', '') is string && d.value.get('kg', '').size() <= 20))
@@ -32,6 +32,8 @@ service cloud.firestore {
           || (d.value.get('reps', '') is string && d.value.get('reps', '').size() <= 20))
         && d.value.get('done', false) is bool
         && d.value.get('deleted', false) is bool
+        && (!d.value.keys().hasAny(['rir']) || (d.value.rir is int && d.value.rir >= 0 && d.value.rir <= 4))
+        && (!d.value.keys().hasAny(['rpe']) || (d.value.rpe is number && d.value.rpe >= 6 && d.value.rpe <= 10))
         && d.revision is int && d.revision >= 1
         && d.updatedMs is int && d.updatedMs > 0
         && d.updatedBy == userId;

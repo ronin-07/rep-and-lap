@@ -8,6 +8,8 @@ import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,w
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
 import {history,loggedSet,num,setCount,validSet} from '@/lib/metrics';
+import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
+import {stableSetId} from '@/lib/set-sync';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'}|null;
 export function useTrainer(){
@@ -26,7 +28,9 @@ export function useTrainer(){
  const [syncMode,setSyncMode]=useState<SyncMode>('saved-local');
  const [toast,setToast]=useState('');
  const [celebration,setCelebration]=useState<Celebration>(null);
- const [restEnd,setRestEnd]=useState(0);
+ const [restState,setRestState]=useState<RestState|null>(null);
+ const restEnd=restState?.endsAt??0;
+ const [recoveryPrompt,setRecoveryPrompt]=useState<{week:string;day:Day}|null>(null);
  const [clock,setClock]=useState(Date.now());
  const [online,setOnline]=useState(true);
  const [installPrompt,setInstallPrompt]=useState<Event|null>(null);
@@ -38,6 +42,12 @@ export function useTrainer(){
  const toastTimeout=useRef<ReturnType<typeof setTimeout>|null>(null);
  const flushTimeout=useRef<ReturnType<typeof setTimeout>|null>(null);
  const mountedRef=useRef(true);
+ const restRef=useRef<RestState|null>(null);
+ const saveRest=useCallback((next:RestState|null)=>{
+  restRef.current=next;setRestState(next);
+  try {const key=`${REST_KEY}:${uidRef.current}`;if(next)localStorage.setItem(key,JSON.stringify(next));else localStorage.removeItem(key);}catch{}
+ },[]);
+ const beginRest=useCallback((seconds:number,target:NextSetTarget|null=null)=>{saveRest(makeRest(seconds,target));setClock(Date.now());},[saveRest]);
  const notify=useCallback((message:string)=>{setToast(message);if(toastTimeout.current)clearTimeout(toastTimeout.current);toastTimeout.current=setTimeout(()=>setToast(''),3000);},[]);
  const persist=useCallback((next:TrackerData)=>{
   dataRef.current=next;setData(next);
@@ -80,7 +90,7 @@ export function useTrainer(){
       if(uidRef.current!==uid)return;
       if(error instanceof SetVersionConflict){
         const next=structuredClone(dataRef.current);flagConflict(next,key,error.remote);persist(next);
-        setSyncMode('needs-attention');notify('A set was edited on another device. Review it in Settings.');
+        setSyncMode('needs-attention');notify('A set conflict needs your review.');
       }else {setFirebaseError(error instanceof Error?error.message:'Set sync failed');setSyncMode('needs-attention');}
     }).finally(()=>{inFlight.current.delete(inflightKey);});
   }
@@ -101,6 +111,7 @@ export function useTrainer(){
   const last=localStorage.getItem(LAST_ACCOUNT_KEY);
   try {const user=last?JSON.parse(last) as {id?:string}:null;uidRef.current=user?.id||'guest';}catch{uidRef.current='guest';}
   const stored=loadData(uidRef.current);dataRef.current=stored;setData(stored);
+  saveRest(parseRest(localStorage.getItem(`${REST_KEY}:${uidRef.current}`)));
   const oldTheme=localStorage.getItem(THEME_KEY);if(oldTheme==='dark'||oldTheme==='light')setTheme(oldTheme);
   setHydrated(true);
   if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
@@ -109,7 +120,7 @@ export function useTrainer(){
   const beforeInstall=(e:Event)=>{e.preventDefault();setInstallPrompt(e);};
   window.addEventListener('beforeinstallprompt',beforeInstall);
   return ()=>{mountedRef.current=false;window.removeEventListener('beforeinstallprompt',beforeInstall);};
- },[]);
+ },[saveRest]);
  useEffect(()=>{
   document.documentElement.dataset.theme=theme;
   const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',theme==='dark'?'#080e1c':'#f6f7fc');
@@ -124,6 +135,7 @@ export function useTrainer(){
       const previous=dataRef.current;try{saveData(uidRef.current,previous);}catch{}
       uidRef.current=newId;inFlight.current.clear();readyRef.current=false;serverRef.current=false;
       const fresh=loadData(newId);dataRef.current=fresh;setData(fresh);
+      restRef.current=parseRest(localStorage.getItem(`${REST_KEY}:${newId}`));setRestState(restRef.current);
     }
     setUser(nextUser);
     if(nextUser)localStorage.setItem(LAST_ACCOUNT_KEY,JSON.stringify({id:nextUser.uid,email:nextUser.email}));
@@ -158,17 +170,19 @@ export function useTrainer(){
  useEffect(()=>{if(!hydrated)return;
   const handleOnline=()=>{setOnline(true);void flush();};
   const handleOffline=()=>{setOnline(false);setSyncMode('saved-local');};
-  const handleFocus=()=>{if(navigator.onLine)void flush();};
+  const handleFocus=()=>{setClock(Date.now());if(navigator.onLine)void flush();};
+  const handleVisibility=()=>{if(document.visibilityState==='visible'){setClock(Date.now());if(navigator.onLine)void flush();}};
   window.addEventListener('online',handleOnline);window.addEventListener('offline',handleOffline);
-  window.addEventListener('focus',handleFocus);
+  window.addEventListener('focus',handleFocus);document.addEventListener('visibilitychange',handleVisibility);
   const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length))void flush();},30000);
-  return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);clearInterval(interval);};
+  return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);document.removeEventListener('visibilitychange',handleVisibility);clearInterval(interval);};
  },[hydrated,flush]);
  useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),15000);return ()=>clearInterval(interval);},[hydrated]);
  useEffect(()=>{
-   if(!restEnd||restEnd<=Date.now())return;
+   if(!restEnd)return;
    setClock(Date.now());
-   const id=setInterval(()=>setClock(Date.now()),1000);
+   if(restEnd<=Date.now())return;
+   const id=setInterval(()=>{const now=Date.now();setClock(now);if(now>=restEnd)clearInterval(id);},1000);
    return ()=>clearInterval(id);
  },[restEnd]);
  useEffect(()=>{
@@ -200,7 +214,8 @@ export function useTrainer(){
   update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};const t=w.timing[day]??={};
    if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;w.completedAt??={};w.completedAt[day]=at;
   },`session:${week}:${day}`);
-  if(!isDone)setCelebration({title:'Session complete!',body:`${PLAN[day].name} is in the books.`,kind:'session'});
+  if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
+  if(!isDone)setRecoveryPrompt({week,day});
   else notify('Session end time recorded.');
  };
  const rescheduleSession=(day:Day,date:string,targetWeek=week)=>{
@@ -234,7 +249,7 @@ export function useTrainer(){
    if(was){delete item.completedAt[day];}
    else {const at=new Date().toISOString();item.completedAt[day]=at;if(item.timing?.[day]?.startedAt&&!item.timing[day]?.endedAt)item.timing[day]!.endedAt=at;}
   },`session:${week}:${day}`);
-  if(!was)setCelebration({title:'Session complete!',body:`${PLAN[day].name} is in the books.`,kind:'session'});
+  if(!was){if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);setRecoveryPrompt({week,day});}
  };
  const editSet=(day:GymDay,exercise:string,index:number,change:(set:GymSet)=>void)=>{
   const next=structuredClone(dataRef.current);
@@ -268,16 +283,40 @@ export function useTrainer(){
   const previousBest=earlier.length?Math.max(...earlier.map(x=>x.best)):null;
   const was=!!current?.done;
   editSet(day,exercise,index,set=>{set.done=!was;set.deleted=false;});
-  if(!was){setRestEnd(Date.now()+(dataRef.current.restSeconds||90)*1000);
+  if(!was){
+   const target=nextIncompleteSet(dataRef.current,week,day,exercise,index);
+   if(target)beginRest(dataRef.current.restSeconds||90,target);
+   else saveRest(null); // The final set never leaves a pointless rest countdown.
    if(previousBest!==null&&num(current?.kg)>previousBest)setCelebration({title:'New personal record!',body:`${exercise}: ${num(current?.kg)} kg`,kind:'pr'});
-   else notify('Set logged. Rest timer started.');
+   else notify(target?'Set logged · rest timer running':'All planned sets logged. Nice work!');
+  }else if(restRef.current)saveRest(null);
+ };
+ const usePrevious=(day:GymDay,exercise:string,index:number,onlyBlank=false)=>{
+  const old=previousCompletedSet(dataRef.current,week,day,exercise,index);
+  if(!old){notify('No earlier logged set for this exercise.');return;}
+  const current=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];
+  if(onlyBlank&&(current?.kg!==undefined&&current?.kg!==''||current?.reps!==undefined&&current?.reps!==''))return;
+  editSet(day,exercise,index,set=>{set.kg=old.kg;set.reps=old.reps;set.done=false;set.deleted=false;});
+  notify('Previous weight and reps filled. Review before logging.');
+ };
+ const setEffort=(day:GymDay,exercise:string,index:number,mode:'rir'|'rpe',raw:string)=>{
+  if(raw!==''&&!validEffort(mode,Number(raw))){notify('Choose a valid effort value.');return;}
+  editSet(day,exercise,index,set=>{delete set[mode==='rir'?'rpe':'rir'];if(raw==='')delete set[mode];else set[mode]=Number(raw);});
+ };
+ const goToNextSet=()=>{
+  const target=restRef.current?.target;
+  saveRest(null);
+  if(!target)return;
+  setWeek(target.week);setGymDay(target.day);setTrackingTab('gym');setView('workout');
+  const entry=dataRef.current.weeks[target.week]?.gym?.[target.day]?.[target.exercise]?.sets[target.index];
+  if((entry?.kg===undefined||entry.kg==='')&&(entry?.reps===undefined||entry.reps==='')){
+   const old=suggestedNextSet(dataRef.current,target.week,target.day,target.exercise,target.index);
+   if(old){const next=structuredClone(dataRef.current);queueSetChange(next,`session:${target.week}:${target.day}`,target.exercise,target.index,set=>{set.kg=old.kg;set.reps=old.reps;set.done=false;});persist(next);if(uidRef.current!=='guest')scheduleFlush();}
   }
+  const id=`set-kg-${stableSetId(target.exercise,target.index)}`;
+  setTimeout(()=>{const field=document.getElementById(id) as HTMLInputElement|null;field?.scrollIntoView({behavior:'smooth',block:'center'});field?.focus({preventScroll:true});},60);
  };
- const usePrevious=(day:GymDay,exercise:string,index:number)=>{
-  const old=history(dataRef.current,day,exercise).filter(x=>x.week<week).at(-1)?.sets[index];
-  if(!old||!loggedSet(old))return;
-  gymField(day,exercise,index,'kg',String(old.kg));
- };
+ const closeRecoveryPrompt=()=>{const prompt=recoveryPrompt;setRecoveryPrompt(null);if(prompt)setCelebration({title:'Session complete!',body:`${PLAN[prompt.day].name} is in the books.`,kind:'session'});};
  const swimField=(day:SwimDay,field:string,value:string|number|boolean)=>update(d=>{
   const w=d.weeks[week]??=weekBlank(),item=w.swim[day]??={drills:{}};
   (item as unknown as Record<string,unknown>)[field]=value;
@@ -295,7 +334,7 @@ export function useTrainer(){
  },`session:${week}:${day}`);
  const deleteInterval=(day:SwimDay,index:number)=>update(d=>{const item=d.weeks[week]?.swim?.[day];if(item)item.intervals?.splice(index,1);},`session:${week}:${day}`);
  const noteField=(day:Day,field:keyof SessionNotes,value:string)=>update(d=>{
-  const w=d.weeks[week]??=weekBlank();w.sessionNotes??={};const notes=w.sessionNotes[day]??={};notes[field]=value;w.sessionNotes[day]=notes;
+  const w=d.weeks[week]??=weekBlank();w.sessionNotes??={};const notes=w.sessionNotes[day]??={};if(field==='sessionRpe')notes.sessionRpe=value===''?undefined:Number(value);else notes[field]=value;w.sessionNotes[day]=notes;
  },`session:${week}:${day}`);
  const addWater=(amount:number,date=keyOf(new Date()))=>{
   if(amount<25||amount>2000){notify('Enter a drink between 25 and 2,000 mL.');return;}
@@ -309,7 +348,7 @@ export function useTrainer(){
   notify('Weigh-in recorded.');
  };
  const deleteWeight=(date:string)=>{if(!confirm('Remove this weigh-in?'))return;update(d=>{d.weights[date]={deleted:true};},`weight:${date}`);};
- const updatePreferences=(change:Partial<Pick<TrackerData,'restSeconds'|'targetWeight'|'reminders'>>)=>update(d=>{Object.assign(d,change);},'preferences');
+ const updatePreferences=(change:Partial<Pick<TrackerData,'restSeconds'|'targetWeight'|'reminders'|'effortMode'>>)=>update(d=>{Object.assign(d,change);},'preferences');
  const backup=()=>downloadFile(`rep-and-lap-backup-${keyOf(new Date())}.json`,JSON.stringify({...dataRef.current,exportedAt:new Date().toISOString(),app:'Rep & Lap'},null,2));
  const restore=async(file:File)=>{
   try{
@@ -341,7 +380,7 @@ export function useTrainer(){
   const rows:string[][]=[];
   if(kind==='water'){rows.push(['date','timestamp','millilitres']);for(const item of Object.values(dataRef.current.waterLogs))if(!item.deleted)rows.push([item.date,item.at,String(item.ml)]);}
   if(kind==='weight'){rows.push(['date','kg','notes']);for(const [date,item] of Object.entries(dataRef.current.weights))if(!item.deleted)rows.push([date,String(item.kg??''),item.note||'']);}
-  if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
+  if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','rir','rpe','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),String(s.rir??''),String(s.rpe??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
   if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']);}
   const csv=rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
   downloadFile(`rep-and-lap-${kind}-${keyOf(new Date())}.csv`,csv,'text/csv');
@@ -357,6 +396,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,clock,startRest:(sec?:number)=>setRestEnd(Date.now()+(sec||data.restSeconds)*1000),stopRest:()=>setRestEnd(0),extendRest:()=>setRestEnd(v=>v+15000),installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

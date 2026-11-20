@@ -8,7 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run tests/metrics.test.ts tests/data-safety.test.ts",
+    "test": "vitest run tests/metrics.test.ts tests/data-safety.test.ts tests/workout-flow.test.ts",
     "format": "prettier --write app components hooks lib tests",
     "format:check": "prettier --check app components hooks lib tests",
     "test:rules": "firebase emulators:exec --project replap-rules-tests --only firestore \"vitest run tests/firestore.rules.test.ts\""

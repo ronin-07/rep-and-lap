@@ -1,3 +1,7 @@
+> **Development branch `feature/v3.2`: Milestone 2 workout-flow update.** See [RELEASE-MILESTONE-2.md](RELEASE-MILESTONE-2.md). Do not merge to production until all five milestones are tested.
+
+> **New (v3.2 Milestone 1):** Read [RELEASE-MILESTONE-1.md](./RELEASE-MILESTONE-1.md) before deploying. It requires publishing updated Firestore rules before installing this app update.
+
 # RepLap — React + TypeScript + Next.js on Vercel
 
 **Rep & Lap** is a mobile-first gym, swimming, hydration and weight-tracking PWA built with **Next.js App Router, React, TypeScript, Firebase Authentication and Cloud Firestore**. This edition is configured for **Vercel hosting at `/`**, rather than the old GitHub Pages `/rep-and-lap/` path.

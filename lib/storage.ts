@@ -3,7 +3,7 @@ import {DAYS, type TrackerData, type WeekLog, type Day} from './types';
 export const STORAGE_KEY='rep-and-lap-firebase-v1'; // Reuse existing Firebase edition cache, no data reset.
 export const LAST_ACCOUNT_KEY='rep-and-lap-firebase-last-account';
 export const THEME_KEY='rep-and-lap-theme';
-export function blankData():TrackerData {return {version:3,setRecords:{},pendingSets:{},setConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
+export function blankData():TrackerData {return {version:3,setRecords:{},pendingSets:{},setConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,effortMode:'off',recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
 export function weekBlank():WeekLog{return {done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{}};}
 export function loadData(uid:string):TrackerData {
   if(typeof window==='undefined')return blankData();
@@ -11,7 +11,7 @@ export function loadData(uid:string):TrackerData {
     const value=JSON.parse(localStorage.getItem(`${STORAGE_KEY}:${uid}`)||'null');
     if(!value||typeof value.weeks!=='object'||Array.isArray(value.weeks))return blankData();
     const result:TrackerData={...blankData(),...value};
-    result.weights||={};result.waterLogs||={};result.recordUpdates||={};result.pendingSync||={};result.setOverrides||={};
+    if(!['off','rir','rpe'].includes(result.effortMode))result.effortMode='off';result.weights||={};result.waterLogs||={};result.recordUpdates||={};result.pendingSync||={};result.setOverrides||={};
     if(!Object.keys(result.recordUpdates).length) {
       const t=Date.now()-60_000;
       for(const [w,entry] of Object.entries(result.weeks))for(const day of DAYS)
@@ -24,7 +24,7 @@ export function loadData(uid:string):TrackerData {
 }
 export function saveData(uid:string,data:TrackerData) {localStorage.setItem(`${STORAGE_KEY}:${uid}`,JSON.stringify(data));}
 export function recordPayload(data:TrackerData,key:string):unknown {
-  if(key==='preferences')return {setOverrides:data.setOverrides,targetWeight:data.targetWeight,restSeconds:data.restSeconds,reminders:data.reminders};
+  if(key==='preferences')return {setOverrides:data.setOverrides,targetWeight:data.targetWeight,restSeconds:data.restSeconds,effortMode:data.effortMode,reminders:data.reminders};
   if(key.startsWith('weight:'))return data.weights[key.slice(7)]??{deleted:true};
   if(key.startsWith('water:'))return data.waterLogs[key.slice(6)]??{deleted:true};
   if(key.startsWith('session:')){
@@ -37,7 +37,7 @@ export function applyRecord(data:TrackerData,key:string,value:unknown):TrackerDa
   const next:TrackerData=structuredClone(data);
   if(key==='preferences'){
     const p=(value||{}) as Partial<TrackerData>;
-    next.setOverrides=p.setOverrides||{};next.targetWeight=p.targetWeight??'';next.restSeconds=p.restSeconds||90;next.reminders=p.reminders||{enabled:false,time:'18:00'};
+    next.setOverrides=p.setOverrides||{};next.targetWeight=p.targetWeight??'';next.restSeconds=p.restSeconds||90;next.effortMode=['off','rir','rpe'].includes(p.effortMode||'')?p.effortMode!:'off';next.reminders=p.reminders||{enabled:false,time:'18:00'};
   }else if(key.startsWith('weight:'))next.weights[key.slice(7)]=(value||{deleted:true}) as TrackerData['weights'][string];
   else if(key.startsWith('water:'))next.waterLogs[key.slice(6)]=(value||{deleted:true}) as TrackerData['waterLogs'][string];
   else if(key.startsWith('session:')){

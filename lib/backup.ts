@@ -33,6 +33,8 @@ function validateWeek(week:unknown){
           const ex=safeRecord(exercise,'exercise',6);check(Array.isArray(ex.sets)&&ex.sets.length<=30,'Invalid exercise sets');
           for(const set of ex.sets){if(set==null)continue;const s=safeRecord(set,'set',9);
             check(saneScalar(s.kg,1200)&&saneScalar(s.reps,1000),'Invalid set numbers');
+            if(s.rir!==undefined)check(typeof s.rir==='number'&&Number.isInteger(s.rir)&&s.rir>=0&&s.rir<=4,'Invalid set RIR');
+            if(s.rpe!==undefined)check(typeof s.rpe==='number'&&s.rpe>=6&&s.rpe<=10&&s.rpe*2===Math.round(s.rpe*2),'Invalid set RPE');
             check(s.done===undefined||typeof s.done==='boolean','Invalid completed set');
             check(s.deleted===undefined||typeof s.deleted==='boolean','Invalid deleted set');
             if(s.id!==undefined)check(typeof s.id==='string'&&/^s-[a-f0-9]{8}-\d{1,2}$/.test(s.id),'Invalid set ID');
@@ -85,6 +87,7 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
   }
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];
   if(typeof raw.restSeconds==='number'&&raw.restSeconds>=15&&raw.restSeconds<=600)base.restSeconds=raw.restSeconds;
+  if(raw.effortMode==='off'||raw.effortMode==='rir'||raw.effortMode==='rpe')base.effortMode=raw.effortMode;
   if(object(raw.reminders)&&typeof raw.reminders.enabled==='boolean'&&typeof raw.reminders.time==='string')base.reminders={enabled:raw.reminders.enabled,time:raw.reminders.time};
   // Derived revisions, pending cloud writes, remote snapshots and conflicts are intentionally discarded.
   // The validated gym values in weeks are the portable source of truth for restore.

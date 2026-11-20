@@ -32,6 +32,13 @@ describe('Gym set security rules (Firestore emulator)',()=>{
     await assertFails(updateDoc(ref,{revision:3}));
     await assertSucceeds(updateDoc(ref,{revision:2}));
   });
+  it('accepts optional RIR/RPE and rejects invalid effort numbers',async()=>{
+    const db=env.authenticatedContext('alice').firestore(),ref=doc(db,'users/alice/gymSets',id);
+    await assertSucceeds(setDoc(ref,{...payload('alice',1),value:{...payload('alice',1).value,rir:2}}));
+    await assertSucceeds(updateDoc(ref,{revision:2,value:{...payload('alice',1).value,rpe:8.5}}));
+    await assertFails(updateDoc(ref,{revision:3,value:{...payload('alice',1).value,rir:8}}));
+    await assertFails(updateDoc(ref,{revision:3,value:{...payload('alice',1).value,rpe:12}}));
+  });
   it('prevents identity swaps, malformed sets and hard deletes',async()=>{
     const db=env.authenticatedContext('alice').firestore(),ref=doc(db,'users/alice/gymSets',id);
     await assertFails(setDoc(ref,{...payload('alice',1),index:99}));

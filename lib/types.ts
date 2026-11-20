@@ -2,12 +2,12 @@ export const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturda
 export type Day = typeof DAYS[number];
 export type GymDay = 'Monday'|'Tuesday'|'Wednesday';
 export type SwimDay = 'Thursday'|'Friday'|'Saturday';
-export type View = 'home'|'workout'|'progress'|'profile'|'settings';
+export type View = 'home'|'workout'|'progress'|'profile'|'settings'|'conflicts';
 export type TrackingTab = 'gym'|'swim'|'water'|'weight';
 export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration';
 export type InputNumber = number|string;
 export type SyncMode = 'saved-local'|'syncing'|'synced'|'needs-attention'|'checking';
-export interface GymSet {id?:string;kg?:InputNumber;reps?:InputNumber;done?:boolean;deleted?:boolean}
+export interface GymSet {id?:string;kg?:InputNumber;reps?:InputNumber;done?:boolean;deleted?:boolean;rir?:number;rpe?:number}
 // Individual gym sets sync independently; a session's older gym payload remains a read-only fallback.
 export interface SetDocument {
   key:string; sessionKey:string; setId:string; exercise:string; index:number;
@@ -27,7 +27,7 @@ export interface SwimLog {
   breaststroke?:string;notes?:string;drills?:Record<string,boolean>;intervals?:SwimInterval[];
 }
 export interface SessionTiming {startedAt?:string; endedAt?:string}
-export interface SessionNotes {fatigue?:string;discomfort?:string;technique?:string;general?:string}
+export interface SessionNotes {fatigue?:string;discomfort?:string;technique?:string;general?:string;soreness?:string;sessionRpe?:number}
 export interface WeekLog {
   done:Partial<Record<Day,boolean>>;
   gym:Partial<Record<GymDay,Record<string,ExerciseLog>>>;
@@ -39,7 +39,7 @@ export interface WeekLog {
 }
 export interface WeighIn {kg?:InputNumber;note?:string;deleted?:boolean}
 export interface WaterEntry {date:string;ml:number;at:string;deleted?:boolean}
-export interface Preferences {setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;reminders:{enabled:boolean;time:string}}
+export interface Preferences {setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
 export interface TrackerData extends Preferences {
   version:number;weeks:Record<string,WeekLog>;weights:Record<string,WeighIn>;
   waterLogs:Record<string,WaterEntry>;recordUpdates:Record<string,number>;pendingSync:Record<string,number>;
