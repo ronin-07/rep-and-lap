@@ -462,3 +462,28 @@ main.content{animation:pageGlide .38s cubic-bezier(.18,.8,.2,1) both}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.chart-line-animated{stroke-dashoffset:0!important}.celebration-card{opacity:1!important;transform:none!important}}
 
 .heatmap-layout{display:flex;align-items:stretch;gap:8px}.heatmap-layout .heatmap{flex:1;min-width:0}.heatmap-day-labels{display:grid;grid-template-rows:16px repeat(6,12px);gap:5px;flex:0 0 10px;margin:11px 0;color:var(--muted);font-size:8px;align-items:center;justify-items:center}
+
+/* Practical workout experience, offline status and install controls */
+.saved-state{display:inline-flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;max-width:230px}
+.saved-state .save-indicator{display:block;flex:none;width:8px;height:8px;border-radius:50%;background:#b7a2ff;box-shadow:0 0 0 3px #9a84ff26}
+.saved-state[data-state="synced"] .save-indicator{background:#55d9b0;box-shadow:0 0 0 3px #55d9b026}
+.saved-state[data-state="attention"] .save-indicator{background:#f5a16b;box-shadow:0 0 0 3px #f5a16b28}
+.saved-state[data-state="syncing"] .save-indicator{background:#78b4ff;animation:sync-pulse 1.2s ease-in-out infinite}
+@keyframes sync-pulse{50%{opacity:.35;transform:scale(.72)}}
+.sync-pill[data-state="synced"]{color:#77ddc9;background:#154339;border-color:#1d6255}
+.sync-pill[data-state="attention"]{color:#ffb58a;background:#4c312a;border-color:#81533f}
+.session-notes{margin-top:18px}
+.session-notes .section-heading h3{font-size:17px;margin:0 0 4px}
+.session-notes .section-heading p{font-size:12px;opacity:.8;margin:0}
+.session-notes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.session-notes-grid .field:last-child{grid-column:1/-1}
+.session-notes-grid textarea{min-height:78px;resize:vertical;font:inherit;line-height:1.45}
+.reminder-setting{display:flex;align-items:center;flex-wrap:wrap;gap:16px;justify-content:space-between;margin-bottom:12px}
+.reminder-toggle{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:700;cursor:pointer}
+.reminder-toggle input{accent-color:#7772e9;width:18px;height:18px;cursor:pointer}
+.reminder-setting .field{min-width:140px;max-width:165px}
+.setting-card .setting-fine{display:block;line-height:1.5;font-size:11px;color:var(--muted,#8e9aaf)}
+.setting-card .inline-success{color:#4bc5a4;font-size:12px;font-weight:700;align-self:center}
+@media(max-width:690px){.session-notes-grid{grid-template-columns:1fr}.session-notes-grid .field:last-child{grid-column:auto}}
+@media(max-width:590px){.saved-state{max-width:126px;font-size:10px;overflow:hidden;text-overflow:ellipsis}.reminder-setting{align-items:stretch}.reminder-setting .field{max-width:none}}
+@media(prefers-reduced-motion:reduce){.saved-state .save-indicator{animation:none!important}}
