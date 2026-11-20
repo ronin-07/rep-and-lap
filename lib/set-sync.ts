@@ -1,7 +1,7 @@
 import type {GymSet,PendingSetWrite,SetDocument,TrackerData,GymDay,WeekLog} from './types';
-const weekBlank=():WeekLog=>({done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{}});
+const weekBlank=():WeekLog=>({done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{},scheduleStatus:{},routineOverrides:{}});
 
-export const DATA_SCHEMA_VERSION=3;
+export const DATA_SCHEMA_VERSION=4;
 export function stableSetId(exercise:string,index:number):string {
   // Deterministic IDs let two devices upgrade pre-v3 sets without duplicating them.
   let hash=2166136261;
@@ -18,7 +18,7 @@ export function normalizeSets(data:TrackerData):TrackerData {
   data.setRecords??={};data.pendingSets??={};data.setConflicts??={};
   for(const entry of Object.values(data.weeks||{})) {
     entry.done??={};entry.gym??={};entry.swim??={};
-    entry.sessionNotes??={};entry.timing??={};entry.schedule??={};entry.completedAt??={};
+    entry.sessionNotes??={};entry.timing??={};entry.schedule??={};entry.completedAt??={};entry.scheduleStatus??={};entry.routineOverrides??={};
     for(const exercises of Object.values(entry.gym))for(const [exercise,log] of Object.entries(exercises||{})){
       if(!Array.isArray(log?.sets))continue;
       log.sets.forEach((set,index)=>{if(set&&!set.id)set.id=stableSetId(exercise,index);});

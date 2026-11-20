@@ -1,7 +1,9 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval} from '@/lib/types';
+import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise} from '@/lib/types';
 import {PLAN} from '@/lib/plan';
+import {exercisesFor,editRoutine,cloneExercises} from '@/lib/routines';
+import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
 import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet} from '@/lib/firebase';
@@ -205,32 +207,45 @@ export function useTrainer(){
   const session=dataRef.current.weeks[week]?.timing?.[day];
   if(session?.startedAt&&!session.endedAt){notify('This session is already running.');return;}
   if(dataRef.current.weeks[week]?.done?.[day]||session?.endedAt){notify('This session was already finished.');return;}
+  if(statusFor(dataRef.current,week,day)!=='scheduled'&&!confirm('This was marked as a rest or skipped day. Restore the workout and start?'))return;
   const at=new Date().toISOString();
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]={startedAt:at};},`session:${week}:${day}`);
+  update(d=>{const w=d.weeks[week]??=weekBlank();if(w.scheduleStatus)delete w.scheduleStatus[day];w.timing??={};w.timing[day]={startedAt:at};
+    if(PLAN[day].kind==='gym'){w.routineOverrides??={};w.routineOverrides[day as GymDay]??=cloneExercises(exercisesFor(d,week,day as GymDay));}
+  },`session:${week}:${day}`);
   notify('Workout timer started. You can keep logging sets.');
  };
  const finishSession=(day:Day)=>{
   const at=new Date().toISOString();const isDone=!!dataRef.current.weeks[week]?.done?.[day];
   update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};const t=w.timing[day]??={};
-   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;w.completedAt??={};w.completedAt[day]=at;
+   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;
   },`session:${week}:${day}`);
   if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
   if(!isDone)setRecoveryPrompt({week,day});
   else notify('Session end time recorded.');
  };
  const rescheduleSession=(day:Day,date:string,targetWeek=week)=>{
-  const parsed=dateFor(date);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||keyOf(parsed)!==date){notify('Choose a valid date.');return;}
+  if(!isValidDate(date)){notify('Choose a valid date.');return;}
   if(dataRef.current.weeks[targetWeek]?.done?.[day]){notify('Completed sessions cannot be moved.');return;}
-  update(d=>{const w=d.weeks[targetWeek]??=weekBlank();w.schedule??={};w.schedule[day]=date;},`session:${targetWeek}:${day}`);
+  if(dataRef.current.weeks[targetWeek]?.timing?.[day]?.startedAt&&!dataRef.current.weeks[targetWeek]?.timing?.[day]?.endedAt){notify('Finish or cancel the active session before moving it.');return;}
+  update(d=>{const w=d.weeks[targetWeek]??=weekBlank();w.schedule??={};w.schedule[day]=date;if(w.scheduleStatus)delete w.scheduleStatus[day];},`session:${targetWeek}:${day}`);
   notify(`${PLAN[day].name} moved to ${date}.`);
+ };
+ const setScheduleStatus=(day:Day,status:ScheduleStatus|null,targetWeek=week)=>{
+  const record=dataRef.current.weeks[targetWeek];
+  if(record?.done?.[day]){notify('Completed workouts cannot be marked as rest or skipped.');return;}
+  if(record?.timing?.[day]?.startedAt&&!record.timing[day]?.endedAt){notify('Finish this active session before changing the schedule.');return;}
+  update(d=>{const w=d.weeks[targetWeek]??=weekBlank();w.scheduleStatus??={};if(status)w.scheduleStatus[day]=status;else delete w.scheduleStatus[day];},`session:${targetWeek}:${day}`);
+  notify(status==='rest'?'Recovery day saved. Your streak will not be penalized.':status==='skipped'?'Workout marked as skipped.': 'Workout restored to the schedule.');
  };
  const catchUpWeek=(targetWeek=week)=>{
   const today=keyOf(new Date()),current=dataRef.current.weeks[targetWeek]??weekBlank();
-  const pending=DAYS.filter(day=>!current.done?.[day]).map(day=>({day,date:current.schedule?.[day]||dateForWeek(targetWeek,day)})).sort((a,b)=>a.date.localeCompare(b.date));
+  const pending=DAYS.filter(day=>!current.done?.[day]&&!current.scheduleStatus?.[day]).map(day=>({day,date:current.schedule?.[day]||dateForWeek(targetWeek,day)})).sort((a,b)=>a.date.localeCompare(b.date));
   if(!pending.some(x=>x.date<today)){notify('No missed sessions in this week.');return;}
   const used=new Set<string>();
   // Already completed days stay fixed. Rescheduling never changes any exercise logs.
-  for(const day of DAYS)if(current.done[day])used.add(current.schedule?.[day]||dateForWeek(targetWeek,day));
+  for(const day of DAYS)if(current.done[day]||current.scheduleStatus?.[day])used.add(current.schedule?.[day]||dateForWeek(targetWeek,day));
+  // Respect sessions already planned from other weeks so catch-up won't silently collide.
+  for(const [otherWeek] of Object.entries(dataRef.current.weeks))if(otherWeek!==targetWeek)for(const day of DAYS){const otherStatus=statusFor(dataRef.current,otherWeek,day);if(otherStatus==='scheduled'||otherStatus==='completed')used.add(scheduledDate(dataRef.current,otherWeek,day));}
   let cursor=today;const assignments=new Map<Day,string>();
   for(const item of pending){
    let target=item.date>=cursor&&!used.has(item.date)?item.date:cursor;
@@ -245,7 +260,8 @@ export function useTrainer(){
  const toggleDone=(day:Day)=>{
   const was=!!dataRef.current.weeks[week]?.done?.[day];
   if(was&&!confirm('Mark this session incomplete? All logged sets and workout time will be kept.'))return;
-  update(d=>{const item=d.weeks[week]??=weekBlank();item.done[day]=!was;item.completedAt??={};
+  if(!was&&statusFor(dataRef.current,week,day)!=='scheduled'&&!confirm('Restore this skipped or rest session and mark it complete?'))return;
+  update(d=>{const item=d.weeks[week]??=weekBlank();item.done[day]=!was;if(!was&&item.scheduleStatus)delete item.scheduleStatus[day];item.completedAt??={};
    if(was){delete item.completedAt[day];}
    else {const at=new Date().toISOString();item.completedAt[day]=at;if(item.timing?.[day]?.startedAt&&!item.timing[day]?.endedAt)item.timing[day]!.endedAt=at;}
   },`session:${week}:${day}`);
@@ -253,6 +269,9 @@ export function useTrainer(){
  };
  const editSet=(day:GymDay,exercise:string,index:number,change:(set:GymSet)=>void)=>{
   const next=structuredClone(dataRef.current);
+  const w=next.weeks[week]??=weekBlank();
+  if(!w.routineOverrides?.[day]){w.routineOverrides??={};w.routineOverrides[day]=cloneExercises(exercisesFor(next,week,day));
+    const key=`session:${week}:${day}`;const stamp=Math.max(Date.now(),(next.recordUpdates[key]||0)+1);next.recordUpdates[key]=stamp;next.pendingSync[key]=stamp;}
   queueSetChange(next,`session:${week}:${day}`,exercise,index,change);
   persist(next);if(uidRef.current!=='guest')scheduleFlush();
  };
@@ -275,6 +294,32 @@ export function useTrainer(){
   }else update(d=>{const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={},entry=ex[exercise]??={sets:[]};
     entry.setCount=next;ex[exercise]=entry;d.setOverrides[`${day}|${exercise}`]=next;
   },'preferences');
+ };
+ const changeRoutine=(day:GymDay,kind:'add'|'remove'|'move'|'replace',index:number,payload?:RoutineExercise|number)=>{
+  try {
+   const existing=exercisesFor(dataRef.current,week,day);
+   if((kind==='remove'||kind==='replace')&&existing[index]){
+    const archived=dataRef.current.weeks[week]?.gym?.[day]?.[existing[index].name];
+    if(archived?.sets?.some(s=>s.done&&!s.deleted)&&!confirm('This exercise has logged sets. Hide it from the current routine? Its recorded sets will remain in history.'))return;
+   }
+   const changed=editRoutine(existing,kind,index,payload);
+   if((kind==='remove'||kind==='replace')&&restRef.current?.target?.week===week&&restRef.current?.target?.day===day&&restRef.current?.target?.exercise===existing[index]?.name)saveRest(null);
+   update(d=>{const w=d.weeks[week]??=weekBlank();w.routineOverrides??={};w.routineOverrides[day]=changed;},`session:${week}:${day}`);
+   notify('This session’s routine updated.');
+  }catch(error){notify(error instanceof Error?error.message:'Routine change failed.');}
+ };
+ const saveRoutineDefault=(day:GymDay)=>{
+  const exercises=cloneExercises(exercisesFor(dataRef.current,week,day));
+  update(d=>{d.routineTemplates[day]=exercises;},'preferences');
+  notify('Saved as your default for future sessions.');
+ };
+ const resetSessionRoutine=(day:GymDay)=>{
+  if(!confirm('Restore the default exercise list for this session? Logged sets stay in history.'))return;
+  update(d=>{const w=d.weeks[week]??=weekBlank();if(w.routineOverrides)delete w.routineOverrides[day];},`session:${week}:${day}`);
+ };
+ const resetDefaultRoutine=(day:GymDay)=>{
+  if(!confirm('Reset your saved default routine for this day?'))return;
+  update(d=>{delete d.routineTemplates[day];},'preferences');
  };
  const logSet=(day:GymDay,exercise:string,index:number)=>{
   const current=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];
@@ -396,6 +441,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

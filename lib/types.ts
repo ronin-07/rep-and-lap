@@ -4,7 +4,9 @@ export type GymDay = 'Monday'|'Tuesday'|'Wednesday';
 export type SwimDay = 'Thursday'|'Friday'|'Saturday';
 export type View = 'home'|'workout'|'progress'|'profile'|'settings'|'conflicts';
 export type TrackingTab = 'gym'|'swim'|'water'|'weight';
-export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration';
+export type ProgressTab = 'overview'|'calendar'|'strength'|'swimming'|'weight'|'hydration';
+export type ScheduleStatus = 'rest'|'skipped';
+export interface RoutineExercise {name:string;sets:number;reps:string;muscles:string}
 export type InputNumber = number|string;
 export type SyncMode = 'saved-local'|'syncing'|'synced'|'needs-attention'|'checking';
 export interface GymSet {id?:string;kg?:InputNumber;reps?:InputNumber;done?:boolean;deleted?:boolean;rir?:number;rpe?:number}
@@ -36,10 +38,12 @@ export interface WeekLog {
   timing?:Partial<Record<Day,SessionTiming>>;
   schedule?:Partial<Record<Day,string>>;
   completedAt?:Partial<Record<Day,string>>;
+  scheduleStatus?:Partial<Record<Day,ScheduleStatus>>;
+  routineOverrides?:Partial<Record<GymDay,RoutineExercise[]>>;
 }
 export interface WeighIn {kg?:InputNumber;note?:string;deleted?:boolean}
 export interface WaterEntry {date:string;ml:number;at:string;deleted?:boolean}
-export interface Preferences {setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
+export interface Preferences {routineTemplates:Partial<Record<GymDay,RoutineExercise[]>>;setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
 export interface TrackerData extends Preferences {
   version:number;weeks:Record<string,WeekLog>;weights:Record<string,WeighIn>;
   waterLogs:Record<string,WaterEntry>;recordUpdates:Record<string,number>;pendingSync:Record<string,number>;

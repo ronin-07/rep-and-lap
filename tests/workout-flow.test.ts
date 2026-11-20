@@ -33,7 +33,7 @@ describe('next-set navigation and safe autofill',()=>{
   expect(nextIncompleteSet(data,week,day,exercise,0)).toEqual({week,day,exercise,index:1});
  });
  it('does not start a timer when all prescribed sets are logged',()=>{
-  const data=blankData();data.weeks[week]=weekBlank();
+  const data=blankData();data.weeks[week]=weekBlank();data.weeks[week].gym.Monday={};
   for(const ex of plan.exercises)data.weeks[week].gym.Monday![ex.name]={sets:Array.from({length:ex.sets},()=>({kg:60,reps:10,done:true}))};
   expect(nextIncompleteSet(data,week,day,exercise,0)).toBeNull();
  });

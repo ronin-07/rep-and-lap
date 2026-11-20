@@ -1,4 +1,4 @@
-import {PLAN} from './plan';
+import {exercisesFor} from './routines';
 import {gymStats,setCount,loggedSet} from './metrics';
 import type {GymDay,GymSet,TrackerData} from './types';
 
@@ -7,8 +7,7 @@ export interface RestState {startedAt:number;endsAt:number;durationSeconds:numbe
 export const REST_KEY='replap-rest-v1';
 
 export function nextIncompleteSet(data:TrackerData,week:string,day:GymDay,afterExercise:string,afterIndex:number):NextSetTarget|null {
- const plan=PLAN[day];if(plan.kind!=='gym')return null;
- const positions=plan.exercises.flatMap(ex=>Array.from({length:setCount(data,week,day,ex.name)},(_,index)=>({week,day,exercise:ex.name,index})));
+ const positions=exercisesFor(data,week,day).flatMap(ex=>Array.from({length:setCount(data,week,day,ex.name)},(_,index)=>({week,day,exercise:ex.name,index})));
  const current=positions.findIndex(x=>x.exercise===afterExercise&&x.index===afterIndex);
  const following=current<0?positions:[...positions.slice(current+1),...positions.slice(0,current+1)];
  return following.find(x=>!loggedSet(data.weeks[week]?.gym?.[day]?.[x.exercise]?.sets[x.index]))||null;

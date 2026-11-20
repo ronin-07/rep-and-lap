@@ -8,7 +8,7 @@ function legacy(){const d=blankData();d.version=2;d.weeks[wk]=weekBlank();d.week
 describe('v3 legacy migration and individual set operation safety',()=>{
  it('preserves legacy sets and assigns deterministic stable IDs',()=>{
   const d=normalizeSets(legacy());
-  expect(d.version).toBe(3);
+  expect(d.version).toBe(4);
   expect(d.weeks[wk].gym.Monday?.[exercise].sets[0].id).toBe(stableSetId(exercise,0));
   expect(normalizeSets(d).weeks[wk].gym.Monday?.[exercise].sets[0].kg).toBe('60');
  });

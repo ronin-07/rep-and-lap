@@ -1,3 +1,5 @@
+> **Development branch:** v3.2 Milestone 3 adds training calendar, rest/skip/reschedule workflows, editable gym routines, schema v4 and routine-aware rest navigation. See [Milestone 3 release notes](RELEASE-MILESTONE-3.md). Do not merge into `main` before all milestones are tested.
+
 > **Development branch `feature/v3.2`: Milestone 2 workout-flow update.** See [RELEASE-MILESTONE-2.md](RELEASE-MILESTONE-2.md). Do not merge to production until all five milestones are tested.
 
 > **New (v3.2 Milestone 1):** Read [RELEASE-MILESTONE-1.md](./RELEASE-MILESTONE-1.md) before deploying. It requires publishing updated Firestore rules before installing this app update.
@@ -26,7 +28,7 @@ No Firestore migration or rules change is needed. It uses the same `users/{uid}`
 - Removed `NEXT_PUBLIC_REPO_NAME` and updated manifest, icons, service worker, notifications and 404 home link to root `/` paths.
 - Removed `.github/workflows/deploy.yml` and `public/.nojekyll` (GitHub Pages-only files).
 - Service worker script has a new cache version and is sent with `Cache-Control: no-cache` to aid updates.
-- Pinned Vercel's Node.js major version to **22.x** with `package.json` `engines.node`.
+- Pinned Vercel's Node.js major version to **26.x** with `package.json` `engines.node`.
 - Vercel automatically builds and deploys from GitHub; no `vercel.json`, custom output directory or GitHub Actions deployment workflow is needed. Next.js's standard output is `.next/`.
 
 ## Get ready to deploy

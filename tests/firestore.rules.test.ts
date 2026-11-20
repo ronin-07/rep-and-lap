@@ -52,3 +52,15 @@ describe('Gym set security rules (Firestore emulator)',()=>{
       {recordKey:'session:2026-11-16:Monday',payload:{done:true,gym:{}},updatedMs:1763630000000}));
   });
 });
+
+describe('Milestone 3 schedule and routine fields',()=>{
+  it('accepts session status and routine snapshot for the owner without relaxing document security',async()=>{
+    const own=env.authenticatedContext('alice').firestore();
+    const ref=doc(own,'users/alice/gymSessions','session:2026-11-16:Monday');
+    const session={recordKey:'session:2026-11-16:Monday',updatedMs:1763630000000,payload:{
+      done:null,plannedDate:'2026-11-19',scheduleStatus:'rest',routineOverride:[{name:'Dumbbell bench press',sets:3,reps:'8–12',muscles:'Chest'}]
+    }};
+    await assertSucceeds(setDoc(ref,session));
+    await assertFails(setDoc(doc(env.authenticatedContext('bob').firestore(),'users/alice/gymSessions','session:2026-11-16:Monday'),session));
+  });
+});

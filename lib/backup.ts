@@ -17,13 +17,25 @@ function safeRecord(v:unknown,label:string,max:number):Record<string,unknown> {
   return v;
 }
 function saneScalar(v:unknown,max=1000){return v===undefined||v===null||(typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=max)||(typeof v==='string'&&v.length<=40&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=max);}
+function validateExercises(value:unknown){
+ check(Array.isArray(value)&&value.length<=30,'Invalid routine exercises');
+ const seen=new Set<string>();
+ for(const candidate of value){const ex=safeRecord(candidate,'routine exercise',4);check(Object.keys(ex).every(k=>['name','sets','reps','muscles'].includes(k)),'Unexpected routine field');
+  check(typeof ex.name==='string'&&ex.name.trim().length>0&&ex.name.length<=160&&!seen.has(ex.name),'Invalid or duplicate exercise name');
+  check(typeof ex.sets==='number'&&Number.isInteger(ex.sets)&&ex.sets>=1&&ex.sets<=10,'Invalid routine set count');
+  check(typeof ex.reps==='string'&&ex.reps.length<=50&&typeof ex.muscles==='string'&&ex.muscles.length<=160,'Invalid routine fields');
+  seen.add(ex.name);
+ }
+}
 function validateWeek(week:unknown){
-  const w=safeRecord(week,'week',12);
-  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt']){
+  const w=safeRecord(week,'week',16);
+  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','scheduleStatus','routineOverrides']){
     if(w[section]===undefined)continue;
     const daily=safeRecord(w[section],section,7);
     for(const [day,value] of Object.entries(daily)){
       check(DAYS.includes(day as Day),`Unexpected day in ${section}`);
+      if(section==='scheduleStatus')check(value==='rest'||value==='skipped','Invalid schedule status');
+      if(section==='routineOverrides'){check(['Monday','Tuesday','Wednesday'].includes(day),'Invalid gym routine day');validateExercises(value);}
       if(section==='done')check(typeof value==='boolean',`Invalid completion flag`);
       if(section==='schedule')check(typeof value==='string'&&validDate(value),`Invalid scheduled date`);
       if(section==='gym'){
@@ -48,7 +60,7 @@ function validateWeek(week:unknown){
   }
 }
 function hasSession(w:WeekLog,day:Day):boolean {
-  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day];
+  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day]||!!w.scheduleStatus?.[day]||!!w.routineOverrides?.[day as GymDay];
 }
 export function countRecords(data:TrackerData):BackupCounts {
   let sessions=0,sets=0;
@@ -62,7 +74,7 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
   check(text.length<=5_000_000,'Backup exceeds 5 MB');
   const raw=safeRecord(JSON.parse(text) as unknown,'backup',35);
   const version=raw.version??1;
-  check(typeof version==='number'&&Number.isInteger(version)&&version>=1&&version<=3,'Unsupported backup version');
+  check(typeof version==='number'&&Number.isInteger(version)&&version>=1&&version<=4,'Unsupported backup version');
   const weeks=safeRecord(raw.weeks,'weeks',520),weights=safeRecord(raw.weights??{},'weigh-ins',6000),water=safeRecord(raw.waterLogs??{},'drinks',50000);
   for(const [day,w] of Object.entries(weeks)){check(validDate(day),'Invalid week date');validateWeek(w);}
   for(const [day,value] of Object.entries(weights)){
@@ -85,6 +97,7 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
     for(const [key,value] of Object.entries(overrides))check(key.length<=200&&typeof value==='number'&&Number.isInteger(value)&&value>=1&&value<=30,'Invalid set override');
     base.setOverrides={...overrides} as Record<string,number>;
   }
+  if(raw.routineTemplates!==undefined){const templates=safeRecord(raw.routineTemplates,'routine templates',3);for(const [day,value] of Object.entries(templates)){check(['Monday','Tuesday','Wednesday'].includes(day),'Invalid routine template day');validateExercises(value);}base.routineTemplates=templates as TrackerData['routineTemplates'];}
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];
   if(typeof raw.restSeconds==='number'&&raw.restSeconds>=15&&raw.restSeconds<=600)base.restSeconds=raw.restSeconds;
   if(raw.effortMode==='off'||raw.effortMode==='rir'||raw.effortMode==='rpe')base.effortMode=raw.effortMode;
@@ -103,7 +116,7 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
     for(const day of DAYS){
       if(!hasSession(incoming,day))continue;
       if(hasSession(existing,day)){duplicates++;continue;}
-      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt'] as const){
+      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','scheduleStatus','routineOverrides'] as const){
         const from=incoming[prop] as Record<string,unknown>|undefined;
         if(from&&hasOwn(from,day)){const into=(existing[prop]??={}) as Record<string,unknown>;into[day]=structuredClone(from[day]);}
       }
@@ -118,6 +131,9 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
     if(hasOwn(data.waterLogs,id)){duplicates++;continue;}
     data.waterLogs[id]=structuredClone(drink);changedKeys.push(`water:${id}`);newRecords++;
   }
+  // The user's saved routine templates are portable preferences, but never overwrite an existing template during Merge.
+  let addedTemplate=false;for(const day of ['Monday','Tuesday','Wednesday'] as const){if(!data.routineTemplates[day]&&source.routineTemplates[day]){data.routineTemplates[day]=structuredClone(source.routineTemplates[day]);addedTemplate=true;}}
+  if(addedTemplate)changedKeys.push('preferences');
   return {data:normalizeSets(data),changedKeys,duplicates,newRecords};
 }
 export function markRestoredWrites(data:TrackerData,keys:string[],stamp=Date.now()):void {

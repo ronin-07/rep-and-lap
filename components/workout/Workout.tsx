@@ -9,6 +9,9 @@ import {previousCompletedSet} from '@/lib/workout-flow';
 import {labelWeek,shiftWeek,keyOf,dateFor,formatDate} from '@/lib/dates';
 import {setCount,gymStats,weekLog,num,loggedSet,validSet,history,bestSwim,waterGoal,waterEntries,waterTotal,weightEntries,weightTrend,plannedDate,sessionMinutes,formatDuration} from '@/lib/metrics';
 import SessionNotes from './SessionNotes';
+import RoutineEditor from './RoutineEditor';
+import {exercisesFor} from '@/lib/routines';
+import {statusFor} from '@/lib/scheduling';
 import {LineChart,MiniBars} from '@/components/Charts';
 
 function WeekChooser({app}:{app:Trainer}){return <div className="week-chooser"><button className="icon-btn" aria-label="Previous week" onClick={()=>app.setWeek(shiftWeek(app.week,-1))}><ChevronLeft size={19}/></button><strong>{labelWeek(app.week)}</strong><button className="icon-btn" aria-label="Next week" onClick={()=>app.setWeek(shiftWeek(app.week,1))}><ChevronRight size={19}/></button></div>}
@@ -31,10 +34,12 @@ function SessionClock({app,day}:{app:Trainer;day:Day}){
 }
 function Gym({app}:{app:Trainer}){
  const day=app.gymDay,plan=PLAN[day];if(plan.kind!=='gym')return null;
- const stats=gymStats(app.data,app.week,day),w=weekLog(app.data,app.week),done=!!w.done?.[day];
+ const stats=gymStats(app.data,app.week,day),w=weekLog(app.data,app.week),done=!!w.done?.[day],status=statusFor(app.data,app.week,day);
+ const activeExercises=exercisesFor(app.data,app.week,day);
  return <div className="stack"><SelectDay days={GYM_DAYS} value={day} onChange={v=>app.setGymDay(v as GymDay)}/>
  <div className="workout-banner card"><div><span className="eyebrow">{day.toUpperCase()} · STRENGTH</span><h2>{plan.name}</h2><p>{plan.subtitle}</p></div><div className="workout-banner-pill">{stats.logged} / {stats.total} sets</div></div>
- <div className="workout-columns"><div className="stack">{plan.exercises.map(ex=>{
+ <RoutineEditor app={app} day={day}/>{(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped workout'}</strong><span>This session is {status}. It does not count as completed training.</span><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore workout</button></div>}
+ <div className="workout-columns"><div className="stack">{activeExercises.map(ex=>{
  const count=setCount(app.data,app.week,day,ex.name),entry=w.gym?.[day]?.[ex.name];
  const volume=(entry?.sets||[]).slice(0,count).filter(loggedSet).reduce((s,x)=>s+num(x.kg)*num(x.reps),0);
  return <article className="card exercise-card" key={ex.name}><div className="exercise-header"><div><h3>{ex.name}</h3><p>{ex.muscles} · {ex.reps} reps</p></div><div className="counter"><button aria-label={`Remove set from ${ex.name}`} onClick={()=>app.changeSetCount(day,ex.name,-1)}><Minus size={15}/></button><span>{count} sets</span><button aria-label={`Add set to ${ex.name}`} onClick={()=>app.changeSetCount(day,ex.name,1)}><Plus size={15}/></button></div></div>
@@ -53,6 +58,7 @@ function Swimming({app}:{app:Trainer}){
  if(plan.kind!=='swim')return null;
  const items:[keyof SwimLog,string,string][]=[['duration','Duration','min'],['distance','Total distance','m'],['longest','Longest freestyle','m'],['rest','Rest after 25 m','sec'],['rpe','Effort (RPE)','/ 10'],['sculling','Sculling','sec'],['treading','Treading water','sec']];
  return <div className="stack"><SelectDay days={SWIM_DAYS} value={day} onChange={v=>app.setSwimDay(v as SwimDay)}/><div className="workout-banner card aqua-banner"><div><span className="eyebrow">{day.toUpperCase()} · POOL</span><h2>{plan.name}</h2><p>{plan.description}</p></div><span className="icon-wrap aqua"><Swim size={24}/></span></div>
+ {(statusFor(app.data,app.week,day)==='rest'||statusFor(app.data,app.week,day)==='skipped')&&<div className="schedule-notice card"><strong>{statusFor(app.data,app.week,day)==='rest'?'Recovery day':'Skipped swim'}</strong><span>This session is not scheduled for training.</span><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore session</button></div>}
  <div className="workout-columns"><div className="stack"><section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">POOL LENGTHS</span><h2>One length at a time.</h2></div></div><div className="field"><span>Pool size</span><div className="rest-choices"><button className={pool===25?'selected':''} onClick={()=>app.swimField(day,'poolLength',25)}>25 m</button><button className={pool===50?'selected':''} onClick={()=>app.swimField(day,'poolLength',50)}>50 m</button></div></div><div className="length-counter"><button className="icon-btn large" onClick={()=>app.changeLengths(day,-1)} aria-label="Subtract pool length"><Minus/></button><div><strong>{num(log.lengths)}</strong><small>lengths · {num(log.distance)} m</small></div><button className="icon-btn large" onClick={()=>app.changeLengths(day,1)} aria-label="Add pool length"><Plus/></button></div></section>
  <section className="card pane-pad stack"><span className="eyebrow">SESSION NUMBERS</span><div className="form-grid">{items.map(([key,label,unit])=><label className="field" key={key}><span>{label} <small>({unit})</small></span><input inputMode="decimal" type="number" min="0" max={key==='rpe'?10:undefined} value={String(log[key]??'')} onChange={e=>app.swimField(day,key,e.target.value)} placeholder="0"/></label>)}<label className="field"><span>Breaststroke skill</span><select value={log.breaststroke||'Not started'} onChange={e=>app.swimField(day,'breaststroke',e.target.value)}>{['Not started','Learning','Basic','Comfortable','Confident'].map(v=><option key={v}>{v}</option>)}</select></label></div>
  <h3>Intervals</h3><form className="interval-form" onSubmit={e=>{e.preventDefault();const r=Number(repeats),l=Number(lengths),s=Number(rest);if(r>=1&&r<=30&&l>=1&&l<=8&&s>=0&&s<=300)app.addInterval(day,{repeats:r,lengths:l,rest:s,pool});else app.notify('Check interval values.');}}><label className="field"><span>Repeats</span><input type="number" min="1" max="30" value={repeats} onChange={e=>setRepeats(e.target.value)}/></label><label className="field"><span>Lengths</span><input type="number" min="1" max="8" value={lengths} onChange={e=>setLengths(e.target.value)}/></label><label className="field"><span>Rest (s)</span><input type="number" min="0" max="300" value={rest} onChange={e=>setRest(e.target.value)}/></label><button className="button-secondary"><Plus size={17}/> Add</button></form>
