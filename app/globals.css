@@ -235,3 +235,112 @@ input[type='date']::-webkit-datetime-edit{padding:0;min-width:0}
 @media(prefers-reduced-motion:reduce){.routine-item,.calendar-cell{transition:none}}
 /* Keep concise stat values from spilling over on narrow phones. */
 .mini-stat{min-width:0}.mini-stat strong{overflow-wrap:anywhere;line-height:1.25}
+
+/* v3.2 hotfix — consistent schedule states, mobile forms, and routine confirmations */
+.schedule-list{gap:14px}
+.schedule-list .schedule-item{
+  display:flex;flex-direction:column;align-items:stretch;gap:0;
+  margin:0;padding:15px;border:1px solid var(--border);border-left:4px solid var(--border);
+  border-radius:15px;background:var(--panel2);min-width:0;
+}
+.schedule-list .schedule-item.status-completed{border-left-color:#6ed8b0;background:color-mix(in srgb,var(--green) 6%,var(--panel2))}
+.schedule-list .schedule-item.status-rest{border-left-color:#6bddcc;background:color-mix(in srgb,var(--aqua) 5%,var(--panel2))}
+.schedule-list .schedule-item.status-skipped,.schedule-list .schedule-item.is-late{border-left-color:#ffb18f}
+.schedule-list .schedule-item.today{outline:1px solid rgba(175,158,255,.23);outline-offset:0}
+.schedule-list .schedule-main{display:flex;align-items:flex-start;gap:14px;min-width:0;padding:2px 0 10px}
+.schedule-list .day-initial{flex:0 0 47px;min-width:47px;height:48px;display:grid;place-items:center}
+.schedule-list .schedule-content{display:flex;flex:1 1 0;min-width:0;gap:3px}
+.schedule-list .schedule-content strong{font-size:.95rem;line-height:1.35;white-space:normal}
+.schedule-list .schedule-content small{line-height:1.48;font-size:.75rem;white-space:normal;overflow-wrap:anywhere}
+.schedule-list .schedule-date{color:var(--muted);font-variant-numeric:tabular-nums}
+.schedule-list .schedule-original{font-style:italic}
+.schedule-status-pill{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;
+ border-radius:10px;min-height:36px;padding:7px 9px;font-size:.74rem;font-weight:800;white-space:nowrap;
+ border:1px solid transparent;background:rgba(170,156,247,.09);color:var(--purple)}
+.schedule-status-pill svg{flex-shrink:0}
+.schedule-status-pill.is-completed{color:#9de9c4;background:rgba(109,216,176,.13);border-color:rgba(109,216,176,.3)}
+.schedule-status-pill.is-rest{color:#80e8d9;background:rgba(91,219,201,.14);border-color:rgba(91,219,201,.32)}
+.schedule-status-pill.is-skipped,.schedule-status-pill.is-missed{color:#ffc0a8;background:rgba(255,169,144,.12);border-color:rgba(255,169,144,.34)}
+.schedule-status-pill.is-planned{color:#cfbaff;background:rgba(173,151,255,.13);border-color:rgba(173,151,255,.3)}
+.schedule-list .schedule-actions{display:flex;flex-wrap:wrap;gap:9px;padding:12px 0 0 61px;border-top:1px solid var(--border);align-items:center}
+.schedule-list .schedule-actions>button{min-height:42px;padding:9px 12px;font-size:.77rem}
+.schedule-list .reschedule-disclosure{margin:0;min-width:0;max-width:100%}
+.schedule-list .reschedule-disclosure[open]{flex-basis:100%;max-width:100%}
+.schedule-list .reschedule-disclosure summary{width:max-content;max-width:100%;min-height:42px;display:inline-flex;align-items:center;gap:6px}
+.schedule-list .reschedule-disclosure[open] summary{margin-bottom:10px}
+.schedule-list .reschedule-disclosure .field{max-width:310px;min-width:0;width:100%}
+.schedule-list .reschedule-disclosure .field input{min-width:0}
+
+.custom-water-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end;width:100%;min-width:0}
+.custom-water-form .field{min-width:0;width:100%}
+.custom-water-form input{width:100%;min-width:0;height:49px}
+.custom-water-form button{display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:49px;white-space:nowrap}
+
+/* Safari's native date content must not impose its intrinsic inline width on a grid cell. */
+.form-grid,.form-grid>*{min-width:0;max-width:100%}
+.weigh-date-field{display:block;min-width:0;max-width:100%;width:100%;overflow:hidden}
+.weigh-date-field>span{display:block;margin-bottom:7px}
+input[type='date']{inline-size:100%;min-inline-size:0;max-inline-size:100%;box-sizing:border-box;
+ overflow:hidden;white-space:nowrap;
+ font-variant-numeric:tabular-nums;line-height:1.4}
+input[type='date']::-webkit-date-and-time-value{min-width:0;max-width:100%;text-align:left}
+input[type='date']::-webkit-datetime-edit{min-width:0;max-width:100%;text-align:left}
+input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inline-start:auto}
+
+.routine-advanced{border-top:1px solid var(--border);padding-top:14px}
+.routine-advanced summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--muted);
+ font-size:.79rem;font-weight:800}
+.routine-advanced[open]{display:flex;flex-direction:column;gap:9px}
+.routine-advanced .button-secondary{align-self:flex-start;min-height:44px;display:inline-flex;gap:8px;align-items:center}
+.routine-footer button:disabled,.routine-advanced button:disabled{opacity:.5;cursor:not-allowed}
+.logged-extra-tag{color:var(--aqua)!important;font-weight:700}
+.routine-confirm-overlay{z-index:135}
+.routine-confirm{width:min(480px,100%);max-height:min(90dvh,780px);overflow-y:auto;padding:26px;
+ display:flex;flex-direction:column;gap:17px;background:var(--card-grad);box-shadow:0 28px 70px rgba(0,0,0,.42)}
+.routine-confirm-heading{display:flex;align-items:center;gap:12px}
+.routine-confirm-heading svg{color:var(--aqua);flex-shrink:0}
+.routine-confirm-heading h2{font-size:1.25rem;line-height:1.35;margin:0}
+.routine-confirm>p{color:var(--muted);font-size:.88rem;line-height:1.65;margin:0}
+.routine-confirm-details{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:var(--panel2)}
+.routine-confirm-details>div{display:flex;gap:9px;font-size:.79rem;line-height:1.5}
+.routine-confirm-details svg{flex-shrink:0;color:var(--aqua);margin-top:2px}
+.routine-confirm-actions{display:flex;gap:10px;justify-content:flex-end}
+.routine-confirm-actions button{min-height:46px;min-width:125px}
+
+.mobile-menu-trigger,.mobile-extra-nav{display:none}
+.calendar-back-home{display:none;align-items:center;gap:8px;min-height:44px;padding:9px 13px;
+ border:1px solid var(--border);border-radius:10px;background:var(--panel2);color:var(--text);font-weight:740;align-self:flex-start}
+@media(max-width:900px){
+ .settings-top{display:none}
+ .mobile-menu-trigger{display:grid}
+ .mobile-extra-nav{position:absolute;right:15px;top:calc(100% - 3px);width:min(290px,calc(100vw - 30px));
+  display:flex;flex-direction:column;padding:8px;z-index:50;border-radius:14px;border:1px solid var(--border);
+  background:var(--panel);box-shadow:0 18px 45px rgba(0,0,0,.4)}
+ .mobile-extra-nav button{display:flex;align-items:center;gap:13px;min-height:49px;width:100%;
+  background:transparent;border:0;border-radius:9px;padding:12px;text-align:left;color:var(--text);font-weight:750}
+ .mobile-extra-nav button:hover,.mobile-extra-nav button:focus-visible{background:var(--panel2)}
+ .calendar-back-home{display:inline-flex}
+}
+@media(max-width:670px){
+ .schedule-list{gap:12px}
+ .schedule-list .schedule-item{padding:15px 13px}
+ .schedule-list .schedule-main{gap:9px}
+ .schedule-list .day-initial{flex:0 0 41px;min-width:41px;height:41px}
+ .schedule-list .schedule-content strong{font-size:.9rem}
+ .schedule-status-pill{padding:6px 7px;gap:4px;min-height:34px;font-size:.67rem}
+ .schedule-status-pill svg{width:14px;height:14px}
+ .schedule-list .schedule-actions{padding:12px 0 0;gap:8px}
+ .schedule-list .schedule-actions>button{flex:1 1 auto;min-width:0}
+ .schedule-list .reschedule-disclosure:not([open]){flex:1 0 100%}
+ .schedule-list .reschedule-disclosure:not([open]) summary{width:100%;justify-content:center}
+ .custom-water-form{grid-template-columns:1fr;gap:10px}
+ .custom-water-form button{width:100%;min-height:48px}
+ .routine-confirm{padding:22px 18px}
+ .routine-confirm-actions button{flex:1;min-width:0}
+}
+@media(max-width:365px){
+ .schedule-list .schedule-main{flex-wrap:wrap}
+ .schedule-list .schedule-content{flex-basis:calc(100% - 51px)}
+ .schedule-status-pill{margin-left:50px}
+ .routine-confirm-actions{flex-direction:column}
+}

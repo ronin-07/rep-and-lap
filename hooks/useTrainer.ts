@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise} from '@/lib/types';
 import {PLAN} from '@/lib/plan';
-import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory} from '@/lib/routines';
+import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory,restoredSessionRoutine,freezeExistingRoutines,weeksToFreezeBeforeTemplateChange} from '@/lib/routines';
 import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
@@ -310,23 +310,20 @@ export function useTrainer(){
  };
  const saveRoutineDefault=(day:GymDay)=>{
   const exercises=cloneExercises(exercisesFor(dataRef.current,week,day));
-  update(d=>{d.routineTemplates[day]=exercises;},'preferences');
-  notify('Saved as your default for future sessions.');
+  const frozenWeeks=weeksToFreezeBeforeTemplateChange(dataRef.current,week,day);
+  update(d=>{freezeExistingRoutines(d,week,day);d.routineTemplates[day]=exercises;},['preferences',...frozenWeeks.map(w=>`session:${w}:${day}`)]);
+  notify('Saved as your default for future workouts. Existing sessions are unchanged.');
  };
  const resetSessionRoutine=(day:GymDay)=>{
-  if(!confirm('Restore the default exercise list for this session? Logged sets stay in history.'))return;
-  update(d=>{const w=d.weeks[week]??=weekBlank();
-   const original=cloneExercises(d.routineTemplates?.[day]||((PLAN[day].kind==='gym')?PLAN[day].exercises:[]));
-   const loggedNames=Object.entries(w.gym?.[day]||{}).filter(([,entry])=>entry.sets.some(set=>!set.deleted&&set.done)).map(([name])=>name);
-   const existing=exercisesFor(d,week,day);
-   for(const name of loggedNames)if(!original.some(ex=>ex.name===name)){const archived=existing.find(ex=>ex.name===name);original.push(archived||{name,sets:3,reps:'8–12',muscles:'Previously logged'});}
-   w.routineOverrides??={};w.routineOverrides[day]=original;
-  },`session:${week}:${day}`);notify('Routine reset. Logged exercises remain visible.');
+  if(dataRef.current.weeks[week]?.done?.[day]){notify('Completed workouts cannot be restored.');return;}
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.routineOverrides??={};w.routineOverrides[day]=restoredSessionRoutine(d,week,day);},`session:${week}:${day}`);
+  notify('Workout plan restored. Every logged set is preserved.');
  };
  const resetDefaultRoutine=(day:GymDay)=>{
-  if(!confirm('Reset your saved default routine for this day?'))return;
-  try {update(d=>resetDefaultPreservingHistory(d,week,day),['preferences',`session:${week}:${day}`]);
-    notify('Saved default restored. Any already-logged exercises are preserved.');}catch(error){notify(error instanceof Error?error.message:'Could not reset default.');}
+  if(!dataRef.current.routineTemplates?.[day])return;
+  const frozenWeeks=weeksToFreezeBeforeTemplateChange(dataRef.current,week,day);
+  try {update(d=>resetDefaultPreservingHistory(d,week,day),['preferences',...frozenWeeks.map(w=>`session:${w}:${day}`)]);
+    notify('Original RepLap routine restored for future workouts.');}catch(error){notify(error instanceof Error?error.message:'Could not restore original default.');}
  };
  const deleteLoggedSet=(day:GymDay,exercise:string,index:number)=>{
   const record=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];

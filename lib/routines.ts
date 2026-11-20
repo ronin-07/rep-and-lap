@@ -129,16 +129,53 @@ export function editRoutine(exercises:RoutineExercise[],kind:'add'|'remove'|'mov
  return list;
 }
 
-/** Reset an inherited template safely: preserve this week's performed exercises. */
-export function resetDefaultPreservingHistory(data:TrackerData,week:string,day:GymDay):void {
- const record=data.weeks[week];
- if(record){
-  const loggedNames=Object.entries(record.gym?.[day]||{}).filter(([,e])=>e.sets.some(set=>set.done&&!set.deleted)).map(([name])=>name);
-  if(loggedNames.length){
-   const original=cloneExercises(exercisesFor(data,week,day));
-   for(const name of loggedNames)if(!original.some(ex=>ex.name===name))original.push({name,sets:3,reps:'8–12',muscles:'Previously logged'});
-   record.routineOverrides??={};record.routineOverrides[day]=original;
+/** Preserve the exercise choices for already-used sessions before changing defaults.
+ *  The active edited session is also frozen even before the first logged set.
+ */
+export function weeksToFreezeBeforeTemplateChange(data:TrackerData,week:string,day:GymDay):string[] {
+ const weeks=new Set<string>([week]);
+ for(const [key,record] of Object.entries(data.weeks)) {
+  if(record.routineOverrides?.[day])continue;
+  const hadSets=Object.values(record.gym?.[day]||{}).some(entry=>entry.sets.some(set=>!set.deleted&&(set.done||set.kg!==undefined||set.reps!==undefined)));
+  if(hadSets||record.done?.[day]||record.timing?.[day]?.startedAt)weeks.add(key);
+ }
+ return [...weeks];
+}
+
+export function freezeExistingRoutines(data:TrackerData,week:string,day:GymDay):string[] {
+ const frozen:string[]=[];
+ for(const key of weeksToFreezeBeforeTemplateChange(data,week,day)) {
+  const record=data.weeks[key];
+  if(!record||record.routineOverrides?.[day])continue;
+  const exercises=cloneExercises(exercisesFor(data,key,day));
+  record.routineOverrides??={};record.routineOverrides[day]=exercises;
+  frozen.push(key);
+ }
+ return frozen;
+}
+
+/** Produce a previewable restore plan without losing performed exercises. */
+export function restoredSessionRoutine(data:TrackerData,week:string,day:GymDay):RoutineExercise[] {
+ const builtIn=PLAN[day];
+ const target=cloneExercises(data.routineTemplates?.[day] || (builtIn.kind==='gym'?builtIn.exercises:[]));
+ const current=exercisesFor(data,week,day);
+ const records=data.weeks[week]?.gym?.[day]||{};
+ for(const [name,entry] of Object.entries(records)) {
+  const lastLogged=entry.sets.reduce((max,set,i)=>set.done&&!set.deleted?Math.max(max,i+1):max,0);
+  if(!lastLogged)continue;
+  const existing=target.find(ex=>ex.name===name);
+  if(existing)existing.sets=Math.max(existing.sets,lastLogged);
+  else {
+   const archived=current.find(ex=>ex.name===name);
+   target.push({...archived||{name,sets:3,reps:'8–12',muscles:'Previously logged'},sets:Math.max(archived?.sets||3,lastLogged)});
   }
  }
- data.routineTemplates??={};delete data.routineTemplates[day];
+ return target;
+}
+
+/** Only future routine templates change. Current / recorded sessions retain their plan. */
+export function resetDefaultPreservingHistory(data:TrackerData,week:string,day:GymDay):void {
+ freezeExistingRoutines(data,week,day);
+ data.routineTemplates??={};
+ delete data.routineTemplates[day];
 }

@@ -59,3 +59,44 @@ describe('Active workout navigation with custom routines',()=>{
   expect(nextIncompleteSet(d,w,'Monday','Dumbbell bench press',0)).toMatchObject({exercise:'Machine chest press',index:0});
  });
 });
+
+describe('Hotfix: safe routine confirmations and template isolation',()=>{
+ it('preserves the active session and previously logged sessions when saving a new default',async()=>{
+  const {freezeExistingRoutines}=await import('../lib/routines');
+  const d=blankData(),older='2026-11-09';
+  d.routineTemplates.Monday=[{name:'Machine chest press',sets:3,reps:'8–12',muscles:'Chest'}];
+  d.weeks[older]=weekBlank();
+  d.weeks[older].gym.Monday={'Machine chest press':{sets:[{kg:35,reps:10,done:true}]}};
+  d.weeks[w]=weekBlank();
+  const beforeOld=exercisesFor(d,older,'Monday');
+  const beforeCurrent=exercisesFor(d,w,'Monday');
+  freezeExistingRoutines(d,w,'Monday');
+  d.routineTemplates.Monday=[{name:'Dumbbell bench press',sets:3,reps:'8–12',muscles:'Chest'}];
+  expect(exercisesFor(d,older,'Monday')).toEqual(beforeOld);
+  expect(exercisesFor(d,w,'Monday')).toEqual(beforeCurrent);
+  expect(exercisesFor(d,'2026-11-30','Monday')[0].name).toBe('Dumbbell bench press');
+ });
+ it('restores original future default without changing past logged or active session routines',async()=>{
+  const {resetDefaultPreservingHistory}=await import('../lib/routines');
+  const d=blankData(),past='2026-11-09';
+  d.routineTemplates.Monday=[{name:'Machine chest press',sets:3,reps:'8–12',muscles:'Chest'}];
+  d.weeks[past]=weekBlank();d.weeks[past].gym.Monday={'Machine chest press':{sets:[{kg:40,reps:9,done:true}]}};
+  d.weeks[w]=weekBlank();
+  const previous=exercisesFor(d,past,'Monday');const active=exercisesFor(d,w,'Monday');
+  resetDefaultPreservingHistory(d,w,'Monday');
+  expect(d.routineTemplates.Monday).toBeUndefined();
+  expect(exercisesFor(d,past,'Monday')).toEqual(previous);
+  expect(exercisesFor(d,w,'Monday')).toEqual(active);
+  expect(exercisesFor(d,'2026-11-30','Monday')).toEqual(exercisesFor(blankData(),'2026-11-30','Monday'));
+ });
+ it('restoring workout preserves logged substitutions and their full set count',async()=>{
+  const {restoredSessionRoutine}=await import('../lib/routines');
+  const d=blankData();d.weeks[w]=weekBlank();
+  d.weeks[w].routineOverrides!.Monday=[{name:'Dumbbell bench press',sets:1,reps:'8–12',muscles:'Chest'}];
+  d.weeks[w].gym.Monday={'Dumbbell bench press':{sets:[{kg:20,reps:12,done:true},{kg:22,reps:9,done:true}]}};
+  const restored=restoredSessionRoutine(d,w,'Monday');
+  expect(restored.find(ex=>ex.name==='Dumbbell bench press')?.sets).toBeGreaterThanOrEqual(2);
+  expect(d.weeks[w].gym.Monday['Dumbbell bench press']!.sets).toHaveLength(2);
+  expect(restored[0].name).toBe(exercisesFor(blankData(),w,'Monday')[0].name);
+ });
+});

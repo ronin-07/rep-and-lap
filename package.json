@@ -1,6 +1,6 @@
 {
   "name": "replap",
-  "version": "3.2.0-m4",
+  "version": "3.2.0-m4-hotfix.1",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
