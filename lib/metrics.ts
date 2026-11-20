@@ -6,7 +6,7 @@ import {scheduledDate,completedDate,entriesForDate,trainingStreak} from './sched
 export const num=(v:unknown)=>Number.isFinite(Number(v))?Number(v):0;
 export const hasVal=(v:unknown)=>v!==undefined&&v!==null&&v!==''&&Number.isFinite(Number(v));
 export const validSet=(s?:GymSet)=>!!s&&hasVal(s.kg)&&hasVal(s.reps)&&num(s.kg)>=0&&num(s.reps)>0;
-export const loggedSet=(s?:GymSet)=>validSet(s)&&s?.done!==false;
+export const loggedSet=(s?:GymSet)=>validSet(s)&&s?.done!==false&&s?.deleted!==true;
 export function weekLog(data:TrackerData,w:string):WeekLog{return data.weeks[w]??{done:{},gym:{},swim:{}};}
 export function setCount(data:TrackerData,week:string,day:GymDay,name:string):number {
   const base=exercisesFor(data,week,day).find(e=>e.name===name)?.sets||3;

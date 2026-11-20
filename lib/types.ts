@@ -4,7 +4,7 @@ export type GymDay = 'Monday'|'Tuesday'|'Wednesday';
 export type SwimDay = 'Thursday'|'Friday'|'Saturday';
 export type View = 'home'|'workout'|'progress'|'profile'|'settings'|'conflicts'|'calendar';
 export type TrackingTab = 'gym'|'swim'|'water'|'weight';
-export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration';
+export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration'|'insights';
 export type ScheduleStatus = 'rest'|'skipped';
 export interface RoutineExercise {name:string;sets:number;reps:string;muscles:string}
 export type InputNumber = number|string;

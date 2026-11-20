@@ -523,3 +523,61 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
   .schedule-list .schedule-item,.water-drop-core,.water-ripple,.water-spark{animation:none!important;transition:none!important;transform:none!important}
   .water-ripple,.water-spark{opacity:0}
 }
+
+/* v3.2 Milestone 5 — accessible, data-driven training insights */
+.insight-page{max-width:100%;min-width:0}
+.insight-section{min-width:0;overflow:hidden}
+.insight-title{align-items:flex-start;flex-wrap:wrap}
+.insight-title h2{max-width:34ch}
+.insight-title p{max-width:62ch;margin-top:7px}
+.insight-week-picker,.month-pager{display:flex;align-items:center;justify-content:center;gap:15px;min-width:0;margin:3px 0 21px}
+.insight-week-picker strong,.month-pager strong{min-width:155px;text-align:center;font-size:1rem;overflow-wrap:anywhere}
+.insight-week-picker button,.month-pager button{display:grid;place-items:center;min-height:44px;min-width:44px;padding:10px;border-radius:12px}
+.insight-week-picker button:disabled,.month-pager button:disabled{opacity:.4}
+.insight-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:9px;min-height:160px;padding:22px 18px;margin:12px 0 17px;background:var(--panel2);border:1px dashed var(--border);border-radius:17px}
+.insight-empty svg{color:var(--purple)}
+.insight-empty strong{font-size:1rem}
+.insight-empty span{color:var(--muted);font-size:.83rem;max-width:43ch}
+.muscle-summary-line{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;margin:0 0 15px;color:var(--muted);font-size:.8rem}
+.muscle-summary-line strong{font-size:1.03rem;color:var(--text)}
+.muscle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:5px 0 16px}
+.muscle-tile{min-width:0;padding:17px 15px 15px;background:var(--panel2);border:1px solid var(--border);border-radius:16px;transition:border-color .18s,transform .18s,box-shadow .18s}
+.muscle-tile.is-trained{border-color:color-mix(in srgb,var(--aqua) 32%,var(--border));background:linear-gradient(130deg,color-mix(in srgb,var(--aqua) 9%,var(--panel2)),var(--panel2))}
+.muscle-tile-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:14px}
+.muscle-tile-heading strong{font-size:.9rem;overflow-wrap:anywhere}
+.muscle-tile-heading span{color:var(--aqua);font-size:1.1rem;font-weight:800;font-variant-numeric:tabular-nums}
+.muscle-tile.is-empty .muscle-tile-heading span{color:var(--muted)}
+.muscle-bar,.achievement-track{background:var(--ringbg);height:9px;border-radius:999px;overflow:hidden}
+.muscle-bar span,.achievement-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--aqua),var(--purple));transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.muscle-tile small{display:block;margin-top:10px;color:var(--muted);font-size:.72rem}
+.month-pager{margin:4px 0 18px}
+.recap-feature{display:flex;align-items:center;gap:14px;border:1px solid color-mix(in srgb,var(--purple) 35%,var(--border));border-radius:17px;padding:18px;margin:0 0 17px;background:linear-gradient(120deg,color-mix(in srgb,var(--purple) 12%,var(--panel2)),var(--panel2))}
+.recap-feature-icon{display:grid;place-items:center;flex:0 0 44px;height:44px;background:color-mix(in srgb,var(--purple) 24%,var(--panel));border-radius:13px;color:var(--purple)}
+.recap-feature strong{font-size:1rem}
+.recap-feature p{color:var(--muted);font-size:.82rem;margin:5px 0 0}
+.recap-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:17px}
+.recap-metric{padding:19px 17px;background:var(--panel2);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.recap-metric>span{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.8rem;min-width:0}
+.recap-metric>span svg{flex-shrink:0;color:var(--purple)}
+.recap-metric strong{font-size:clamp(1.38rem,2.8vw,1.9rem);font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.recap-metric em{font-size:.8rem;font-style:normal;font-weight:600;color:var(--muted)}
+.recap-metric small{font-size:.73rem;color:var(--muted);line-height:1.45;overflow-wrap:anywhere}
+.achievement-counter{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:var(--purple);font-size:.83rem;font-weight:800;border:1px solid var(--border);padding:9px 12px;border-radius:999px;background:var(--panel2)}
+.achievement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.achievement-tile{border:1px solid var(--border);background:var(--panel2);border-radius:17px;padding:17px;min-width:0;display:flex;flex-direction:column;gap:9px}
+.achievement-tile.is-unlocked{background:linear-gradient(145deg,color-mix(in srgb,var(--gold) 10%,var(--panel2)),var(--panel2));border-color:color-mix(in srgb,var(--gold) 38%,var(--border))}
+.achievement-top{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.achievement-icon{height:40px;width:40px;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--purple) 16%,var(--panel));color:var(--purple)}
+.is-unlocked .achievement-icon{background:color-mix(in srgb,var(--gold) 19%,var(--panel));color:var(--gold)}
+.achievement-state{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:.67rem;white-space:nowrap}
+.is-unlocked .achievement-state{color:var(--gold)}
+.achievement-tile>strong{font-size:.99rem;line-height:1.4}
+.achievement-tile>p{color:var(--muted);font-size:.77rem;line-height:1.45;min-height:2.7em;margin:0}
+.achievement-tile .achievement-track{margin-top:auto}
+.achievement-tile.is-unlocked .achievement-track span{background:linear-gradient(90deg,var(--gold),var(--aqua))}
+.achievement-tile>small{color:var(--muted);font-size:.72rem}
+@media(hover:hover){.muscle-tile:hover{border-color:var(--aqua);transform:translateY(-2px);box-shadow:0 7px 20px rgba(0,0,0,.1)}}
+@media(max-width:1100px){.achievement-grid,.recap-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){.insight-section{padding:19px 16px}.insight-title h2{font-size:1.28rem}.muscle-grid,.recap-grid,.achievement-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.muscle-tile,.achievement-tile{padding:13px 11px}.muscle-tile-heading{margin-bottom:12px}.muscle-tile-heading strong{font-size:.82rem}.recap-metric{padding:14px 12px}.recap-metric>span{font-size:.71rem;line-height:1.3}.recap-metric strong{font-size:1.36rem}.achievement-state{font-size:.61rem}.achievement-tile>p{font-size:.71rem}.month-pager,.insight-week-picker{gap:8px}.month-pager strong,.insight-week-picker strong{min-width:0;flex:1;font-size:.88rem}.insight-week-picker button,.month-pager button{min-height:44px;min-width:44px}.achievement-counter{font-size:.74rem}}
+@media(max-width:365px){.muscle-grid,.recap-grid,.achievement-grid{grid-template-columns:1fr}.recap-metric{gap:7px}.achievement-tile>p{min-height:0}.insight-title h2{font-size:1.2rem}}
+@media(prefers-reduced-motion:reduce){.muscle-bar span,.achievement-track span,.muscle-tile{transition:none!important;transform:none!important}}
