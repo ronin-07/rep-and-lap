@@ -1,5 +1,5 @@
 /* Rep & Lap — offline-first shell. Firebase credentials and API responses are never SW-cached. */
-const CACHE='rep-and-lap-firebase-20261120-v1';
+const CACHE='rep-and-lap-firebase-dashboard-20261120-v2';
 const SHELL=['./','./index.html','./app.js','./styles.css','./firebase-config.js','./firebase-client.js','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./icon-maskable-512.png'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())

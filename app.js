@@ -181,7 +181,7 @@
   function currentExerciseChoice(){for(const day of DAYS.slice(0,3))for(const x of PLAN[day].exercises)if(x[0]===exerciseChoice)return {day,name:exerciseChoice};return {day:'Monday',name:'Barbell bench press'};}
   function timerDisplay(){const left=Math.max(0,Math.ceil((restEnd-Date.now())/1000));return `${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`;}
   function renderRestTimer(){const dock=document.getElementById('restDock');if(!dock)return;
-    const left=Math.max(0,restEnd-Date.now());dock.hidden=!left;if(!left){if(restTick){clearInterval(restTick);restTick=null;}return;}
+    const left=Math.max(0,restEnd-Date.now());dock.hidden=!left||view!=='gym';if(!left){if(restTick){clearInterval(restTick);restTick=null;}return;}
     const label=document.getElementById('restCountdown');if(label)label.textContent=timerDisplay();
     const progress=document.getElementById('restProgress');if(progress)progress.style.width=`${Math.max(0,Math.min(100,100*left/(restDuration*1000)))}%`;
   }
@@ -193,13 +193,14 @@
   const nfmt=n=>Math.round(n).toLocaleString('en-GB');
   function setView(v){view=v;render();window.scrollTo({top:0,behavior:'instant'});}
   const PRIMARY_NAV=[['dashboard','Home','grid'],['workout','Workout','dumbbell'],['insights','Progress','chart'],['profile','Profile','user']];
-  function primaryView(){return ['gym','swim'].includes(view)?'workout':['water','weight','settings'].includes(view)?'profile':view;}
+  function primaryView(){return ['gym','swim','water','weight'].includes(view)?'workout':view;}
   function menu(){
     const active=primaryView();
+    const mobileActive=view==='settings'?'profile':active;
     document.getElementById('sideNav').innerHTML=PRIMARY_NAV.map(([id,label,icon])=>`<button class="nav-button ${active===id?'active':''}" data-view="${id}" type="button" aria-current="${active===id?'page':'false'}">${ico(icon)}<span>${label}</span></button>`).join('');
-    document.getElementById('mobileNav').innerHTML=PRIMARY_NAV.map(([id,label,icon])=>`<button class="${active===id?'active':''}" data-view="${id}" type="button" aria-label="${label}" aria-current="${active===id?'page':'false'}">${ico(icon,21)}<span>${label}</span></button>`).join('');
-    const secondary=document.getElementById('secondaryNav');
-    if(secondary)secondary.innerHTML=[['gym','Gym log','dumbbell'],['swim','Swim log','waves'],['water','Hydration','droplet'],['weight','Body weight','scale'],['settings','Settings','settings']].map(([id,label,icon])=>`<button class="nav-button nav-secondary ${view===id?'active':''}" data-view="${id}" type="button">${ico(icon,17)}<span>${label}</span></button>`).join('');
+    document.getElementById('mobileNav').innerHTML=PRIMARY_NAV.map(([id,label,icon])=>`<button class="${mobileActive===id?'active':''}" data-view="${id}" type="button" aria-label="${label}" aria-current="${mobileActive===id?'page':'false'}">${ico(icon,21)}<span>${label}</span></button>`).join('');
+    const settingsItem=document.getElementById('sidebarSettingsButton');
+    if(settingsItem){settingsItem.classList.toggle('active',view==='settings');settingsItem.setAttribute('aria-current',view==='settings'?'page':'false');}
     document.getElementById('breadcrumbName').textContent=({dashboard:'Home',workout:'Workout',gym:'Gym log',swim:'Swim log',water:'Hydration',weight:'Body weight',insights:'Progress',profile:'Profile',settings:'Settings'})[view];
   }
   const weekSwitcher=()=>`<div class="week-switcher" aria-label="Select training week"><button type="button" data-action="prev-week" aria-label="Previous week">${ico('chevronLeft',17)}</button><span>${weekLabel(week)}</span><button type="button" data-action="next-week" aria-label="Next week">${ico('chevronRight',17)}</button></div>`;
@@ -212,32 +213,103 @@
   function sessionCalendar(){return DAYS.map((day,index)=>{const p=PLAN[day],isDone=thisWeekCompleted(day),isToday=week===todayWeek()&&new Date().getDay()===index+1;
     return `<article class="session-list-item ${isDone?'session-done':''} ${isToday?'session-today':''}"><div class="session-day-date"><b>${day.slice(0,3).toUpperCase()}</b><span>${p.kind==='gym'?'GYM':'SWIM'}</span></div><div class="session-description"><strong>${escapeHTML(p.name)}</strong><small>${isDone?'Completed':p.subtitle}</small></div><span class="session-state">${isDone?ico('check',16):isToday?'<i class="today-pulse"></i>':ico('chevronRight',15)}</span><button class="session-hitarea" type="button" data-action="open-session" data-day="${day}" aria-label="Open ${escapeHTML(p.name)}"></button></article>`;
   }).join('');}
-  function weeklyHeatmap(){const weeks=Array.from({length:7},(_,i)=>shiftWeek(week,i-6));return `<section class="glass-panel activity-panel"><div class="panel-topline"><div><div class="eyebrow">CONSISTENCY</div><h3>Keep the streak moving</h3><p>Every session adds to your momentum.</p></div><span class="mini-fact">7 weeks</span></div><div class="heatmap-layout"><div class="heatmap-day-labels" aria-hidden="true"><span></span>${["M","T","W","T","F","S"].map(d=>`<span>${d}</span>`).join('')}</div><div class="heatmap" role="img" aria-label="Workout completion over the last seven training weeks">${weeks.map((wk,i)=>`<div class="heatmap-week"><span class="heatmap-week-label">${i===6?'THIS':wkShort(wk)}</span>${DAYS.map(d=>{const done=!!getWeek(wk).done?.[d];return `<span class="heat-cell ${done?'completed':''}" title="${wk} ${d}: ${done?'completed':'not marked complete'}"></span>`}).join('')}</div>`).join('')}</div></div><div class="heatmap-legend"><span>Less</span><i></i><i></i><i class="completed"></i><span>More</span></div></section>`;}
-  function highlightsCard(){const entries=[];for(const d of DAYS.slice(0,3))for(const [name] of PLAN[d].exercises){const logs=exerciseHistory(d,name);if(logs.length)entries.push({day:d,name,kg:exercisePersonalBest(d,name),last:logs.at(-1).week});}
-    entries.sort((a,b)=>b.last.localeCompare(a.last));const pb=Math.max(25,allSwimBest('longest'));const wm=weightMetrics();
-    return `<section class="glass-panel highlight-panel"><div class="panel-topline"><div><div class="eyebrow">LATEST PROGRESS</div><h3>Recent milestones</h3></div>${ico('medal',20)}</div>${entries.length?entries.slice(0,2).map(x=>`<div class="highlight-row"><span class="highlight-icon">${ico('trophy',17)}</span><div><strong>${escapeHTML(x.name)}</strong><small>Best logged load</small></div><b>${nfmt(x.kg)} <small>kg</small></b></div>`).join(''):`<div class="highlight-row"><span class="highlight-icon">${ico('bolt',17)}</span><div><strong>No gym records yet</strong><small>Your first logged set will appear here.</small></div></div>`}<div class="highlight-row"><span class="highlight-icon aqua">${ico('waves',17)}</span><div><strong>Longest freestyle</strong><small>Swimming endurance</small></div><b>${nfmt(pb)} <small>m</small></b></div>${wm.last?`<div class="highlight-row"><span class="highlight-icon blush">${ico('scale',17)}</span><div><strong>Latest body weight</strong><small>${wm.last[0]}</small></div><b>${Number(wm.last[1].kg).toFixed(1)} <small>kg</small></b></div>`:''}<button class="subtle-link" type="button" data-view="insights">Explore progress ${ico('chevronRight',15)}</button></section>`;
+  function completedTrainingDates(){
+    const dates=new Set();
+    for(const [wk,w] of Object.entries(data.weeks||{})){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(wk))continue;
+      for(let i=0;i<DAYS.length;i++)if(w.done?.[DAYS[i]]){
+        const d=dateFor(wk);d.setDate(d.getDate()+i);dates.add(keyOf(d));
+      }
+    }
+    return [...dates].sort();
+  }
+  function previousTrainingDate(date){
+    const d=dateFor(date);do{d.setDate(d.getDate()-1);}while(d.getDay()===0);return keyOf(d);
+  }
+  function streakMetrics(){
+    const today=keyOf(new Date()),dates=completedTrainingDates().filter(d=>d<=today),completed=new Set(dates);
+    let best=0,run=0,last=null;
+    for(const date of dates){run=last&&previousTrainingDate(date)===last?run+1:1;best=Math.max(best,run);last=date;}
+    let cursor=completed.has(today)?today:previousTrainingDate(today),current=0;
+    while(completed.has(cursor)){current++;cursor=previousTrainingDate(cursor);}
+    return {current,best,recorded:dates.length};
+  }
+  function weeklyHeatmap(){
+    const weeks=Array.from({length:7},(_,i)=>shiftWeek(week,i-6));
+    return `<section class="glass-panel activity-panel"><div class="panel-topline"><div><div class="eyebrow">YOUR CONSISTENCY</div><h3>Activity history</h3><p>Completed sessions, day by day.</p></div><span class="mini-fact">7 weeks</span></div><div class="heatmap-layout"><div class="heatmap-day-labels" aria-hidden="true"><span></span>${['M','T','W','T','F','S'].map(d=>`<span>${d}</span>`).join('')}</div><div class="heatmap" role="img" aria-label="Workout completion across seven weeks">${weeks.map((wk,i)=>`<div class="heatmap-week"><span class="heatmap-week-label">${wk===todayWeek()?'THIS':wkShort(wk)}</span>${DAYS.map(d=>{const done=!!getWeek(wk).done?.[d];return `<span class="heat-cell ${done?'completed':''}" title="${wk} ${d}: ${done?'complete':'not complete'}"></span>`}).join('')}</div>`).join('')}</div></div><div class="heatmap-legend"><span>Not completed</span><i></i><i class="completed"></i><span>Completed</span></div></section>`;
+  }
+  function milestoneEvents(){
+    const results=[];
+    // A first log establishes a baseline; it is not a new personal-record event.
+    for(const d of DAYS.slice(0,3))for(const [name] of PLAN[d].exercises){
+      const hist=exerciseHistory(d,name);let best=hist[0]?.bestWeight||0;
+      for(let i=1;i<hist.length;i++){
+        if(hist[i].bestWeight>best){
+          const dt=dateFor(hist[i].week);dt.setDate(dt.getDate()+DAYS.indexOf(d));
+          results.push({date:keyOf(dt),title:name,caption:'New strength best',value:`${nfmt(hist[i].bestWeight)} kg`,icon:'trophy',tone:'lilac'});
+          best=hist[i].bestWeight;
+        }
+      }
+    }
+    let swimMax=25;
+    for(const wk of Object.keys(data.weeks||{}).sort())for(const d of DAYS.slice(3)){
+      const distance=number(getWeek(wk).swim?.[d]?.longest),dt=dateFor(wk);dt.setDate(dt.getDate()+DAYS.indexOf(d));
+      for(const target of [50,100,200])if(swimMax<target && distance>=target){
+        results.push({date:keyOf(dt),title:`${target} m freestyle`,caption:'Continuous swim milestone',value:'Achieved',icon:'waves',tone:'aqua'});
+      }
+      swimMax=Math.max(swimMax,distance);
+    }
+    for(const [wk,w] of Object.entries(data.weeks||{}))if(DAYS.every(d=>w.done?.[d])){
+      const end=dateFor(wk);end.setDate(end.getDate()+5);
+      results.push({date:keyOf(end),title:'A complete training week',caption:'All six sessions finished',value:'6/6',icon:'medal',tone:'warm'});
+    }
+    return results.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+  }
+  function highlightsCard(){
+    const items=milestoneEvents();
+    return `<section class="glass-panel highlight-panel"><div class="panel-topline"><div><div class="eyebrow">PERSONAL HIGHLIGHTS</div><h3>Recent milestones</h3><p>The achievements you've earned.</p></div><span class="section-ornament">${ico('trophy',20)}</span></div>${items.length?items.map(x=>`<div class="highlight-row"><span class="highlight-icon ${x.tone}">${ico(x.icon,18)}</span><div><strong>${escapeHTML(x.title)}</strong><small>${escapeHTML(x.caption)} · ${escapeHTML(x.date)}</small></div><b>${escapeHTML(x.value)}</b></div>`).join(''):`<div class="highlight-empty">${ico('spark',23)}<div><strong>Your next milestone starts here.</strong><p>Complete a training week, reach 50 m freestyle, or improve a previous lift to see it here.</p></div></div>`}<button class="subtle-link" type="button" data-view="insights">See all progress ${ico('chevronRight',15)}</button></section>`;
+  }
+  function streakCard(){
+    const stats=streakMetrics();
+    return `<section class="glass-panel streak-panel"><div class="panel-topline"><div><div class="eyebrow">STAY CONSISTENT</div><h3>Your training streak</h3><p>Only scheduled days count. Sundays are rest days.</p></div><span class="section-ornament streak-fire">${ico('bolt',20)}</span></div><div class="streak-stats"><div class="streak-primary"><strong>${stats.current}</strong><span>active ${stats.current===1?'day':'days'}</span></div><div class="streak-secondary"><span>Personal best</span><strong>${stats.best} <small>${stats.best===1?'day':'days'}</small></strong></div></div><div class="streak-week-dots" aria-label="This week's scheduled sessions">${DAYS.map((d,i)=>`<span class="streak-day ${getWeek(todayWeek()).done?.[d]?'is-done':''}"><i>${getWeek(todayWeek()).done?.[d]?ico('check',12):d.slice(0,1)}</i><small>${['M','T','W','T','F','S'][i]}</small></span>`).join('')}</div><button class="subtle-link" type="button" data-view="workout">View training week ${ico('chevronRight',15)}</button></section>`;
+  }
+  function activityRings(metrics,waterNow,waterGoal){
+    const circles=[
+      {name:'Gym',value:metrics.gymCompleted,total:3,unit:'sessions',color:'#ae9aff',r:86,delay:'.05s'},
+      {name:'Swimming',value:metrics.swimCompleted,total:3,unit:'sessions',color:'#62ddc6',r:65,delay:'.13s'},
+      {name:'Hydration',value:waterNow,total:waterGoal,unit:'mL',color:'#ffb889',r:44,delay:'.21s'}
+    ];
+    const rings=circles.map(x=>{
+      const length=2*Math.PI*x.r,offset=length*(1-Math.min(1,Math.max(0,x.value/x.total)));
+      return `<circle class="activity-ring-track" cx="112" cy="112" r="${x.r}"/><circle class="activity-ring-progress" cx="112" cy="112" r="${x.r}" stroke="${x.color}" stroke-width="12" stroke-linecap="round" fill="none" transform="rotate(-90 112 112)" style="--length:${length.toFixed(3)};--offset:${offset.toFixed(3)};--delay:${x.delay}"/>`;
+    }).join('');
+    return `<section class="activity-rings-card glass-panel" aria-labelledby="ringsTitle"><div class="rings-heading"><div><div class="eyebrow">YOUR ACTIVITY</div><h2 id="ringsTitle">Stay in your rhythm</h2></div><span class="rings-caption">Training this week · water today</span></div><div class="rings-layout"><div class="rings-visual" role="img" aria-label="Gym ${metrics.gymCompleted} of 3, swimming ${metrics.swimCompleted} of 3, hydration ${waterNow} of ${waterGoal} millilitres"><svg viewBox="0 0 224 224" aria-hidden="true"><defs><filter id="ringGlow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${rings}</svg><div class="rings-center"><strong>${metrics.completed}<small>/6</small></strong><span>sessions</span></div></div><div class="rings-legend">${circles.map((x,i)=>{const pct=Math.round(Math.min(1,x.value/x.total)*100);const shown=i===2?`${(x.value/1000).toFixed(2)} / ${(x.total/1000).toFixed(1)} L`:`${x.value} / ${x.total}`;return `<div class="ring-legend-row" role="progressbar" aria-label="${x.name}" aria-valuemin="0" aria-valuemax="${x.total}" aria-valuenow="${Math.min(x.value,x.total)}" aria-valuetext="${shown}"><span class="ring-legend-dot" style="--dot:${x.color}"></span><span><b>${x.name}</b><small>${i===2?'Today':'This week'}</small></span><strong>${shown}</strong></div>`;}).join('')}<p class="ring-note">Hydration is a suggested daily target, not a limit.</p></div></div></section>`;
   }
   function dashboard(){
-    const m=weekMetrics(),day=focusDay(),p=day?PLAN[day]:null,isRecovery=week===todayWeek()&&new Date().getDay()===0||!day;
-    const hour=new Date().getHours(),salutation=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening',pct=Math.round(m.completed/6*100),wm=weightMetrics(),waterNow=waterTotal(keyOf(new Date())),wg=waterSuggestion(keyOf(new Date()));
+    const m=weekMetrics(),day=focusDay(),p=day?PLAN[day]:null,isRecovery=(week===todayWeek()&&new Date().getDay()===0)||!day;
+    const hour=new Date().getHours(),salutation=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+    const weight=weightMetrics(),today=keyOf(new Date()),waterNow=waterTotal(today),goal=waterSuggestion(today).ml;
     const daySubtitle=week===todayWeek()?`TODAY · ${day?day.toUpperCase():'SUNDAY'}`:'SELECTED WEEK · UP NEXT';
-    return `${heading('YOUR TRAINING SPACE',`${salutation}.`,'Today’s session and the progress you’ve made.')}
-      <section class="home-hero-grid">
-        <article class="focus-hero"><div class="focus-orb focus-orb-a" aria-hidden="true"></div><div class="focus-orb focus-orb-b" aria-hidden="true"></div><div class="focus-content"><div class="focus-eyebrow"><span class="live-dot"></span>${daySubtitle}</div><h2>${isRecovery?'Rest and recover.':escapeHTML(p.name)}</h2><p>${isRecovery?'Take a lighter day before the next training week.':escapeHTML(p.kind==='gym'?p.subtitle:p.description)}</p><div class="focus-meta"><span>${ico(isRecovery?'clock':p.kind==='gym'?'dumbbell':'waves',17)} ${isRecovery?'Rest & reset':p.kind==='gym'?'Strength training':'Swimming session'}</span><span>${ico('calendar',17)} ${weekLabel(week)}</span></div><div class="focus-actions">${isRecovery?`<button class="focus-action" type="button" data-view="workout">Browse training week ${ico('chevronRight',16)}</button>`:`<button class="focus-action" type="button" data-action="open-session" data-day="${day}">Open ${p.kind==='gym'?'workout':'swim'} ${ico('chevronRight',17)}</button>`}<button class="focus-secondary" type="button" data-view="workout">All sessions</button></div></div><div class="hero-sculpture" aria-hidden="true"><span></span><span></span><span></span></div></article>
-        <article class="weekly-focus glass-panel"><div class="eyebrow">YOUR WEEK</div><div class="weekly-ring" style="--completion:${pct}%" role="img" aria-label="${m.completed} of 6 workouts complete"><div><strong>${m.completed}<span>/6</span></strong><small>sessions complete</small></div></div><div class="weekly-bottom"><div><strong>${pct}%</strong><span>weekly completion</span></div><button type="button" data-view="workout" aria-label="View weekly workouts">${ico('chevronRight',18)}</button></div></article>
-      </section>
-      <section class="home-glances"><button class="glance-card" data-view="water" type="button"><span class="glance-icon aqua">${ico('droplet',20)}</span><div><span>Water today</span><strong>${(waterNow/1000).toFixed(2)}<small> / ${(wg.ml/1000).toFixed(1)} L</small></strong></div><span class="glance-arrow">${ico('chevronRight',16)}</span></button><button class="glance-card" data-view="insights" type="button"><span class="glance-icon lilac">${ico('dumbbell',19)}</span><div><span>Gym volume this week</span><strong>${nfmt(m.gymVolume)}<small> kg</small></strong></div><span class="glance-arrow">${ico('chevronRight',16)}</span></button><button class="glance-card" data-view="weight" type="button"><span class="glance-icon rose">${ico('scale',19)}</span><div><span>Latest weight</span><strong>${wm.last?Number(wm.last[1].kg).toFixed(1):'—'}<small> kg</small></strong></div><span class="glance-arrow">${ico('chevronRight',16)}</span></button></section>
-      <div class="home-section-title"><div><div class="eyebrow">YOUR SCHEDULE</div><h2>The week, at a glance</h2></div><button class="subtle-link" type="button" data-view="workout">All workouts ${ico('chevronRight',15)}</button></div>
-      <section class="home-lower-grid"><div class="glass-panel session-panel"><div class="session-list">${sessionCalendar()}</div></div><div class="home-side-stack">${highlightsCard()}${weeklyHeatmap()}</div></section>`;
+    return `<div class="home-headline"><div><div class="eyebrow">REP & LAP / OVERVIEW</div><h1>${salutation}<span class="headline-mark">.</span></h1><p>Your next session and everything that matters today.</p></div>${weekSwitcher()}</div>
+      <div class="home-focus-layout"><article class="focus-hero"><div class="focus-orb focus-orb-a" aria-hidden="true"></div><div class="focus-orb focus-orb-b" aria-hidden="true"></div><div class="focus-content"><div class="focus-eyebrow"><span class="live-dot"></span>${daySubtitle}</div><h2>${isRecovery?'Rest & recharge':escapeHTML(p.name)}</h2><p>${isRecovery?'Recovery is part of the training plan.':escapeHTML(p.kind==='gym'?p.subtitle:p.description)}</p><div class="focus-meta"><span>${ico(isRecovery?'clock':p.kind==='gym'?'dumbbell':'waves',17)} ${isRecovery?'Recovery day':p.kind==='gym'?'Strength session':'Pool session'}</span><span>${ico('calendar',17)} ${weekLabel(week)}</span></div><div class="focus-actions"><button class="focus-action" type="button" ${isRecovery?'data-view="workout"':`data-action="open-session" data-day="${day}"`}>${isRecovery?'See your training week':'Open today’s session'} ${ico('chevronRight',17)}</button><button class="focus-secondary" type="button" data-view="workout">All sessions</button></div></div><div class="hero-sculpture" aria-hidden="true"><span></span><span></span><span></span></div></article>
+      ${activityRings(m,waterNow,goal)}</div>
+      <section class="home-quick-actions" aria-label="Quick tracking"><div class="quick-card"><div class="quick-icon aqua">${ico('droplet',21)}</div><div class="quick-text"><span>Water today</span><strong>${(waterNow/1000).toFixed(2)} <small>of ${(goal/1000).toFixed(1)} L</small></strong></div><button class="quick-action" type="button" data-action="add-water-today" data-ml="250" aria-label="Log 250 millilitres of water">${ico('plus',16)} 250 mL</button><button class="quick-arrow" data-view="water" type="button" aria-label="Open water log">${ico('chevronRight',18)}</button></div><button class="quick-card quick-card-button" type="button" data-view="weight"><div class="quick-icon lilac">${ico('scale',21)}</div><div class="quick-text"><span>Body weight</span><strong>${weight.last?Number(weight.last[1].kg).toFixed(1)+' kg':'Log a weigh-in'}</strong><small>${weight.last?'Latest entry · open weight log':'Start tracking your trend'}</small></div><span class="quick-arrow">${ico('chevronRight',18)}</span></button></section>
+      <section class="home-momentum"><div class="home-momentum-heading"><div class="eyebrow">YOUR MOMENTUM</div><h2>Small wins add up</h2></div><div class="home-momentum-grid">${highlightsCard()}${streakCard()}</div></section>
+      <section class="home-schedule"><div class="home-section-title"><div><div class="eyebrow">WEEKLY ROUTINE</div><h2>Your six training days</h2></div><button class="subtle-link" type="button" data-view="workout">Go to workout ${ico('chevronRight',15)}</button></div><div class="home-lower-grid"><div class="glass-panel session-panel"><div class="session-list">${sessionCalendar()}</div></div>${weeklyHeatmap()}</div></section>`;
   }
   function workout(){const m=weekMetrics(),day=focusDay();return `${heading('YOUR TRAINING', 'Your training week.', 'Choose a workout to see your plan and record your session.')}
     <section class="workout-shortcuts"><button type="button" class="workout-shortcut purple" data-view="gym"><span>${ico('dumbbell',24)}</span><div><small>STRENGTH</small><strong>Gym workouts</strong><span>Push · Pull · Legs</span></div>${ico('chevronRight',20)}</button><button type="button" class="workout-shortcut teal" data-view="swim"><span>${ico('waves',24)}</span><div><small>IN THE WATER</small><strong>Swimming</strong><span>Technique · Skills · Endurance</span></div>${ico('chevronRight',20)}</button></section>
     <div class="home-section-title"><div><div class="eyebrow">CURRENT PLAN</div><h2>${m.completed} of 6 sessions completed</h2></div>${weekSwitcher()}</div>
     <div class="glass-panel workout-week-panel">${sessionCalendar()}</div>
     <div class="workout-bottom-links"><button class="glance-card" data-view="water" type="button">${ico('droplet',19)} Hydration log ${ico('chevronRight',15)}</button><button class="glance-card" data-view="insights" type="button">${ico('chart',19)} Workout progress ${ico('chevronRight',15)}</button></div>`;}
-  function profile(){const wm=weightMetrics(),today=keyOf(new Date()),waterMl=waterTotal(today),user=cloud.user?.email?escapeHTML(cloud.user.email):'Local profile';return `${heading('YOUR SPACE', 'Your training space.', 'Manage your activity, body metrics and account.',false)}
-    <section class="profile-overview glass-panel"><div class="profile-avatar">${ico('user',31)}</div><div class="profile-intro"><div class="eyebrow">REP & LAP MEMBER</div><h2>${user}</h2><p>${cloud.user?'Cloud account connected':'Your workouts are saved on this device.'}</p></div><span id="profile-sync-pill" class="sync-pill" data-state="${syncLabel().mode}">${ico('cloud',15)} ${escapeHTML(syncLabel().text)}</span></section>
-    <div class="profile-tiles"><button type="button" class="profile-tile" data-view="weight"><span class="profile-tile-icon rose">${ico('scale',23)}</span><div><strong>Body weight</strong><small>${wm.last?`${Number(wm.last[1].kg).toFixed(1)} kg · latest entry`:'Start tracking your weight'}</small></div>${ico('chevronRight',17)}</button><button type="button" class="profile-tile" data-view="water"><span class="profile-tile-icon aqua">${ico('droplet',23)}</span><div><strong>Water log</strong><small>${(waterMl/1000).toFixed(2)} L logged today</small></div>${ico('chevronRight',17)}</button><button type="button" class="profile-tile" data-view="settings"><span class="profile-tile-icon lilac">${ico('settings',23)}</span><div><strong>Settings & account</strong><small>Google sign-in, cloud sync, appearance, backups</small></div>${ico('chevronRight',17)}</button></div><section class="profile-note glass-panel">${ico('shield',19)}<div><strong>Your training stays yours</strong><p>Everything works locally. If cloud sync is configured and you sign in, sessions sync to your account when online.</p></div></section>`;}
+  function profile(){
+    const user=cloud.user?.displayName||cloud.user?.email||'Your training space',email=cloud.user?.email||'Not signed in',weeksLogged=Object.values(data.weeks||{}).filter(w=>DAYS.some(d=>w.done?.[d]||w.gym?.[d]||w.swim?.[d])).length,count=completedTrainingDates().length;
+    return `${heading('YOUR PROFILE','Your training space.','Your account, routine and preferences.',false)}
+      <section class="profile-overview glass-panel"><div class="profile-avatar">${ico('user',31)}</div><div class="profile-intro"><div class="eyebrow">REP & LAP PROFILE</div><h2>${escapeHTML(user)}</h2><p>${cloud.user?escapeHTML(email):'Your training is saved on this device.'}</p></div><span id="profile-sync-pill" class="sync-pill" data-state="${syncLabel().mode}">${ico('cloud',15)} ${escapeHTML(syncLabel().text)}</span></section>
+      <div class="profile-summary-grid"><article class="profile-summary-card glass-panel"><div class="profile-mini-icon">${ico('bolt',21)}</div><span>Training weeks logged</span><strong>${weeksLogged}</strong><p>Weeks with workout entries</p></article><article class="profile-summary-card glass-panel"><div class="profile-mini-icon teal">${ico('check',21)}</div><span>Completed sessions</span><strong>${count}</strong><p>Across your training history</p></article></div>
+      <section class="glass-panel profile-plan"><div class="panel-topline"><div><div class="eyebrow">YOUR ROUTINE</div><h3>Six days. One rhythm.</h3></div>${ico('calendar',19)}</div><div class="profile-plan-days"><div><span>Mon · Tue · Wed</span><strong>Push · Pull · Legs</strong><small>Strength training</small></div><div><span>Thu · Fri · Sat</span><strong>Technique · Skills · Endurance</strong><small>Swimming</small></div><div><span>Sunday</span><strong>Recovery</strong><small>Rest day</small></div></div></section>
+      <button type="button" class="profile-settings-entry glass-panel" data-view="settings"><span class="profile-tile-icon lilac">${ico('settings',23)}</span><span><strong>Settings</strong><small>Appearance, reminders, Google account, backup and installation</small></span>${ico('chevronRight',20)}</button>`;
+  }
   function waterMiniDashboard(){const today=keyOf(new Date()),goal=waterSuggestion(today),total=waterTotal(today),pct=Math.min(100,Math.round(total/goal.ml*100));
     return `<section class="hydration-mini"><div class="hydration-mini-icon">${ico('droplet',23)}</div><div class="hydration-mini-main"><div class="eyebrow">TODAY'S HYDRATION</div><strong>${(total/1000).toFixed(2)} <span>/ ${(goal.ml/1000).toFixed(1)} L suggested</span></strong><div class="water-track"><span style="width:${pct}%"></span></div><small>${goal.label} · ${(Math.max(0,goal.ml-total)/1000).toFixed(2)} L to suggestion</small></div><div class="hydration-mini-actions"><button class="outline-btn" data-action="add-water-today" data-ml="250" type="button">${ico('plus',14)} 250 mL</button><button class="primary-btn" data-view="water" type="button">Open water log →</button></div></section>`;
   }
@@ -348,7 +420,7 @@
   function settings(){
    const entries=Object.values(data.weeks).filter(w=>Object.keys(w.gym||{}).length||Object.keys(w.swim||{}).length||Object.values(w.done||{}).some(Boolean)).length;
    const cloudMessage=!configured?'Connect your account to keep workouts in sync across devices.':cloud.user?`Signed in as ${escapeHTML(cloud.user.email||'your account')}. Automatic synchronization is active while online.`:'Sign in to keep your training history available on your other devices.';
-   return `${heading('PREFERENCES & DATA','Your preferences.','Appearance, reminders, backups and account settings.',false)}
+   return `<div class="settings-back-row"><button type="button" class="outline-btn back-to-profile" data-view="profile">${ico('chevronLeft',17)} Back to Profile</button></div>${heading('SETTINGS','Settings.','Your app, your preferences.',false)}
      <div class="settings-note">${ico('shield',17)} Your changes are saved automatically on this device. Sign in to sync them with other devices when online.</div>
      <div class="settings-list">
        <article class="setting-card"><h3>Install Rep & Lap</h3><p>Keep your tracker one tap away. Your recent workouts are available without a connection.</p><div class="actions"><button class="primary-btn" type="button" data-action="install-app">${ico('download',15)} Install app</button>${installHelp()}</div></article>
@@ -361,7 +433,7 @@
        <article class="setting-card"><h3>Clear local records</h3><p>${entries} weeks with activity. Only data saved in this browser is removed. Cloud records stay in your account.</p><div class="actions"><button class="outline-btn danger" type="button" data-action="reset-data">Erase local records</button></div></article>
      </div>`;
   }
-  function render(){menu();const app=document.getElementById('app');app.innerHTML=({dashboard,workout,gym,swim,water,weight,insights,profile,settings})[view]();updateSyncUI();}
+  function render(){menu();const app=document.getElementById('app');app.innerHTML=({dashboard,workout,gym,swim,water,weight,insights,profile,settings})[view]();updateSyncUI();renderRestTimer();}
   let celebrationCloseTimer=null;
   function celebrate(title,subtitle,variant='workout'){
     const modal=document.getElementById('celebration');if(!modal)return;
@@ -589,7 +661,7 @@
   });
   document.addEventListener('input',event=>{const el=event.target;if(el.dataset.gymDay)storeGym(el);else if(el.dataset.swimDay)storeSwim(el);else if(el.dataset.sessionDay&&el.tagName!=='SELECT')storeSessionNote(el);});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.getElementById('celebration')?.hidden)closeCelebration();});
-  document.getElementById('headerSettings').addEventListener('click',()=>setView('settings'));
+  document.getElementById('headerSettings')?.addEventListener('click',()=>setView('settings'));
   document.getElementById('headerToday').addEventListener('click',()=>{week=todayWeek();render();notify('Showing current week');});
   document.getElementById('themeToggle').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';applyTheme();render();});
   document.getElementById('importFile').addEventListener('change',async(event)=>{

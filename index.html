@@ -22,23 +22,21 @@
       <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><div><strong>rep<span>&</span>lap</strong><small>YOUR TRAINING</small></div></div>
       <div class="nav-group-label">WORKSPACE</div>
       <nav class="side-nav" id="sideNav" aria-label="Views"></nav>
-      <div class="nav-group-label nav-group-secondary">TRACKERS</div>
-      <nav class="side-nav secondary-nav" id="secondaryNav" aria-label="Tracking tools"></nav>
       <div class="sidebar-spacer"></div>
-      <div class="sidebar-coach">
-        <div class="coach-icon" aria-hidden="true">✦</div>
-        <strong>Consistency wins.</strong>
-        <p>Three lifts. Three swims. One stronger you.</p>
-        <div class="coach-stripes"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="sidebar-bottom">
+        <div class="sidebar-tiny-label">YOUR SPACE</div>
+        <button class="nav-button sidebar-settings-button" id="sidebarSettingsButton" data-view="settings" type="button" aria-label="Open Settings">
+          <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.07.07-2.78 2.78-.07-.07A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1.4 1.6V21h-3.2v-.1A1.8 1.8 0 0 0 9 19.4a1.8 1.8 0 0 0-1.98.36l-.07.07-2.78-2.78.07-.07A1.8 1.8 0 0 0 4.6 15 1.8 1.8 0 0 0 3 13.6H2.9v-3.2H3A1.8 1.8 0 0 0 4.6 9a1.8 1.8 0 0 0-.36-1.98l-.07-.07 2.78-2.78.07.07A1.8 1.8 0 0 0 9 4.6 1.8 1.8 0 0 0 10.4 3h3.2A1.8 1.8 0 0 0 15 4.6a1.8 1.8 0 0 0 1.98-.36l.07-.07 2.78 2.78-.07.07A1.8 1.8 0 0 0 19.4 9a1.8 1.8 0 0 0 1.6 1.4h.1v3.2H21A1.8 1.8 0 0 0 19.4 15Z"/></svg>
+          <span>Settings</span>
+        </button>
+        <div class="sidebar-footnote">REP & LAP · TRAIN SMARTER</div>
       </div>
-      <a class="sidebar-sheet" href="https://docs.google.com/spreadsheets/d/1wXWgc62YyYDiqV9XPjyDYlgbsHwoxJQeUpl6htIvSew/edit?usp=drivesdk" target="_blank" rel="noopener noreferrer">Original Google Sheet <span>↗</span></a>
-      <div class="sidebar-footer">YOUR TRAINING · IN ONE PLACE</div>
     </aside>
 
     <div class="main-wrap">
       <header class="topbar">
-        <div class="breadcrumb"><span class="breadcrumb-dot"></span><span id="breadcrumbName">Overview</span><span class="breadcrumb-muted">/ Training space</span></div>
-        <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button><button class="theme-toggle settings-shortcut" id="headerSettings" type="button" aria-label="Settings" title="Settings"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.07.07-2.78 2.78-.07-.07A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1.4 1.6V21h-3.2v-.1A1.8 1.8 0 0 0 9 19.4a1.8 1.8 0 0 0-1.98.36l-.07.07-2.78-2.78.07-.07A1.8 1.8 0 0 0 4.6 15 1.8 1.8 0 0 0 3 13.6H2.9v-3.2H3A1.8 1.8 0 0 0 4.6 9a1.8 1.8 0 0 0-.36-1.98l-.07-.07 2.78-2.78.07.07A1.8 1.8 0 0 0 9 4.6 1.8 1.8 0 0 0 10.4 3h3.2A1.8 1.8 0 0 0 15 4.6a1.8 1.8 0 0 0 1.98-.36l.07-.07 2.78 2.78-.07.07A1.8 1.8 0 0 0 19.4 9a1.8 1.8 0 0 0 1.6 1.4h.1v3.2H21A1.8 1.8 0 0 0 19.4 15Z"/></svg></button><span class="saved-state" id="saveState" role="status" aria-live="polite" data-state="local"><span class="save-indicator"></span> Saved locally</span><button id="headerToday" class="today-btn" type="button">This week</button></div>
+        <div class="breadcrumb"><span class="breadcrumb-dot"></span><span id="breadcrumbName">Overview</span><span class="breadcrumb-muted">/ Your training</span></div>
+        <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button><span class="saved-state" id="saveState" role="status" aria-live="polite" data-state="local"><span class="save-indicator"></span> Saved locally</span><button id="headerToday" class="today-btn" type="button">This week</button></div>
       </header>
       <main id="app" class="content" tabindex="-1"></main>
       <footer class="footer">Progress over perfection. <span>Rep & Lap · Training tracker</span></footer>
