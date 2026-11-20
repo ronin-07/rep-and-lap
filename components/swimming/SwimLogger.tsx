@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Check,ChevronDown,ChevronUp,Clock,Plus,Minus,Play,Square,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
+import {Check,CheckCircle2,ChevronDown,ChevronUp,Clock,Plus,Minus,Play,Square,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {SwimDay,SwimActivity,SwimStroke,SwimSegment,SwimRoutine,SwimMode} from '@/lib/types';
 import {SWIM_DAYS,PLAN} from '@/lib/plan';
