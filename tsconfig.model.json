@@ -24,6 +24,7 @@
     "lib/backup.ts",
     "lib/workout-flow.ts",
     "lib/training-intelligence.ts",
-    "lib/insights.ts"
+    "lib/insights.ts",
+    "lib/activity-notifications.ts"
   ]
 }
