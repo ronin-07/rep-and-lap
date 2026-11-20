@@ -12,7 +12,7 @@ import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,typ
 import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {stableSetId} from '@/lib/set-sync';
-import {blankSegment,swimRoutine,swimPersonalBests,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke} from '@/lib/swimming';
+import {blankSegment,swimRoutine,swimPersonalBests,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
 export function useTrainer(){
@@ -429,10 +429,13 @@ export function useTrainer(){
     log.segments.push(blankSegment(activity,isStroke(activity)?d.swimModes[activity]||SWIM_MODE_DEFAULTS[activity]:'learning'));
   },`session:${week}:${day}`);
  };
- const updateSwimSegment=(day:SwimDay,id:string,patch:Partial<SwimSegment>)=>update(d=>{
+ const updateSwimSegment=(day:SwimDay,id:string,patch:Partial<SwimSegment>)=>{
+  if(!validSwimSegmentPatch(patch))return;
+  update(d=>{
   const s=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!s)return;
   Object.assign(s,patch);
  },`session:${week}:${day}`);
+ };
  const removeSwimSegment=(day:SwimDay,id:string)=>{
   const log=dataRef.current.weeks[week]?.swim?.[day];const segment=log?.segments?.find(x=>x.id===id);if(!segment)return;
   if(!confirm(`Remove this ${segment.activity} entry? The lengths, intervals and notes recorded in this segment will be deleted.`))return;
@@ -443,16 +446,17 @@ export function useTrainer(){
   item.technique??={};item.technique[step]=done;
  },`session:${week}:${day}`);
  const addSwimInterval=(day:SwimDay,id:string,interval:Omit<SwimIntervalSet,'id'>)=>{
-  if(!Number.isInteger(interval.repeats)||interval.repeats<1||interval.repeats>50||!Number.isInteger(interval.lengths)||interval.lengths<1||interval.lengths>40||interval.restSeconds<0||interval.restSeconds>1800){notify('Check interval repetitions, lengths and rest seconds.');return;}
+  if(!Number.isInteger(interval.repeats)||interval.repeats<1||interval.repeats>50||!Number.isInteger(interval.lengths)||interval.lengths<1||interval.lengths>40||!Number.isInteger(interval.restSeconds)||interval.restSeconds<0||interval.restSeconds>1800||
+     (interval.secondsPerRepeat!==undefined&&(!Number.isFinite(Number(interval.secondsPerRepeat))||Number(interval.secondsPerRepeat)<=0||Number(interval.secondsPerRepeat)>10000))){notify('Check interval repetitions, lengths, rest and timed repeat values.');return;}
   update(d=>{const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!item)return;
-   item.intervals??=[];item.intervals.push({...interval,id:crypto.randomUUID()});
+   item.intervals??=[];if(item.intervals.length>=60){notify('A swimming segment can contain up to 60 interval sets.');return;}item.intervals.push({...interval,id:crypto.randomUUID()});
   },`session:${week}:${day}`);
  };
  const removeSwimInterval=(day:SwimDay,id:string,intervalId:string)=>update(d=>{
   const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(item)item.intervals=item.intervals?.filter(x=>x.id!==intervalId);
  },`session:${week}:${day}`);
  const editSwimPreference=(patch:Partial<Pick<TrackerData,'swimPoolDefault'|'swimTargets'|'swimModes'>>)=>{
-  if(patch.swimPoolDefault!==undefined&&(patch.swimPoolDefault<10||patch.swimPoolDefault>100))return;
+  if(patch.swimPoolDefault!==undefined&&validPool(patch.swimPoolDefault)!==patch.swimPoolDefault)return;
   update(d=>{Object.assign(d,patch);},'preferences');
  };
  const saveSwimDefault=(day:SwimDay)=>{

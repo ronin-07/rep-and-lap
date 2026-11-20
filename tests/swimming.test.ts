@@ -3,7 +3,7 @@ import {blankData,weekBlank,recordPayload,applyRecord} from '../lib/storage';
 import {readBackup,mergeBackup} from '../lib/backup';
 import {activityNotifications} from '../lib/activity-notifications';
 import {monthlyRecap,achievements} from '../lib/insights';
-import {swimRoutine,initialSwimRoutines,segmentDistance,segmentContinuous,segmentTimed,swimTotals,strokeInsights,swimPersonalBests,effectivePool} from '../lib/swimming';
+import {swimRoutine,initialSwimRoutines,segmentDistance,segmentContinuous,segmentTimed,swimTotals,strokeInsights,swimPersonalBests,effectivePool,validPool,validSwimSegmentPatch} from '../lib/swimming';
 import type {SwimSegment} from '../lib/types';
 const WK='2026-11-16', NOW=Date.parse('2026-11-20T19:00:00Z');
 const makeSegment=(id:string,activity:SwimSegment['activity'],params:Partial<SwimSegment>={}):SwimSegment=>({id,activity,mode:'advanced',lengths:0,minutes:0,intervals:[],technique:{},...params});
@@ -14,6 +14,22 @@ describe('Milestone 6 multi-stroke swimming',()=>{
   const legacy={lengths:4,distance:100};expect(effectivePool(legacy,50)).toBe(25);
   expect(swimTotals(legacy,50).meters).toBe(100);
   expect(swimTotals(undefined,50).meters).toBe(0);
+ });
+ it('rejects fractional pool settings and invalid editable swim measurements',()=>{
+  expect(validPool(12.5)).toBe(50);
+  expect(validPool(25)).toBe(25);
+  expect(validSwimSegmentPatch({lengths:'-1'})).toBe(false);
+  expect(validSwimSegmentPatch({lengths:'2.5'})).toBe(false);
+  expect(validSwimSegmentPatch({timedSeconds:'Infinity'})).toBe(false);
+  expect(validSwimSegmentPatch({minutes:'',lengths:'12'})).toBe(true);
+ });
+ it('does not silently award a smaller continuous record for an invalid overclaim',()=>{
+  const invalid=makeSegment('s','freestyle',{lengths:2,longestContinuous:500});
+  expect(segmentContinuous(invalid,50)).toBe(0);
+  expect(segmentContinuous({...invalid,longestContinuous:100},50)).toBe(100);
+  const data=blankData();data.weeks[WK]=weekBlank();data.weeks[WK].done.Thursday=true;
+  data.weeks[WK].swim.Thursday={poolLength:50,segments:[invalid]};
+  expect(swimPersonalBests(data)).toHaveLength(0);
  });
  it('separates continuous lengths from interval distance and avoids timed double counting',()=>{
   const freestyle=makeSegment('swim-a','freestyle',{lengths:4,longestContinuous:100,minutes:20,timedMeters:50,timedSeconds:72,

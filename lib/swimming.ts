@@ -38,7 +38,7 @@ export const SWIM_ACTIVITY_LABELS:Record<SwimActivity,string>={
 };
 export const isStroke=(x:SwimActivity):x is SwimStroke=>(SWIM_STROKES as readonly string[]).includes(x);
 export const swimNumber=(v:unknown):number=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v))?Number(v):0;
-export function validPool(n:unknown):number {const v=swimNumber(n);return v>=10&&v<=100?v:50;}
+export function validPool(n:unknown):number {const v=swimNumber(n);return Number.isInteger(v)&&v>=10&&v<=100?v:50;}
 export function effectivePool(log?:SwimLog,defaultPool=50):number {
  if(log?.poolLength!==undefined&&swimNumber(log.poolLength)>0)return validPool(log.poolLength);
  // Legacy swims were historically logged against a 25 m default.
@@ -68,18 +68,33 @@ export function swimIntervalMeters(interval:SwimIntervalSet,pool:number):number 
  const lengths=Math.max(0,Math.floor(swimNumber(interval.lengths)));
  return reps*lengths*pool;
 }
+/** Reject out-of-range input before it is written to a synced swim record.
+ * Empty strings are permitted while a number field is being edited. */
+export function validSwimSegmentPatch(patch:Partial<SwimSegment>):boolean {
+ const limits:Partial<Record<keyof SwimSegment,number>>={minutes:240,lengths:1000,longestContinuous:100000,timedMeters:100000,timedSeconds:100000};
+ for(const [field,limit] of Object.entries(limits) as [keyof SwimSegment,number][]){
+  const raw=patch[field];
+  if(raw===undefined||raw==='')continue;
+  const value=Number(raw);
+  if(!Number.isFinite(value)||value<0||value>limit||(field==='lengths'&&!Number.isInteger(value)))return false;
+ }
+ return true;
+}
 export function segmentDistance(segment:SwimSegment,pool:number):number {
  const base=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
  return base+(segment.intervals||[]).reduce((n,interval)=>n+swimIntervalMeters(interval,pool),0);
 }
 export function segmentContinuous(segment:SwimSegment,pool:number):number {
  // Continuous swimming cannot be inferred from repeated intervals.
- return isStroke(segment.activity)?Math.min(Math.max(0,swimNumber(segment.longestContinuous)),Math.max(0,swimNumber(segment.lengths))*pool):0;
+ if(!isStroke(segment.activity))return 0;
+ const claimed=swimNumber(segment.longestContinuous),logged=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
+ // Never turn an invalid claim into an apparent record by silently clamping it.
+ return claimed>=0&&claimed<=logged?claimed:0;
 }
 export function segmentTimed(segment:SwimSegment,pool:number):{meters:number;seconds:number}|null {
  if(!isStroke(segment.activity))return null;
  const meters=swimNumber(segment.timedMeters),secs=swimNumber(segment.timedSeconds);
- const base=Math.max(0,swimNumber(segment.lengths))*pool;
+ const base=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
  if(meters<=0||secs<=0||meters>base)return null;
  return {meters,seconds:secs};
 }
