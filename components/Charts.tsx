@@ -1,6 +1,7 @@
 'use client';
 interface Point {date:string;value:number;target?:number}
 export function LineChart({points,title,unit='',stroke='#a78bfa',compare}:{points:Point[];title?:string;unit?:string;stroke?:string;compare?:Point[]}){
+ if(!points.length||![...points,...(compare||[])].some(p=>p.value>0))return <div className="chart-empty" role="status">No data yet. Log a few sessions to see your trend here.</div>;
  const max=Math.max(1,...points.map(p=>p.value),...(compare||[]).map(p=>p.value));
  const n=Math.max(points.length-1,1),line=points.map((p,i)=>`${30+(i/n)*590},${190-(p.value/max)*158}`).join(' ');
  const second=compare?.map((p,i)=>`${30+(i/n)*590},${190-(p.value/max)*158}`).join(' ');

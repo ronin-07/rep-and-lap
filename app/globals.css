@@ -177,3 +177,61 @@ body.keyboard-open .rest-dock{display:none}
 @media(max-width:670px){.schedule-actions{padding-left:47px;gap:6px}.schedule-actions>button{padding:7px 10px}.routine-heading{align-items:flex-start;flex-direction:column}.routine-editor{padding:17px}.routine-item{align-items:flex-start;flex-direction:column}.routine-controls{width:100%;justify-content:flex-start}.routine-footer .text-btn{margin-left:0}.calendar-weekdays,.training-calendar-grid{gap:5px}.calendar-cell{min-height:51px;border-radius:9px;gap:6px}.calendar-day-number{font-size:.86rem}.calendar-toolbar{gap:8px}.calendar-toolbar strong{min-width:0;flex:1;font-size:.94rem}.calendar-today{margin-left:0}.calendar-session-actions .button-secondary{flex:1;min-width:116px}.calendar-move{min-width:100%;max-width:none}}
 @media(max-width:365px){.calendar-cell{min-height:43px}.calendar-weekdays{font-size:.63rem}.calendar-key{gap:9px}.routine-controls{gap:4px}.schedule-actions{padding-left:8px}.calendar-session-heading{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.calendar-cell{transition:none}}
+
+/* v3.2 milestone 4: layout accessibility, navigation and routine tools */
+*,*::before,*::after{box-sizing:border-box}
+.app-layout,.content-shell,.app-main,.page-header,.card,.stack,.dashboard-split{min-width:0}
+.progress-tabs,.tracking-tabs{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:3px 2px 12px;max-width:100%;width:100%;scroll-snap-type:x proximity}
+.progress-tabs button,.tracking-tabs button{flex:0 0 auto!important;width:auto!important;min-width:max-content!important;white-space:nowrap!important;scroll-snap-align:start;font-size:.84rem;line-height:1.2;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 15px!important}
+.progress-tabs button:focus-visible,.tracking-tabs button:focus-visible,.calendar-cell:focus-visible,.routine-drag:focus-visible{outline:3px solid var(--purple);outline-offset:3px}
+.tracking-tabs button span{white-space:nowrap;overflow:visible}
+.panel-number{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;letter-spacing:normal;line-height:1.25;max-width:100%}
+.panel-number span{font-size:.42em;line-height:1.3;letter-spacing:0;white-space:nowrap;display:inline-block;vertical-align:baseline;margin-left:0!important}
+.field{min-width:0;max-width:100%}.field input,.field select,.field textarea{max-width:100%;width:100%;min-width:0}
+input[type='date']{display:block;width:100%;max-width:100%;min-width:0;min-height:48px;text-align:left;text-align-last:left;padding:10px 14px;box-sizing:border-box;color-scheme:dark}
+:root[data-theme='light'] input[type='date']{color-scheme:light}
+input[type='date']::-webkit-date-and-time-value{text-align:left;min-height:1.3em}
+input[type='date']::-webkit-datetime-edit{padding:0;min-width:0}
+.calendar-selected-heading{align-items:flex-start;flex-wrap:wrap}
+.calendar-primary-status{display:flex;align-items:center;gap:16px;min-width:0;margin-bottom:10px}
+.calendar-primary-status>div{min-width:0}.calendar-primary-status h3{font-size:clamp(1.22rem,3vw,1.7rem);margin:4px 0 5px;line-height:1.2}
+.calendar-primary-status p{font-size:.86rem;color:var(--muted);line-height:1.55;overflow-wrap:anywhere}
+.calendar-status-icon{display:grid;place-items:center;flex:0 0 49px;width:49px;height:49px;border:1px solid currentColor;border-radius:14px}
+.calendar-session-meta{display:flex;flex-wrap:wrap;gap:8px 15px;color:var(--muted);font-size:.75rem}
+.calendar-session{border-left:5px solid var(--border);padding:20px}
+.calendar-session.session-rest{border-left-color:#5bdbc9}.calendar-session.session-skipped{border-left-color:#ffaf97}.calendar-session.session-completed{border-left-color:#82e2b4}.calendar-session.session-scheduled{border-left-color:#b7a4ff}
+.calendar-session-actions{gap:10px;align-items:center}.calendar-session-actions button{display:inline-flex;align-items:center;gap:6px}
+.calendar-reschedule{width:100%;max-width:290px;min-width:0;position:relative}
+.calendar-reschedule summary{display:inline-flex;align-items:center;gap:7px;min-height:44px;cursor:pointer;padding:10px 13px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-weight:750;list-style:none}
+.calendar-reschedule summary::-webkit-details-marker{display:none}.calendar-reschedule[open]{padding:10px 0}.calendar-reschedule .field{margin-top:8px}
+.calendar-cell{min-height:66px;gap:2px;border-width:1.5px}.calendar-cell-icon{min-height:17px;display:flex;align-items:center;justify-content:center}
+.calendar-cell-icon svg{stroke-width:2.7}
+.calendar-cell.status-cell-completed{border-color:rgba(130,226,180,.48)}.calendar-cell.status-cell-skipped{border-style:dashed;border-color:rgba(255,175,151,.65)}.calendar-cell.status-cell-rest{border-style:double;border-width:3px;border-color:rgba(91,219,201,.6)}.calendar-cell.status-cell-planned{border-color:rgba(183,164,255,.52)}
+.calendar-cell.status-cell-free .calendar-cell-icon{opacity:0}
+.calendar-cell:hover{background:color-mix(in srgb,var(--purple) 15%,var(--panel2));outline:1px solid var(--purple)}
+.calendar-key{gap:9px 17px}.calendar-key span{font-size:.81rem;font-weight:750;color:var(--text);gap:7px}.calendar-key svg{flex-shrink:0;stroke-width:2.6}
+.legend-completed{color:#82e2b4}.legend-planned{color:#c4b8ff}.legend-rest{color:#69e3d0}.legend-skipped{color:#ffad9a}
+.schedule-item.status-rest,.schedule-item.status-skipped{border-radius:13px;padding:7px;background:var(--panel2);margin:8px 0;border-left:4px solid var(--aqua)}
+.schedule-item.status-skipped{border-left-color:var(--coral)}
+.schedule-item.status-rest .schedule-content strong,.schedule-item.status-skipped .schedule-content strong{font-size:1.03rem;line-height:1.4}
+.schedule-content{min-width:0;flex:1}.schedule-content strong,.schedule-content small{display:block;overflow-wrap:anywhere;min-width:0;white-space:normal;line-height:1.45}
+.schedule-main{min-width:0;align-items:center}.schedule-main>*{min-width:0}.schedule-actions{padding-left:55px}.schedule-actions button,.schedule-actions summary{min-height:43px!important;white-space:nowrap}
+.reschedule-disclosure{flex:0 1 auto;min-width:0!important;width:auto;max-width:100%}
+.reschedule-disclosure[open]{flex:1 1 100%;max-width:300px}.reschedule-disclosure[open] summary{margin-bottom:10px}
+.schedule-actions .reschedule-disclosure .field{width:100%;max-width:100%;min-width:0}
+.routine-item{gap:10px}.routine-drag{display:grid;place-items:center;flex-shrink:0;width:39px;height:44px;border:1px dashed var(--border);background:transparent;color:var(--muted);border-radius:10px;touch-action:none;cursor:grab}
+.routine-drag:active{cursor:grabbing}.routine-item.dragging{opacity:.62;border-color:var(--purple)}.routine-item.drop-target{border:2px dashed var(--aqua);background:rgba(91,219,201,.08)}
+.routine-search-input{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:11px;background:var(--panel);padding:0 11px}.routine-search-input input{border:0;background:transparent;padding:12px 0;width:100%;min-width:0}
+.routine-filters{display:flex;gap:7px;overflow-x:auto;padding:10px 0 13px;scrollbar-width:thin}.routine-filters button{background:var(--panel);border:1px solid var(--border);border-radius:99px;padding:8px 13px;white-space:nowrap;color:var(--text);font-size:.75rem;min-height:39px}.routine-filters button.selected{border-color:var(--purple);background:rgba(169,149,255,.17)}
+.exercise-catalog{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:5px}.exercise-catalog button{background:var(--panel);color:var(--text);padding:11px 13px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;min-height:53px}.exercise-catalog button.selected{background:rgba(169,149,255,.14);border-color:var(--purple)}.exercise-catalog button span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}.exercise-catalog button strong{font-size:.81rem}.exercise-catalog button small{color:var(--muted);font-size:.72rem}.catalog-chosen{color:var(--aqua);font-size:.71rem}.catalog-custom{margin:9px 0 10px}.catalog-custom.selected{color:var(--aqua)}.routine-add-actions{margin-top:13px;display:flex;flex-wrap:wrap;gap:8px}
+.delete-set-action{color:#ffb9ab!important;font-weight:750}.confirm-delete{width:min(445px,100%);padding:25px;display:flex;flex-direction:column;gap:15px}.confirm-delete h2{font-size:1.4rem}.confirm-delete p{color:var(--muted);line-height:1.6}.confirm-delete .row-actions{justify-content:flex-end;gap:9px}.button-danger{border:none;border-radius:11px;padding:12px 17px;background:#b33a39;color:white;font-weight:750;cursor:pointer}
+.exercise-progression{display:flex;align-items:flex-start;gap:9px;background:rgba(169,149,255,.08);border-top:1px solid var(--border);padding:12px 15px;color:var(--text);font-size:.78rem}.exercise-progression svg{flex-shrink:0;color:var(--purple)}.exercise-progression small{display:block;color:var(--muted);margin-top:4px}
+.progression-advice{background:rgba(169,149,255,.08);border:1px solid rgba(169,149,255,.3);border-radius:13px;padding:17px;display:flex;flex-direction:column;gap:8px}.progression-advice strong{font-size:1.4rem}.progression-advice span{font-size:.83rem;line-height:1.55}.progression-advice small{color:var(--muted);line-height:1.5}
+.chart-empty{min-height:135px;border:1px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;color:var(--muted);font-size:.84rem}
+.recent-session-row{min-width:0;gap:12px}.recent-session-row strong,.recent-session-row small{overflow-wrap:anywhere}
+@media(max-width:900px){.progress-tabs,.tracking-tabs{margin-right:0;max-width:calc(100vw - 30px)}.progress-tabs button,.tracking-tabs button{min-height:47px!important;font-size:.84rem}}
+@media(max-width:670px){.app-main{overflow-x:clip}.calendar-cell{min-height:51px}.calendar-session{padding:15px}.calendar-selected-heading .mini-label{font-size:.68rem}.calendar-reschedule{max-width:100%}.schedule-actions{padding:8px 8px 11px;gap:8px}.schedule-main{gap:9px}.schedule-main .day-initial{flex-shrink:0}.schedule-check{flex-shrink:0}.schedule-actions>button{flex:1 1 auto}.schedule-actions .reschedule-disclosure{width:100%;max-width:100%}.routine-item{flex-direction:row;flex-wrap:wrap;align-items:center}.routine-name{flex:1}.routine-controls{flex:1 1 100%;padding-left:49px}.routine-search-input{width:100%}.routine-add{padding:13px}.panel-number{font-size:clamp(2.1rem,10vw,3.3rem)}.calendar-shortcut{min-width:0}.calendar-key{gap:9px}.calendar-key span{font-size:.72rem}}
+@media(max-width:380px){.progress-tabs,.tracking-tabs{max-width:calc(100vw - 30px)}.tracking-tabs button,.progress-tabs button{padding:9px 12px!important}.calendar-cell{min-height:44px}.calendar-cell-icon svg{width:12px;height:12px}.calendar-session-actions{flex-direction:column;align-items:stretch}.calendar-session-actions button{width:100%}.routine-controls{padding-left:0}.routine-footer button{width:100%;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.routine-item,.calendar-cell{transition:none}}
+/* Keep concise stat values from spilling over on narrow phones. */
+.mini-stat{min-width:0}.mini-stat strong{overflow-wrap:anywhere;line-height:1.25}

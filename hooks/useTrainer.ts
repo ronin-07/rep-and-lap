@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise} from '@/lib/types';
 import {PLAN} from '@/lib/plan';
-import {exercisesFor,editRoutine,cloneExercises} from '@/lib/routines';
+import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory} from '@/lib/routines';
 import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
@@ -315,11 +315,26 @@ export function useTrainer(){
  };
  const resetSessionRoutine=(day:GymDay)=>{
   if(!confirm('Restore the default exercise list for this session? Logged sets stay in history.'))return;
-  update(d=>{const w=d.weeks[week]??=weekBlank();if(w.routineOverrides)delete w.routineOverrides[day];},`session:${week}:${day}`);
+  update(d=>{const w=d.weeks[week]??=weekBlank();
+   const original=cloneExercises(d.routineTemplates?.[day]||((PLAN[day].kind==='gym')?PLAN[day].exercises:[]));
+   const loggedNames=Object.entries(w.gym?.[day]||{}).filter(([,entry])=>entry.sets.some(set=>!set.deleted&&set.done)).map(([name])=>name);
+   const existing=exercisesFor(d,week,day);
+   for(const name of loggedNames)if(!original.some(ex=>ex.name===name)){const archived=existing.find(ex=>ex.name===name);original.push(archived||{name,sets:3,reps:'8–12',muscles:'Previously logged'});}
+   w.routineOverrides??={};w.routineOverrides[day]=original;
+  },`session:${week}:${day}`);notify('Routine reset. Logged exercises remain visible.');
  };
  const resetDefaultRoutine=(day:GymDay)=>{
   if(!confirm('Reset your saved default routine for this day?'))return;
-  update(d=>{delete d.routineTemplates[day];},'preferences');
+  try {update(d=>resetDefaultPreservingHistory(d,week,day),['preferences',`session:${week}:${day}`]);
+    notify('Saved default restored. Any already-logged exercises are preserved.');}catch(error){notify(error instanceof Error?error.message:'Could not reset default.');}
+ };
+ const deleteLoggedSet=(day:GymDay,exercise:string,index:number)=>{
+  const record=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];
+  if(!record||record.deleted||!record.done)return;
+  // A tombstone allows offline edits to propagate instead of resurrecting a deleted set.
+  editSet(day,exercise,index,set=>{set.kg='';set.reps='';set.done=false;set.deleted=true;delete set.rir;delete set.rpe;});
+  if(restRef.current?.target?.exercise===exercise&&restRef.current?.target?.day===day)saveRest(null);
+  notify('Logged set deleted. Set slot is ready to reuse.');
  };
  const logSet=(day:GymDay,exercise:string,index:number)=>{
   const current=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];
@@ -327,6 +342,7 @@ export function useTrainer(){
   const earlier=history(dataRef.current,day,exercise).filter(x=>x.week<week);
   const previousBest=earlier.length?Math.max(...earlier.map(x=>x.best)):null;
   const was=!!current?.done;
+  if(was&&!confirm('Unmark this logged set? Its weight and reps will be kept. Use Delete to remove the recording.'))return;
   editSet(day,exercise,index,set=>{set.done=!was;set.deleted=false;});
   if(!was){
    const target=nextIncompleteSet(dataRef.current,week,day,exercise,index);
@@ -441,6 +457,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

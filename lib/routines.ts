@@ -23,6 +23,88 @@ export const EXERCISE_LIBRARY:RoutineExercise[]=[
  {name:'Hip thrust',sets:3,reps:'8–12',muscles:'Glutes'},
  {name:'Seated calf raises',sets:3,reps:'12–20',muscles:'Calves'},
 ];
+export type CatalogExercise=RoutineExercise & {category?:string;equipment?:string};
+export const EXTRA_EXERCISES:CatalogExercise[]=[
+ {name:'Barbell incline bench press',sets:3,reps:'8–12',muscles:'Chest · shoulders',category:'Chest',equipment:'Barbell'},
+ {name:'Dumbbell incline press',sets:3,reps:'8–12',muscles:'Chest · shoulders',category:'Chest',equipment:'Dumbbells'},
+ {name:'Barbell decline bench press',sets:3,reps:'8–12',muscles:'Chest',category:'Chest',equipment:'Barbell'},
+ {name:'Cable chest fly',sets:3,reps:'8–12',muscles:'Chest',category:'Chest',equipment:'Cable'},
+ {name:'Pec deck fly',sets:3,reps:'8–12',muscles:'Chest',category:'Chest',equipment:'Machine'},
+ {name:'Dumbbell chest fly',sets:3,reps:'8–12',muscles:'Chest',category:'Chest',equipment:'Dumbbells'},
+ {name:'Smith machine bench press',sets:3,reps:'8–12',muscles:'Chest',category:'Chest',equipment:'Smith machine'},
+ {name:'Chest dips',sets:3,reps:'8–12',muscles:'Chest · triceps',category:'Chest',equipment:'Bodyweight'},
+ {name:'Barbell deadlift',sets:3,reps:'8–12',muscles:'Back · glutes · hamstrings',category:'Back',equipment:'Barbell'},
+ {name:'Romanian deadlift',sets:3,reps:'8–12',muscles:'Hamstrings · glutes',category:'Back',equipment:'Barbell'},
+ {name:'Conventional pull-up',sets:3,reps:'8–12',muscles:'Lats · biceps',category:'Back',equipment:'Bodyweight'},
+ {name:'Chin-ups',sets:3,reps:'8–12',muscles:'Lats · biceps',category:'Back',equipment:'Bodyweight'},
+ {name:'Wide grip lat pulldown',sets:3,reps:'8–12',muscles:'Lats',category:'Back',equipment:'Cable'},
+ {name:'Close-grip lat pulldown',sets:3,reps:'8–12',muscles:'Lats',category:'Back',equipment:'Cable'},
+ {name:'Straight-arm pulldown',sets:3,reps:'8–12',muscles:'Lats',category:'Back',equipment:'Cable'},
+ {name:'Seated cable row',sets:3,reps:'8–12',muscles:'Mid back',category:'Back',equipment:'Cable'},
+ {name:'Barbell bent-over row',sets:3,reps:'8–12',muscles:'Mid back · lats',category:'Back',equipment:'Barbell'},
+ {name:'T-bar row',sets:3,reps:'8–12',muscles:'Mid back',category:'Back',equipment:'Machine'},
+ {name:'Chest-supported dumbbell row',sets:3,reps:'8–12',muscles:'Mid back',category:'Back',equipment:'Dumbbells'},
+ {name:'Rear delt fly',sets:3,reps:'8–12',muscles:'Rear delts',category:'Back',equipment:'Dumbbells'},
+ {name:'Hyperextensions',sets:3,reps:'8–12',muscles:'Lower back · glutes',category:'Back',equipment:'Bodyweight'},
+ {name:'Barbell overhead press',sets:3,reps:'8–12',muscles:'Shoulders · triceps',category:'Shoulders',equipment:'Barbell'},
+ {name:'Seated dumbbell shoulder press',sets:3,reps:'8–12',muscles:'Shoulders',category:'Shoulders',equipment:'Dumbbells'},
+ {name:'Cable lateral raise',sets:3,reps:'8–12',muscles:'Side delts',category:'Shoulders',equipment:'Cable'},
+ {name:'Dumbbell front raise',sets:3,reps:'8–12',muscles:'Front delts',category:'Shoulders',equipment:'Dumbbells'},
+ {name:'Reverse pec deck',sets:3,reps:'8–12',muscles:'Rear delts',category:'Shoulders',equipment:'Machine'},
+ {name:'Cable rear delt fly',sets:3,reps:'8–12',muscles:'Rear delts',category:'Shoulders',equipment:'Cable'},
+ {name:'Dumbbell shrugs',sets:3,reps:'8–12',muscles:'Traps',category:'Shoulders',equipment:'Dumbbells'},
+ {name:'Barbell shrugs',sets:3,reps:'8–12',muscles:'Traps',category:'Shoulders',equipment:'Barbell'},
+ {name:'Upright row',sets:3,reps:'8–12',muscles:'Shoulders · traps',category:'Shoulders',equipment:'Barbell'},
+ {name:'Barbell biceps curl',sets:3,reps:'8–12',muscles:'Biceps',category:'Arms',equipment:'Barbell'},
+ {name:'Incline dumbbell curl',sets:3,reps:'8–12',muscles:'Biceps',category:'Arms',equipment:'Dumbbells'},
+ {name:'Hammer curl',sets:3,reps:'8–12',muscles:'Biceps · forearms',category:'Arms',equipment:'Dumbbells'},
+ {name:'Preacher curl',sets:3,reps:'8–12',muscles:'Biceps',category:'Arms',equipment:'Machine'},
+ {name:'Concentration curl',sets:3,reps:'8–12',muscles:'Biceps',category:'Arms',equipment:'Dumbbells'},
+ {name:'Overhead cable triceps extension',sets:3,reps:'8–12',muscles:'Triceps',category:'Arms',equipment:'Cable'},
+ {name:'Triceps rope pushdown',sets:3,reps:'8–12',muscles:'Triceps',category:'Arms',equipment:'Cable'},
+ {name:'Skull crushers',sets:3,reps:'8–12',muscles:'Triceps',category:'Arms',equipment:'EZ bar'},
+ {name:'Close-grip bench press',sets:3,reps:'8–12',muscles:'Triceps · chest',category:'Arms',equipment:'Barbell'},
+ {name:'Reverse wrist curl',sets:3,reps:'8–12',muscles:'Forearms',category:'Arms',equipment:'Dumbbells'},
+ {name:'Back squat',sets:3,reps:'8–12',muscles:'Quads · glutes',category:'Legs',equipment:'Barbell'},
+ {name:'Front squat',sets:3,reps:'8–12',muscles:'Quads',category:'Legs',equipment:'Barbell'},
+ {name:'Leg press',sets:3,reps:'8–12',muscles:'Quads · glutes',category:'Legs',equipment:'Machine'},
+ {name:'Hack squat',sets:3,reps:'8–12',muscles:'Quads',category:'Legs',equipment:'Machine'},
+ {name:'Walking lunges',sets:3,reps:'8–12',muscles:'Quads · glutes',category:'Legs',equipment:'Dumbbells'},
+ {name:'Reverse lunges',sets:3,reps:'8–12',muscles:'Quads · glutes',category:'Legs',equipment:'Dumbbells'},
+ {name:'Step-ups',sets:3,reps:'8–12',muscles:'Quads · glutes',category:'Legs',equipment:'Bodyweight'},
+ {name:'Lying leg curl',sets:3,reps:'8–12',muscles:'Hamstrings',category:'Legs',equipment:'Machine'},
+ {name:'Standing leg curl',sets:3,reps:'8–12',muscles:'Hamstrings',category:'Legs',equipment:'Machine'},
+ {name:'Standing calf raise',sets:3,reps:'8–12',muscles:'Calves',category:'Legs',equipment:'Machine'},
+ {name:'Cable pull-through',sets:3,reps:'8–12',muscles:'Glutes',category:'Legs',equipment:'Cable'},
+ {name:'Hip abduction',sets:3,reps:'8–12',muscles:'Glutes',category:'Legs',equipment:'Machine'},
+ {name:'Hip adduction',sets:3,reps:'8–12',muscles:'Adductors',category:'Legs',equipment:'Machine'},
+ {name:'Glute kickback',sets:3,reps:'8–12',muscles:'Glutes',category:'Legs',equipment:'Cable'},
+ {name:'Cable crunch',sets:3,reps:'12–20',muscles:'Abs',category:'Core',equipment:'Cable'},
+ {name:'Hanging leg raise',sets:3,reps:'12–20',muscles:'Abs',category:'Core',equipment:'Bodyweight'},
+ {name:'Knee raises',sets:3,reps:'12–20',muscles:'Abs',category:'Core',equipment:'Bodyweight'},
+ {name:'Plank',sets:3,reps:'12–20',muscles:'Core',category:'Core',equipment:'Bodyweight'},
+ {name:'Side plank',sets:3,reps:'12–20',muscles:'Obliques',category:'Core',equipment:'Bodyweight'},
+ {name:'Russian twist',sets:3,reps:'12–20',muscles:'Obliques',category:'Core',equipment:'Bodyweight'},
+ {name:'Ab wheel rollout',sets:3,reps:'12–20',muscles:'Abs',category:'Core',equipment:'Ab wheel'},
+ {name:'Dead bug',sets:3,reps:'12–20',muscles:'Core',category:'Core',equipment:'Bodyweight'},
+ {name:'Pallof press',sets:3,reps:'12–20',muscles:'Core · obliques',category:'Core',equipment:'Cable'},
+ {name:'Bicycle crunch',sets:3,reps:'12–20',muscles:'Abs',category:'Core',equipment:'Bodyweight'},
+];
+export const FULL_EXERCISE_LIBRARY:CatalogExercise[]=Array.from(new Map(
+ [...EXERCISE_LIBRARY,...Object.values(PLAN).flatMap(p=>p.kind==='gym'?p.exercises:[]),...EXTRA_EXERCISES]
+ .map(ex=>[ex.name.toLowerCase(),ex] as const)
+ ).values()).sort((a,b)=>a.name.localeCompare(b.name));
+export function exerciseCategory(ex:CatalogExercise):string{
+ if(ex.category)return ex.category;
+ const muscles=ex.muscles.toLowerCase();
+ if(/chest/.test(muscles))return 'Chest';
+ if(/quad|hamstring|glute|calve/.test(muscles))return 'Legs';
+ if(/shoulder|delt|trap/.test(muscles))return 'Shoulders';
+ if(/tricep|bicep|forearm/.test(muscles))return 'Arms';
+ if(/abs|core|oblique/.test(muscles))return 'Core';
+ return 'Back';
+}
+
 export function exercisesFor(data:TrackerData,week:string,day:GymDay):RoutineExercise[]{
  const plan=PLAN[day];if(plan.kind!=='gym')return [];
  return data.weeks[week]?.routineOverrides?.[day]??data.routineTemplates?.[day]??plan.exercises;
@@ -45,4 +127,18 @@ export function editRoutine(exercises:RoutineExercise[],kind:'add'|'remove'|'mov
   else {if(index<0||index>=list.length)throw new Error('Invalid exercise');list[index]=ex;}
  }
  return list;
+}
+
+/** Reset an inherited template safely: preserve this week's performed exercises. */
+export function resetDefaultPreservingHistory(data:TrackerData,week:string,day:GymDay):void {
+ const record=data.weeks[week];
+ if(record){
+  const loggedNames=Object.entries(record.gym?.[day]||{}).filter(([,e])=>e.sets.some(set=>set.done&&!set.deleted)).map(([name])=>name);
+  if(loggedNames.length){
+   const original=cloneExercises(exercisesFor(data,week,day));
+   for(const name of loggedNames)if(!original.some(ex=>ex.name===name))original.push({name,sets:3,reps:'8–12',muscles:'Previously logged'});
+   record.routineOverrides??={};record.routineOverrides[day]=original;
+  }
+ }
+ data.routineTemplates??={};delete data.routineTemplates[day];
 }

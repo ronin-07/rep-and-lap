@@ -1,4 +1,4 @@
-> **Development branch:** v3.2 Milestone 3 adds training calendar, rest/skip/reschedule workflows, editable gym routines, schema v4 and routine-aware rest navigation. See [Milestone 3 release notes](RELEASE-MILESTONE-3.md). Do not merge into `main` before all milestones are tested.
+> **Development branch `feature/v3.2` — Milestone 4 Preview candidate.** Mobile/desktop hotfixes, a standalone Calendar section, searchable/drag-reorder routines, safe logged-set deletion, weekly training time, progressive-overload guidance and swimming progression. See [Milestone 4 notes](RELEASE-MILESTONE-4.md). Keep `main` unchanged until all five milestones pass.
 
 > **Development branch `feature/v3.2`: Milestone 2 workout-flow update.** See [RELEASE-MILESTONE-2.md](RELEASE-MILESTONE-2.md). Do not merge to production until all five milestones are tested.
 
