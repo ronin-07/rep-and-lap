@@ -7,7 +7,18 @@ export type TrackingTab = 'gym'|'swim'|'water'|'weight';
 export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration';
 export type InputNumber = number|string;
 export type SyncMode = 'saved-local'|'syncing'|'synced'|'needs-attention'|'checking';
-export interface GymSet {kg?:InputNumber;reps?:InputNumber;done?:boolean}
+export interface GymSet {id?:string;kg?:InputNumber;reps?:InputNumber;done?:boolean;deleted?:boolean}
+// Individual gym sets sync independently; a session's older gym payload remains a read-only fallback.
+export interface SetDocument {
+  key:string; sessionKey:string; setId:string; exercise:string; index:number;
+  value:GymSet; revision:number; updatedMs:number; updatedBy:string;
+}
+export interface PendingSetWrite {
+  key:string; sessionKey:string; setId:string; exercise:string; index:number;
+  value:GymSet; baseRevision:number; updatedMs:number;
+}
+export interface SetConflict {local:PendingSetWrite; remote:SetDocument|null}
+
 export interface ExerciseLog {sets:GymSet[];setCount?:number;notes?:string}
 export interface SwimInterval {repeats:number; lengths:number;rest:number;pool:number}
 export interface SwimLog {
@@ -32,5 +43,6 @@ export interface Preferences {setOverrides:Record<string,number>;targetWeight:In
 export interface TrackerData extends Preferences {
   version:number;weeks:Record<string,WeekLog>;weights:Record<string,WeighIn>;
   waterLogs:Record<string,WaterEntry>;recordUpdates:Record<string,number>;pendingSync:Record<string,number>;
+  setRecords:Record<string,SetDocument>;pendingSets:Record<string,PendingSetWrite>;setConflicts:Record<string,SetConflict>;
 }
 export interface UserInfo {uid:string;name:string;email:string;photoURL:string|null}

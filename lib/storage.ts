@@ -1,8 +1,9 @@
+import {normalizeSets,overlaySets} from './set-sync';
 import {DAYS, type TrackerData, type WeekLog, type Day} from './types';
 export const STORAGE_KEY='rep-and-lap-firebase-v1'; // Reuse existing Firebase edition cache, no data reset.
 export const LAST_ACCOUNT_KEY='rep-and-lap-firebase-last-account';
 export const THEME_KEY='rep-and-lap-theme';
-export function blankData():TrackerData {return {version:2,weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
+export function blankData():TrackerData {return {version:3,setRecords:{},pendingSets:{},setConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
 export function weekBlank():WeekLog{return {done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{}};}
 export function loadData(uid:string):TrackerData {
   if(typeof window==='undefined')return blankData();
@@ -18,7 +19,7 @@ export function loadData(uid:string):TrackerData {
       for(const k of Object.keys(result.weights))result.recordUpdates[`weight:${k}`]=t;
       for(const k of Object.keys(result.waterLogs))result.recordUpdates[`water:${k}`]=t;
     }
-    return result;
+    return normalizeSets(result);
   } catch{return blankData();}
 }
 export function saveData(uid:string,data:TrackerData) {localStorage.setItem(`${STORAGE_KEY}:${uid}`,JSON.stringify(data));}
@@ -43,16 +44,22 @@ export function applyRecord(data:TrackerData,key:string,value:unknown):TrackerDa
     const [,wk,day]=key.split(':');if(!/^\d{4}-\d{2}-\d{2}$/.test(wk)||!DAYS.includes(day as Day))return next;
     const d=day as Day,record=(value||{}) as {done?:boolean|null;gym?:unknown;swim?:unknown;notes?:unknown;timing?:unknown;plannedDate?:unknown;completedAt?:unknown};
     const w=next.weeks[wk]??=weekBlank();
-    if(record.done!==undefined&&record.done!==null)w.done[d]=record.done;
-    if(record.gym)w.gym[d as 'Monday']=record.gym as NonNullable<WeekLog['gym']['Monday']>;
-    if(record.swim)w.swim[d as 'Thursday']=record.swim as NonNullable<WeekLog['swim']['Thursday']>;
-    if(record.notes){w.sessionNotes??={};w.sessionNotes[d]=record.notes as NonNullable<WeekLog['sessionNotes']>[Day];}
-    if(record.timing && typeof record.timing==='object'){w.timing??={};w.timing[d]=record.timing as NonNullable<WeekLog['timing']>[Day];}
+    if(record.done===null)delete w.done[d];
+    else if(record.done!==undefined)w.done[d]=record.done;
+    if(record.gym===null)delete w.gym[d as 'Monday'];
+    else if(record.gym)w.gym[d as 'Monday']=record.gym as NonNullable<WeekLog['gym']['Monday']>;
+    if(record.swim===null)delete w.swim[d as 'Thursday'];
+    else if(record.swim)w.swim[d as 'Thursday']=record.swim as NonNullable<WeekLog['swim']['Thursday']>;
+    if(record.notes===null)delete w.sessionNotes?.[d];
+    else if(record.notes){w.sessionNotes??={};w.sessionNotes[d]=record.notes as NonNullable<WeekLog['sessionNotes']>[Day];}
+    if(record.timing===null)delete w.timing?.[d];
+    else if(record.timing && typeof record.timing==='object'){w.timing??={};w.timing[d]=record.timing as NonNullable<WeekLog['timing']>[Day];}
     if(typeof record.plannedDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(record.plannedDate)){w.schedule??={};w.schedule[d]=record.plannedDate;}
     else if(record.plannedDate===null && w.schedule)delete w.schedule[d];
     if(typeof record.completedAt==='string'&&!Number.isNaN(Date.parse(record.completedAt))){w.completedAt??={};w.completedAt[d]=record.completedAt;}
     else if(record.completedAt===null && w.completedAt)delete w.completedAt[d];
   }
+  overlaySets(next);
   return next;
 }
 export function downloadFile(name:string,content:string,mime='application/json') {

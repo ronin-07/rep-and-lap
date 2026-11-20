@@ -4,7 +4,9 @@ import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type
 import {PLAN} from '@/lib/plan';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
-import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord} from '@/lib/firebase';
+import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet} from '@/lib/firebase';
+import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
+import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
 import {history,loggedSet,num,setCount,validSet} from '@/lib/metrics';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'}|null;
@@ -29,6 +31,7 @@ export function useTrainer(){
  const [online,setOnline]=useState(true);
  const [installPrompt,setInstallPrompt]=useState<Event|null>(null);
  const [firebaseError,setFirebaseError]=useState('');
+ const [restorePreview,setRestorePreview]=useState<BackupPreview|null>(null);
  const inFlight=useRef(new Set<string>());
  const readyRef=useRef(false);
  const serverRef=useRef(false);
@@ -50,6 +53,7 @@ export function useTrainer(){
     const payload=recordPayload(dataRef.current,key);
     void writeRecord(uid,key,payload,stamp).then(()=>{
       if(uidRef.current!==uid)return;
+      setFirebaseError('');
       const current=dataRef.current;
       if(current.pendingSync[key]===stamp){
         const next=structuredClone(current);
@@ -63,7 +67,24 @@ export function useTrainer(){
       setSyncMode(navigator.onLine?'needs-attention':'saved-local');
     }).finally(()=>{inFlight.current.delete(key);});
   }
- },[persist]);
+  for(const [key,op] of Object.entries(dataRef.current.pendingSets||{})){
+    if(inFlight.current.has(`set|${key}`)||dataRef.current.setConflicts[key])continue;
+    const inflightKey=`set|${key}`;inFlight.current.add(inflightKey);setSyncMode('syncing');
+    void writeSet(uid,op).then(record=>{
+      if(uidRef.current!==uid)return;
+      setFirebaseError('');
+      const next=structuredClone(dataRef.current);acknowledgeSet(next,record,op.updatedMs);persist(next);
+      if(next.pendingSets[key])setTimeout(()=>void flush(),250); // User edited again during the write.
+      if(!Object.keys(next.pendingSync).length&&!Object.keys(next.pendingSets).length&&serverRef.current)setSyncMode('synced');
+    }).catch((error:unknown)=>{
+      if(uidRef.current!==uid)return;
+      if(error instanceof SetVersionConflict){
+        const next=structuredClone(dataRef.current);flagConflict(next,key,error.remote);persist(next);
+        setSyncMode('needs-attention');notify('A set was edited on another device. Review it in Settings.');
+      }else {setFirebaseError(error instanceof Error?error.message:'Set sync failed');setSyncMode('needs-attention');}
+    }).finally(()=>{inFlight.current.delete(inflightKey);});
+  }
+ },[persist,notify]);
  const scheduleFlush=useCallback(()=>{if(flushTimeout.current)clearTimeout(flushTimeout.current);flushTimeout.current=setTimeout(()=>void flush(),700);},[flush]);
  // Every mutation writes to the existing Firebase-era localStorage shape, preserving logged history.
  const update=useCallback((mutate:(copy:TrackerData)=>void,keys:string|string[]|null)=>{
@@ -119,10 +140,16 @@ export function useTrainer(){
     const current=dataRef.current;
     if(current.pendingSync[key])return; // Preserve unacknowledged local writes.
     if(fromCache&&stamp<(current.recordUpdates[key]||0))return;
+    if(stamp<(current.recordUpdates[key]||0))return; // Ignore older cloud snapshots even when online.
     const next=applyRecord(current,key,payload);next.recordUpdates[key]=stamp;persist(next);
+  },(record,hasPending,fromCache)=>{
+    if(id!==uidRef.current||hasPending)return;
+    const next=structuredClone(dataRef.current);
+    integrateServerSet(next,record);persist(next);
   },(ready,hasPending)=>{
     serverRef.current=ready;readyRef.current=ready;
-    if(Object.keys(dataRef.current.pendingSync).length||hasPending)setSyncMode('syncing');
+    if(Object.keys(dataRef.current.setConflicts).length)setSyncMode('needs-attention');
+    else if(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length||hasPending)setSyncMode('syncing');
     else setSyncMode(ready?'synced':'checking');
   },err=>{setFirebaseError(err.message);setSyncMode('needs-attention');});
   void flush();
@@ -134,7 +161,7 @@ export function useTrainer(){
   const handleFocus=()=>{if(navigator.onLine)void flush();};
   window.addEventListener('online',handleOnline);window.addEventListener('offline',handleOffline);
   window.addEventListener('focus',handleFocus);
-  const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&Object.keys(dataRef.current.pendingSync).length)void flush();},30000);
+  const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length))void flush();},30000);
   return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);clearInterval(interval);};
  },[hydrated,flush]);
  useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),15000);return ()=>clearInterval(interval);},[hydrated]);
@@ -209,10 +236,13 @@ export function useTrainer(){
   },`session:${week}:${day}`);
   if(!was)setCelebration({title:'Session complete!',body:`${PLAN[day].name} is in the books.`,kind:'session'});
  };
- const gymField=(day:GymDay,exercise:string,index:number,field:'kg'|'reps',value:string)=>update(d=>{
-  const w=d.weeks[week]??=weekBlank(), ex=w.gym[day]??={};
-  const target=ex[exercise]??={sets:[]};target.sets[index]??={};target.sets[index][field]=value;target.sets[index].done=false;ex[exercise]=target;
- },`session:${week}:${day}`);
+ const editSet=(day:GymDay,exercise:string,index:number,change:(set:GymSet)=>void)=>{
+  const next=structuredClone(dataRef.current);
+  queueSetChange(next,`session:${week}:${day}`,exercise,index,change);
+  persist(next);if(uidRef.current!=='guest')scheduleFlush();
+ };
+ const gymField=(day:GymDay,exercise:string,index:number,field:'kg'|'reps',value:string)=>
+  editSet(day,exercise,index,set=>{set[field]=value;set.done=false;set.deleted=false;});
  const gymNotes=(day:GymDay,exercise:string,value:string)=>update(d=>{
   const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={};const e=ex[exercise]??={sets:[]};e.notes=value;ex[exercise]=e;
  },`session:${week}:${day}`);
@@ -220,9 +250,16 @@ export function useTrainer(){
   const current=setCount(dataRef.current,week,day,exercise),next=current+delta;if(next<1||next>10)return;
   const last=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[current-1];
   if(delta<0&&(last?.kg||last?.reps)&&!confirm('Remove the final set and its values?'))return;
-  update(d=>{const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={},entry=ex[exercise]??={sets:[]};
-    if(delta<0)entry.sets=entry.sets.slice(0,next);entry.setCount=next;ex[exercise]=entry;d.setOverrides[`${day}|${exercise}`]=next;
-  },[`session:${week}:${day}`,'preferences']);
+  if(delta<0){
+    const copy=structuredClone(dataRef.current);
+    queueSetChange(copy,`session:${week}:${day}`,exercise,current-1,set=>{set.deleted=true;set.done=false;});
+    copy.setOverrides[`${day}|${exercise}`]=next;
+    const stamp=Math.max(Date.now(),(copy.recordUpdates.preferences||0)+1);
+    copy.recordUpdates.preferences=stamp;copy.pendingSync.preferences=stamp;
+    persist(copy);if(uidRef.current!=='guest')scheduleFlush();
+  }else update(d=>{const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={},entry=ex[exercise]??={sets:[]};
+    entry.setCount=next;ex[exercise]=entry;d.setOverrides[`${day}|${exercise}`]=next;
+  },'preferences');
  };
  const logSet=(day:GymDay,exercise:string,index:number)=>{
   const current=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[index];
@@ -230,7 +267,7 @@ export function useTrainer(){
   const earlier=history(dataRef.current,day,exercise).filter(x=>x.week<week);
   const previousBest=earlier.length?Math.max(...earlier.map(x=>x.best)):null;
   const was=!!current?.done;
-  update(d=>{const e=d.weeks[week].gym[day]![exercise].sets[index];e.done=!was;},`session:${week}:${day}`);
+  editSet(day,exercise,index,set=>{set.done=!was;set.deleted=false;});
   if(!was){setRestEnd(Date.now()+(dataRef.current.restSeconds||90)*1000);
    if(previousBest!==null&&num(current?.kg)>previousBest)setCelebration({title:'New personal record!',body:`${exercise}: ${num(current?.kg)} kg`,kind:'pr'});
    else notify('Set logged. Rest timer started.');
@@ -275,23 +312,38 @@ export function useTrainer(){
  const updatePreferences=(change:Partial<Pick<TrackerData,'restSeconds'|'targetWeight'|'reminders'>>)=>update(d=>{Object.assign(d,change);},'preferences');
  const backup=()=>downloadFile(`rep-and-lap-backup-${keyOf(new Date())}.json`,JSON.stringify({...dataRef.current,exportedAt:new Date().toISOString(),app:'Rep & Lap'},null,2));
  const restore=async(file:File)=>{
-  try {if(file.size>5_000_000)throw new Error('File too large');const obj=JSON.parse(await file.text()) as TrackerData;
-   if(!obj||typeof obj.weeks!=='object'||!obj.weeks||Array.isArray(obj.weeks)||Object.keys(obj.weeks).some(k=>!/^\d{4}-\d{2}-\d{2}$/.test(k)))throw new Error('Invalid backup');
-   if(!confirm('Restore this backup? Existing local records will be replaced. A safety backup will download first.'))return;
-   backup();const next:TrackerData={...blankData(),...obj,recordUpdates:{},pendingSync:{}};
-   const stamp=Date.now();for(const [w,entry] of Object.entries(next.weeks))for(const day of DAYS)if(entry.done?.[day]!==undefined||entry.gym?.[day as GymDay]||entry.swim?.[day as SwimDay]||entry.sessionNotes?.[day]||entry.timing?.[day]||entry.schedule?.[day]||entry.completedAt?.[day])next.recordUpdates[`session:${w}:${day}`]=stamp;
-   for(const key of Object.keys(next.weights))next.recordUpdates[`weight:${key}`]=stamp;
-   for(const key of Object.keys(next.waterLogs))next.recordUpdates[`water:${key}`]=stamp;
-   next.recordUpdates.preferences=stamp;next.pendingSync={...next.recordUpdates};persist(next);scheduleFlush();notify('Backup restored.');
-  }catch{notify('That file is not a valid Rep & Lap backup.');}
+  try{
+    if(file.size>5_000_000)throw new Error('Backup is larger than 5 MB');
+    const preview=readBackup(await file.text(),dataRef.current);
+    setRestorePreview(preview);
+  }catch(error){notify(error instanceof Error?error.message:'That file is not a valid RepLap backup.');}
  };
+ const confirmRestore=(mode:RestoreMode)=>{
+  const preview=restorePreview;if(!preview)return;
+  // A cloud replacement requires deleting old documents and set revisions across devices.
+  // Until that can be done safely, replacing is intentionally local/guest only.
+  if(mode==='replace-local'&&uidRef.current!=='guest'){notify('Sign out to replace guest-only local data. Use Merge for your cloud account.');return;}
+  if(uidRef.current!=='guest'&&!serverRef.current){notify('Wait until the initial cloud sync completes before importing.');return;}
+  const phrase=mode==='merge'?'Merge new records? Existing records will never be overwritten.':'Replace all guest records on this device?';
+  if(!confirm(phrase+' A safety backup will download first.'))return;
+  backup();
+  if(mode==='replace-local')persist(replaceLocalBackup(preview.backup));
+  else{
+    const merged=mergeBackup(dataRef.current,preview.backup);
+    markRestoredWrites(merged.data,merged.changedKeys);
+    persist(merged.data);
+    if(merged.changedKeys.length&&uidRef.current!=='guest')scheduleFlush();
+  }
+  setRestorePreview(null);notify('Backup import completed.');
+ };
+ const cancelRestore=()=>setRestorePreview(null);
  const exportCsv=(kind:'gym'|'swim'|'weight'|'water')=>{
   const rows:string[][]=[];
   if(kind==='water'){rows.push(['date','timestamp','millilitres']);for(const item of Object.values(dataRef.current.waterLogs))if(!item.deleted)rows.push([item.date,item.at,String(item.ml)]);}
   if(kind==='weight'){rows.push(['date','kg','notes']);for(const [date,item] of Object.entries(dataRef.current.weights))if(!item.deleted)rows.push([date,String(item.kg??''),item.note||'']);}
-  if(kind==='gym'){rows.push(['week','day','exercise','set','kg','reps','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),String(s.kg??''),String(s.reps??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
+  if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
   if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']);}
-  const csv=rows.map(row=>row.map(x=>`"${x.replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const csv=rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
   downloadFile(`rep-and-lap-${kind}-${keyOf(new Date())}.csv`,csv,'text/csv');
  };
  const resetLocal=()=>{if(!confirm('Clear local records on this device? Cloud records will not be removed.'))return;persist(blankData());notify('Local cache cleared.');};
@@ -301,8 +353,10 @@ export function useTrainer(){
  };
  const signin=async()=>{try{setFirebaseError('');await googleSignIn();}catch(e){const msg=e instanceof Error?e.message:'Sign-in unavailable';setFirebaseError(msg);notify('Google sign-in failed. Check your browser settings.');}};
  const signout=async()=>{try{await googleSignOut();}catch{notify('Unable to sign out.');}};
- const pending=Object.keys(data.pendingSync||{}).length;
- const displaySync:SyncMode=!online?'saved-local':firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,clock,startRest:(sec?:number)=>setRestEnd(Date.now()+(sec||data.restSeconds)*1000),stopRest:()=>setRestEnd(0),extendRest:()=>setRestEnd(v=>v+15000),installPrompt,firebaseError,pending,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,exportCsv,resetLocal,enableReminders};
+ const pending=Object.keys(data.pendingSync||{}).length+Object.keys(data.pendingSets||{}).length;
+ const conflicts=Object.values(data.setConflicts||{});
+ const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
+ const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,clock,startRest:(sec?:number)=>setRestEnd(Date.now()+(sec||data.restSeconds)*1000),stopRest:()=>setRestEnd(0),extendRest:()=>setRestEnd(v=>v+15000),installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;
