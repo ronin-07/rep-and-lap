@@ -76,7 +76,7 @@ export function validSwimSegmentPatch(patch:Partial<SwimSegment>):boolean {
   const raw=patch[field];
   if(raw===undefined||raw==='')continue;
   const value=Number(raw);
-  if(!Number.isFinite(value)||value<0||value>limit||(field==='lengths'&&!Number.isInteger(value)))return false;
+  if(!Number.isFinite(value)||value<0||value>limit||(['lengths','longestContinuous','timedMeters'].includes(field)&&!Number.isInteger(value)))return false;
  }
  return true;
 }
@@ -84,18 +84,22 @@ export function segmentDistance(segment:SwimSegment,pool:number):number {
  const base=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
  return base+(segment.intervals||[]).reduce((n,interval)=>n+swimIntervalMeters(interval,pool),0);
 }
+export function validRecordDistance(meters:number,pool:number,available:number):boolean {
+ // A record in this lap-based model must represent complete pool lengths.
+ return Number.isInteger(meters)&&meters>0&&Number.isInteger(pool)&&pool>0&&meters%pool===0&&meters<=available;
+}
 export function segmentContinuous(segment:SwimSegment,pool:number):number {
  // Continuous swimming cannot be inferred from repeated intervals.
  if(!isStroke(segment.activity))return 0;
  const claimed=swimNumber(segment.longestContinuous),logged=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
  // Never turn an invalid claim into an apparent record by silently clamping it.
- return claimed>=0&&claimed<=logged?claimed:0;
+ return validRecordDistance(claimed,pool,logged)?claimed:0;
 }
 export function segmentTimed(segment:SwimSegment,pool:number):{meters:number;seconds:number}|null {
  if(!isStroke(segment.activity))return null;
  const meters=swimNumber(segment.timedMeters),secs=swimNumber(segment.timedSeconds);
  const base=Math.max(0,Math.floor(swimNumber(segment.lengths)))*pool;
- if(meters<=0||secs<=0||meters>base)return null;
+ if(!validRecordDistance(meters,pool,base)||!Number.isFinite(secs)||secs<=0)return null;
  return {meters,seconds:secs};
 }
 export interface SwimTotals {meters:number;bestContinuous:number;freestyleBest:number;minutes:number;byStroke:Partial<Record<SwimStroke,{meters:number;continuous:number;minutes:number}>>};
@@ -161,23 +165,25 @@ export function strokeInsights(data:TrackerData,stroke:SwimStroke):StrokeInsight
 export type SwimRecordEvent={id:string;stroke:SwimStroke;kind:'continuous'|'time';date:string;week:string;day:SwimDay;meters:number;seconds?:number};
 /** Reconstructed chronologically, so same-session edits never generate duplicate achievements. */
 export function swimPersonalBests(data:TrackerData):SwimRecordEvent[]{
- const attempts:SwimRecordEvent[]=[];
+ const attempts:(SwimRecordEvent&{completedAtMs:number})[]=[];
  for(const [week,record] of Object.entries(data.weeks))for(const day of SWIM_DAYS){
   if(!record.done?.[day])continue; // PR announcements require a completed swim.
   const log=record.swim?.[day];if(!log)continue;
   const date=completedDate(data,week,day),pool=effectivePool(log,data.swimPoolDefault);
+  const finished=Date.parse(record.completedAt?.[day]||'');
+  const completedAtMs=Number.isFinite(finished)?finished:Date.parse(`${date}T12:00:00Z`);
   if(log.segments?.length){
-   const old=swimNumber(log.longest);if(old>0)attempts.push({id:`swim-pr-cont:${week}:${day}:legacy:${old}`, stroke:'freestyle',kind:'continuous',date,week,day,meters:old});
-   for(const [index,segment] of log.segments.entries()){
+   const old=swimNumber(log.longest);if(old>0)attempts.push({id:`swim-pr-cont:${week}:${day}:legacy:${old}`, stroke:'freestyle',kind:'continuous',date,week,day,meters:old,completedAtMs});
+   for(const segment of log.segments){
     if(!isStroke(segment.activity))continue;
     const cont=segmentContinuous(segment,pool);
-    if(cont>0)attempts.push({id:`swim-pr-cont:${week}:${day}:${segment.id}:${cont}`, stroke:segment.activity,kind:'continuous',date,week,day,meters:cont});
+    if(cont>0)attempts.push({id:`swim-pr-cont:${week}:${day}:${segment.id}:${cont}`, stroke:segment.activity,kind:'continuous',date,week,day,meters:cont,completedAtMs});
     const timed=segmentTimed(segment,pool);
-    if(timed)attempts.push({id:`swim-pr-time:${week}:${day}:${segment.id}:${timed.meters}:${timed.seconds}`, stroke:segment.activity,kind:'time',date,week,day,meters:timed.meters,seconds:timed.seconds});
+    if(timed)attempts.push({id:`swim-pr-time:${week}:${day}:${segment.id}:${timed.meters}:${timed.seconds}`, stroke:segment.activity,kind:'time',date,week,day,meters:timed.meters,seconds:timed.seconds,completedAtMs});
    }
-  }else{const old=swimNumber(log.longest);if(old>0)attempts.push({id:`swim-pr-cont:${week}:${day}:legacy:${old}`, stroke:'freestyle',kind:'continuous',date,week,day,meters:old});}
+  }else{const old=swimNumber(log.longest);if(old>0)attempts.push({id:`swim-pr-cont:${week}:${day}:legacy:${old}`, stroke:'freestyle',kind:'continuous',date,week,day,meters:old,completedAtMs});}
  }
- attempts.sort((a,b)=>a.date.localeCompare(b.date)||a.week.localeCompare(b.week)||a.id.localeCompare(b.id));
+ attempts.sort((a,b)=>a.completedAtMs-b.completedAtMs||a.date.localeCompare(b.date)||a.week.localeCompare(b.week)||a.id.localeCompare(b.id));
  const bestDistances=new Map<SwimStroke,number>(),bestTimes=new Map<string,number>();
  return attempts.filter(item=>{
   if(item.kind==='continuous'){

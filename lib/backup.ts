@@ -1,7 +1,7 @@
 import {DAYS,type Day,type GymDay,type SwimDay,type TrackerData,type WeekLog} from './types';
 import {blankData,weekBlank} from './storage';
 import {normalizeSets} from './set-sync';
-import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,validPool} from './swimming';
+import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,validPool,validSwimSegmentPatch} from './swimming';
 
 export interface BackupCounts {sessions:number;sets:number;weighIns:number;drinks:number}
 export interface BackupPreview {backup:TrackerData;counts:BackupCounts;duplicates:number;newRecords:number;version:number;exportedAt?:string}
@@ -48,12 +48,14 @@ function validateSwim(value:unknown){
  if(entry.breaststroke!==undefined)check(typeof entry.breaststroke==='string'&&entry.breaststroke.length<=60,'Invalid learning status');
  if(entry.drills!==undefined){const keys=safeRecord(entry.drills,'legacy drill checks',60);for(const done of Object.values(keys))check(typeof done==='boolean','Invalid legacy drill state');}
  if(entry.intervals!==undefined){check(Array.isArray(entry.intervals)&&entry.intervals.length<=80,'Invalid legacy intervals');for(const value of entry.intervals){const row=safeRecord(value,'legacy interval',8);for(const field of ['repeats','lengths','rest','pool'])check(typeof row[field]==='number'&&Number.isFinite(row[field]),'Invalid legacy interval field');}}
- if(entry.segments!==undefined){check(Array.isArray(entry.segments)&&entry.segments.length<=25,'Invalid swim segments');const ids=new Set<string>();
+ if(entry.segments!==undefined){check(Array.isArray(entry.segments)&&entry.segments.length<=25,'Invalid swim segments');
+  if(entry.segments.length)check(entry.poolLength===undefined||(typeof entry.poolLength==='number'&&validPool(entry.poolLength)===entry.poolLength),'Invalid segmented swim pool length');
+  const ids=new Set<string>();
   for(const value of entry.segments){const row=safeRecord(value,'swim segment',18);
    check(typeof row.id==='string'&&row.id.length<=100&&!ids.has(row.id),'Invalid or duplicate swim segment ID');ids.add(row.id);
    check(typeof row.activity==='string'&&ACTIVITY_NAMES.has(row.activity),'Unknown swimming stroke or drill');
    check(row.mode==='learning'||row.mode==='advanced','Invalid stroke mode');
-   for(const field of ['minutes','lengths','longestContinuous','timedMeters','timedSeconds'])if(row[field]!==undefined)check(saneScalar(row[field],200000),'Invalid swim measurement');
+   check(validSwimSegmentPatch(row as unknown as import('./types').SwimSegment),'Invalid swim measurement');
    if(row.skillLevel!==undefined)check(['Not started','Learning','Basic','Comfortable','Confident'].includes(String(row.skillLevel)),'Invalid swim skill level');
    if(row.difficulty!==undefined)check(['','Easy','Moderate','Difficult'].includes(String(row.difficulty)),'Invalid difficulty');
    if(row.notes!==undefined)check(typeof row.notes==='string'&&row.notes.length<=5000,'Swim notes too long');

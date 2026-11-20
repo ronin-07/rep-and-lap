@@ -23,6 +23,31 @@ describe('Milestone 6 multi-stroke swimming',()=>{
   expect(validSwimSegmentPatch({timedSeconds:'Infinity'})).toBe(false);
   expect(validSwimSegmentPatch({minutes:'',lengths:'12'})).toBe(true);
  });
+ it('rejects partial-length records and noninteger backup measurements',()=>{
+  const invalid=makeSegment('partial','freestyle',{lengths:2,longestContinuous:75,timedMeters:75,timedSeconds:80});
+  expect(validSwimSegmentPatch({longestContinuous:75.5})).toBe(false);
+  expect(validSwimSegmentPatch({timedMeters:50.2})).toBe(false);
+  expect(segmentDistance(invalid,50)).toBe(100);
+  expect(segmentContinuous(invalid,50)).toBe(0);
+  expect(segmentTimed(invalid,50)).toBeNull();
+  expect(segmentContinuous({...invalid,longestContinuous:100},50)).toBe(100);
+  expect(segmentTimed({...invalid,timedMeters:50},50)).toEqual({meters:50,seconds:80});
+  const data=blankData();data.weeks[WK]=weekBlank();data.weeks[WK].swim.Thursday={poolLength:50,segments:[{...invalid,lengths:1.5}]};
+  expect(()=>readBackup(JSON.stringify(data),blankData())).toThrow('Invalid swim measurement');
+ });
+ it('orders same-day PR attempts by actual finish time, not arbitrary week keys',()=>{
+  const data=blankData();
+  const later=data.weeks[WK]=weekBlank();later.done.Thursday=true;
+  later.completedOn!.Thursday='2026-11-20';later.completedAt!.Thursday='2026-11-20T18:00:00Z';
+  later.swim.Thursday={poolLength:50,segments:[makeSegment('later','freestyle',{lengths:2,longestContinuous:100,timedMeters:50,timedSeconds:60})]};
+  const earlier=data.weeks['2026-11-23']=weekBlank();earlier.done.Thursday=true;
+  earlier.completedOn!.Thursday='2026-11-20';earlier.completedAt!.Thursday='2026-11-20T14:00:00Z';
+  earlier.swim.Thursday={poolLength:50,segments:[makeSegment('earlier','freestyle',{lengths:1,longestContinuous:50,timedMeters:50,timedSeconds:70})]};
+  const records=swimPersonalBests(data);
+  expect(records.filter(r=>r.kind==='continuous').map(r=>r.meters)).toEqual([50,100]);
+  expect(records.filter(r=>r.kind==='time').map(r=>r.seconds)).toEqual([70,60]);
+  expect(records).toHaveLength(4);
+ });
  it('does not silently award a smaller continuous record for an invalid overclaim',()=>{
   const invalid=makeSegment('s','freestyle',{lengths:2,longestContinuous:500});
   expect(segmentContinuous(invalid,50)).toBe(0);
