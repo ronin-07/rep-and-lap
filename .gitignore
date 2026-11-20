@@ -1,2 +1,10 @@
-*.sql
-SETUP-SUPABASE.md
+node_modules/
+.next/
+out/
+.env*.local
+.env
+!.env.example
+*.tsbuildinfo
+.DS_Store
+*.log
+.vercel/
