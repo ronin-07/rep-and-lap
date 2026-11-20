@@ -137,6 +137,7 @@ export function useTrainer(){
   const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&Object.keys(dataRef.current.pendingSync).length)void flush();},30000);
   return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);clearInterval(interval);};
  },[hydrated,flush]);
+ useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),15000);return ()=>clearInterval(interval);},[hydrated]);
  useEffect(()=>{
    if(!restEnd||restEnd<=Date.now())return;
    setClock(Date.now());
@@ -159,9 +160,53 @@ export function useTrainer(){
  const goto=useCallback((next:View,tab?:TrackingTab)=>{
   if(tab)setTrackingTab(tab);setView(next);window.scrollTo({top:0,behavior:'instant'});
  },[]);
+ const startSession=(day:Day)=>{
+  const session=dataRef.current.weeks[week]?.timing?.[day];
+  if(session?.startedAt&&!session.endedAt){notify('This session is already running.');return;}
+  if(dataRef.current.weeks[week]?.done?.[day]||session?.endedAt){notify('This session was already finished.');return;}
+  const at=new Date().toISOString();
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]={startedAt:at};},`session:${week}:${day}`);
+  notify('Workout timer started. You can keep logging sets.');
+ };
+ const finishSession=(day:Day)=>{
+  const at=new Date().toISOString();const isDone=!!dataRef.current.weeks[week]?.done?.[day];
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};const t=w.timing[day]??={};
+   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;w.completedAt??={};w.completedAt[day]=at;
+  },`session:${week}:${day}`);
+  if(!isDone)setCelebration({title:'Session complete!',body:`${PLAN[day].name} is in the books.`,kind:'session'});
+  else notify('Session end time recorded.');
+ };
+ const rescheduleSession=(day:Day,date:string,targetWeek=week)=>{
+  const parsed=dateFor(date);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||keyOf(parsed)!==date){notify('Choose a valid date.');return;}
+  if(dataRef.current.weeks[targetWeek]?.done?.[day]){notify('Completed sessions cannot be moved.');return;}
+  update(d=>{const w=d.weeks[targetWeek]??=weekBlank();w.schedule??={};w.schedule[day]=date;},`session:${targetWeek}:${day}`);
+  notify(`${PLAN[day].name} moved to ${date}.`);
+ };
+ const catchUpWeek=(targetWeek=week)=>{
+  const today=keyOf(new Date()),current=dataRef.current.weeks[targetWeek]??weekBlank();
+  const pending=DAYS.filter(day=>!current.done?.[day]).map(day=>({day,date:current.schedule?.[day]||dateForWeek(targetWeek,day)})).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!pending.some(x=>x.date<today)){notify('No missed sessions in this week.');return;}
+  const used=new Set<string>();
+  // Already completed days stay fixed. Rescheduling never changes any exercise logs.
+  for(const day of DAYS)if(current.done[day])used.add(current.schedule?.[day]||dateForWeek(targetWeek,day));
+  let cursor=today;const assignments=new Map<Day,string>();
+  for(const item of pending){
+   let target=item.date>=cursor&&!used.has(item.date)?item.date:cursor;
+   let attempts=0;
+   while((used.has(target)||dateFor(target).getDay()===0) && attempts++<35){const d=dateFor(target);d.setDate(d.getDate()+1);target=keyOf(d);}
+   used.add(target);assignments.set(item.day,target);const d=dateFor(target);d.setDate(d.getDate()+1);cursor=keyOf(d);
+  }
+  update(d=>{const w=d.weeks[targetWeek]??=weekBlank();w.schedule??={};for(const [day,date] of assignments)w.schedule[day]=date;},pending.map(x=>`session:${targetWeek}:${x.day}`));
+  notify('Pending sessions shifted. Check the dates for next-week overlaps.');
+ };
+ function dateForWeek(w:string,day:Day){const d=dateFor(w);d.setDate(d.getDate()+DAYS.indexOf(day));return keyOf(d);}
  const toggleDone=(day:Day)=>{
   const was=!!dataRef.current.weeks[week]?.done?.[day];
-  update(d=>{const item=d.weeks[week]??=weekBlank();item.done[day]=!was;},`session:${week}:${day}`);
+  if(was&&!confirm('Mark this session incomplete? All logged sets and workout time will be kept.'))return;
+  update(d=>{const item=d.weeks[week]??=weekBlank();item.done[day]=!was;item.completedAt??={};
+   if(was){delete item.completedAt[day];}
+   else {const at=new Date().toISOString();item.completedAt[day]=at;if(item.timing?.[day]?.startedAt&&!item.timing[day]?.endedAt)item.timing[day]!.endedAt=at;}
+  },`session:${week}:${day}`);
   if(!was)setCelebration({title:'Session complete!',body:`${PLAN[day].name} is in the books.`,kind:'session'});
  };
  const gymField=(day:GymDay,exercise:string,index:number,field:'kg'|'reps',value:string)=>update(d=>{
@@ -234,7 +279,7 @@ export function useTrainer(){
    if(!obj||typeof obj.weeks!=='object'||!obj.weeks||Array.isArray(obj.weeks)||Object.keys(obj.weeks).some(k=>!/^\d{4}-\d{2}-\d{2}$/.test(k)))throw new Error('Invalid backup');
    if(!confirm('Restore this backup? Existing local records will be replaced. A safety backup will download first.'))return;
    backup();const next:TrackerData={...blankData(),...obj,recordUpdates:{},pendingSync:{}};
-   const stamp=Date.now();for(const [w,entry] of Object.entries(next.weeks))for(const day of DAYS)if(entry.done?.[day]!==undefined||entry.gym?.[day as GymDay]||entry.swim?.[day as SwimDay]||entry.sessionNotes?.[day])next.recordUpdates[`session:${w}:${day}`]=stamp;
+   const stamp=Date.now();for(const [w,entry] of Object.entries(next.weeks))for(const day of DAYS)if(entry.done?.[day]!==undefined||entry.gym?.[day as GymDay]||entry.swim?.[day as SwimDay]||entry.sessionNotes?.[day]||entry.timing?.[day]||entry.schedule?.[day]||entry.completedAt?.[day])next.recordUpdates[`session:${w}:${day}`]=stamp;
    for(const key of Object.keys(next.weights))next.recordUpdates[`weight:${key}`]=stamp;
    for(const key of Object.keys(next.waterLogs))next.recordUpdates[`water:${key}`]=stamp;
    next.recordUpdates.preferences=stamp;next.pendingSync={...next.recordUpdates};persist(next);scheduleFlush();notify('Backup restored.');
@@ -244,8 +289,8 @@ export function useTrainer(){
   const rows:string[][]=[];
   if(kind==='water'){rows.push(['date','timestamp','millilitres']);for(const item of Object.values(dataRef.current.waterLogs))if(!item.deleted)rows.push([item.date,item.at,String(item.ml)]);}
   if(kind==='weight'){rows.push(['date','kg','notes']);for(const [date,item] of Object.entries(dataRef.current.weights))if(!item.deleted)rows.push([date,String(item.kg??''),item.note||'']);}
-  if(kind==='gym'){rows.push(['week','day','exercise','set','kg','reps','logged']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),String(s.kg??''),String(s.reps??''),s.done?'yes':'no']));}
-  if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??'')]);}
+  if(kind==='gym'){rows.push(['week','day','exercise','set','kg','reps','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),String(s.kg??''),String(s.reps??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
+  if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']);}
   const csv=rows.map(row=>row.map(x=>`"${x.replace(/"/g,'""')}"`).join(',')).join('\r\n');
   downloadFile(`rep-and-lap-${kind}-${keyOf(new Date())}.csv`,csv,'text/csv');
  };
@@ -258,6 +303,6 @@ export function useTrainer(){
  const signout=async()=>{try{await googleSignOut();}catch{notify('Unable to sign out.');}};
  const pending=Object.keys(data.pendingSync||{}).length;
  const displaySync:SyncMode=!online?'saved-local':firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,clock,startRest:(sec?:number)=>setRestEnd(Date.now()+(sec||data.restSeconds)*1000),stopRest:()=>setRestEnd(0),extendRest:()=>setRestEnd(v=>v+15000),installPrompt,firebaseError,pending,signin,signout,flush:()=>void flush(),toggleDone,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,clock,startRest:(sec?:number)=>setRestEnd(Date.now()+(sec||data.restSeconds)*1000),stopRest:()=>setRestEnd(0),extendRest:()=>setRestEnd(v=>v+15000),installPrompt,firebaseError,pending,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,catchUpWeek,gymField,gymNotes,changeSetCount,logSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

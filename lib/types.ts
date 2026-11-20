@@ -15,12 +15,16 @@ export interface SwimLog {
   sculling?:InputNumber;treading?:InputNumber;poolLength?:InputNumber;lengths?:InputNumber;
   breaststroke?:string;notes?:string;drills?:Record<string,boolean>;intervals?:SwimInterval[];
 }
+export interface SessionTiming {startedAt?:string; endedAt?:string}
 export interface SessionNotes {fatigue?:string;discomfort?:string;technique?:string;general?:string}
 export interface WeekLog {
   done:Partial<Record<Day,boolean>>;
   gym:Partial<Record<GymDay,Record<string,ExerciseLog>>>;
   swim:Partial<Record<SwimDay,SwimLog>>;
   sessionNotes?:Partial<Record<Day,SessionNotes>>;
+  timing?:Partial<Record<Day,SessionTiming>>;
+  schedule?:Partial<Record<Day,string>>;
+  completedAt?:Partial<Record<Day,string>>;
 }
 export interface WeighIn {kg?:InputNumber;note?:string;deleted?:boolean}
 export interface WaterEntry {date:string;ml:number;at:string;deleted?:boolean}

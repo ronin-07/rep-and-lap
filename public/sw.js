@@ -1,5 +1,5 @@
 /* Rep & Lap Next.js offline shell. No Firebase API or account records are cached here. */
-const VERSION='rep-lap-next-vercel-v1';
+const VERSION='rep-lap-next-vercel-v2';
 const SCOPE=new URL(self.registration.scope);
 const HOME=new URL('./',SCOPE).href;
 const CORE=['./','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./icon-maskable-512.png'];

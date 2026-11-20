@@ -43,7 +43,7 @@ export function history(data:TrackerData,day:GymDay,name:string){return Object.e
 });}
 export function bestSwim(data:TrackerData){return Math.max(25,...Object.values(data.weeks).flatMap(w=>SWIM_DAYS.map(d=>num(w.swim?.[d]?.longest))));}
 export function activeStreak(data:TrackerData){
- const dates:string[]=[];for(const [w,entry] of Object.entries(data.weeks))for(const [idx,day] of DAYS.entries())if(entry.done?.[day]){const d=dateFor(w);d.setDate(d.getDate()+idx);dates.push(keyOf(d));}
+ const dates:string[]=[];for(const [w,entry] of Object.entries(data.weeks))for(const day of DAYS)if(entry.done?.[day]){dates.push(completionDate(data,w,day));}
  const unique=new Set(dates);let best=0,streak=0;
  // Only scheduled training days count. Sunday neither increases nor breaks streak.
  for(let i=200;i>=0;i--){const date=daysAgo(i),day=dateFor(date).getDay();if(day===0)continue;if(unique.has(date)){streak++;best=Math.max(best,streak);}else streak=0;}
@@ -61,3 +61,86 @@ export function milestones(data:TrackerData):Milestone[]{
 }
 export function weeklyChart(data:TrackerData,metric:'volume'|'meters'|'completed',count=8){const now=weekOf(new Date());return Array.from({length:count},(_,i)=>{const date=dateFor(now);date.setDate(date.getDate()+(i-count+1)*7);const w=keyOf(date);return {date:w,value:metric==='volume'?summary(data,w).volume:metric==='meters'?summary(data,w).meters:summary(data,w).completed};});}
 export function hydrationChart(data:TrackerData,n=7){return Array.from({length:n},(_,i)=>{const date=daysAgo(n-i-1);return {date,value:waterTotal(data,date),target:waterGoal(date)};});}
+
+// Session dates belong to the original training-plan week, even if a missed
+// session is subsequently moved to another calendar day. This preserves records.
+export function plannedDate(data:TrackerData,w:string,day:Day):string{
+ const candidate=data.weeks[w]?.schedule?.[day];
+ if(candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate))return candidate;
+ const date=dateFor(w);date.setDate(date.getDate()+DAYS.indexOf(day));return keyOf(date);
+}
+export function sessionMinutes(timing?:{startedAt?:string;endedAt?:string},now?:number):number|null{
+ if(!timing?.startedAt)return null;
+ const start=Date.parse(timing.startedAt),end=timing.endedAt?Date.parse(timing.endedAt):now;
+ if(!Number.isFinite(start)||end===undefined||!Number.isFinite(end)||end<start)return null;
+ return Math.floor((end-start)/60000);
+}
+export function formatDuration(minutes:number|null):string{
+ if(minutes===null)return 'Not tracked';
+ if(minutes<60)return `${minutes} min`;
+ return `${Math.floor(minutes/60)}h ${String(minutes%60).padStart(2,'0')}m`;
+}
+// Epley estimated one-rep max. Rep sets outside 1–12 reps are excluded;
+// bodyweight-only (0 kg) sets cannot be meaningfully estimated this way.
+export function estimatedOneRepMax(kg:number,reps:number):number|null{
+ if(!Number.isFinite(kg)||!Number.isInteger(reps)||kg<=0||reps<1||reps>12)return null;
+ return reps===1?kg:kg*(1+reps/30);
+}
+export function exerciseStrength(data:TrackerData,day:GymDay,name:string){
+ return history(data,day,name).map(entry=>{
+  const estimates=entry.sets.map(s=>estimatedOneRepMax(num(s.kg),num(s.reps))).filter((v):v is number=>v!==null);
+  return {...entry,e1rm:estimates.length?Math.max(...estimates):null};
+ });
+}
+export function strengthInsights(data:TrackerData){
+ const all=GYM_DAYS.flatMap(day=>PLAN[day].kind==='gym'?PLAN[day].exercises.map(ex=>({day,name:ex.name})):[]);
+ const matched=all.map(ex=>{
+  const entries=exerciseStrength(data,ex.day,ex.name).filter(x=>x.e1rm!==null);
+  const first=entries[0],last=entries.at(-1);
+  if(!first||!last||entries.length<2||first.week===last.week||!first.e1rm||!last.e1rm)return null;
+  return {name:ex.name,day:ex.day,first:first.e1rm,last:last.e1rm,changePct:(last.e1rm/first.e1rm-1)*100,entries:entries.length};
+ }).filter((x):x is NonNullable<typeof x>=>x!==null);
+ const overallPct=matched.length?(Math.exp(matched.reduce((sum,x)=>sum+Math.log(x.last/x.first),0)/matched.length)-1)*100:null;
+ let lifetimeVolume=0,totalSets=0,totalMinutes=0,timedSessions=0,completedSessions=0;
+ for(const [week,log] of Object.entries(data.weeks)){
+  for(const day of DAYS){if(log.done?.[day])completedSessions++;
+   const minutes=sessionMinutes(log.timing?.[day]);if(minutes!==null){totalMinutes+=minutes;timedSessions++;}
+   if(PLAN[day].kind==='gym'){
+    const result=gymStats(data,week,day as GymDay);lifetimeVolume+=result.volume;totalSets+=result.logged;
+   }
+  }
+ }
+ return {matched,overallPct,lifetimeVolume,totalSets,totalMinutes,timedSessions,completedSessions,
+  biggestGain:[...matched].sort((a,b)=>b.changePct-a.changePct)[0]||null};
+}
+export function sessionForDate(data:TrackerData,date:string):{week:string;day:Day}|null{
+ const sessions=Object.entries(data.weeks).flatMap(([w,entry])=>DAYS.filter(day=>!entry.done?.[day]&&plannedDate(data,w,day)===date).map(day=>({week:w,day})));
+ return sessions.sort((a,b)=>a.week.localeCompare(b.week))[0]||null;
+}
+
+// Actual finish date if recorded; backwards compatible with legacy records.
+export function completionDate(data:TrackerData,w:string,day:Day):string{
+ const log=data.weeks[w];const stamp=log?.completedAt?.[day]||log?.timing?.[day]?.endedAt;
+ if(stamp&&!Number.isNaN(Date.parse(stamp)))return keyOf(new Date(stamp));
+ return plannedDate(data,w,day);
+}
+export function recentSessions(data:TrackerData,limit=6){
+ return Object.entries(data.weeks).flatMap(([week,log])=>DAYS.filter(day=>log.done?.[day]).map(day=>({
+  week,day,name:PLAN[day].name,date:completionDate(data,week,day),
+  startedAt:log.timing?.[day]?.startedAt,endedAt:log.timing?.[day]?.endedAt,
+  minutes:sessionMinutes(log.timing?.[day]),
+ }))).sort((a,b)=>b.date.localeCompare(a.date)||b.week.localeCompare(a.week)).slice(0,limit);
+}
+
+// Unlike the plan-week summary, this answers "how many sessions did I
+// actually complete this calendar week?" and respects rescheduled sessions.
+export function calendarCompleted(data:TrackerData,week:string){
+ const next=dateFor(week);next.setDate(next.getDate()+7);const until=keyOf(next);
+ let gym=0,swim=0;
+ for(const [w,log] of Object.entries(data.weeks))for(const day of DAYS){
+  if(!log.done?.[day])continue;
+  const actual=completionDate(data,w,day);
+  if(actual>=week&&actual<until){if(GYM_DAYS.includes(day as GymDay))gym++;else swim++;}
+ }
+ return {gym,swim,completed:gym+swim};
+}

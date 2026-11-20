@@ -1,11 +1,11 @@
 'use client';
 import {useState} from 'react';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Square,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {GymDay,SwimDay,Day,SwimInterval,SwimLog} from '@/lib/types';
 import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
-import {labelWeek,shiftWeek,keyOf,dateFor} from '@/lib/dates';
-import {setCount,gymStats,weekLog,num,loggedSet,validSet,history,bestSwim,waterGoal,waterEntries,waterTotal,weightEntries,weightTrend} from '@/lib/metrics';
+import {labelWeek,shiftWeek,keyOf,dateFor,formatDate} from '@/lib/dates';
+import {setCount,gymStats,weekLog,num,loggedSet,validSet,history,bestSwim,waterGoal,waterEntries,waterTotal,weightEntries,weightTrend,plannedDate,sessionMinutes,formatDuration} from '@/lib/metrics';
 import SessionNotes from './SessionNotes';
 import {LineChart,MiniBars} from '@/components/Charts';
 
@@ -17,6 +17,15 @@ export default function Workout({app}:{app:Trainer}){
  <div className="tracking-tabs">{(['gym','swim','water','weight'] as const).map(tab=><button key={tab} className={app.trackingTab===tab?'active':''} onClick={()=>app.setTrackingTab(tab)}>{tab==='gym'?<Dumbbell size={18}/>:tab==='swim'?<Swim size={18}/>:tab==='water'?<Droplets size={18}/>:<Weight size={18}/>}<span>{tab==='gym'?'Gym':tab==='swim'?'Swimming':tab==='water'?'Water':'Body weight'}</span></button>)}</div>
  {app.trackingTab==='gym'?<Gym app={app}/>:app.trackingTab==='swim'?<Swimming app={app}/>:app.trackingTab==='water'?<Water app={app}/>:<BodyWeight app={app}/>}
  </div>
+}
+function SessionClock({app,day}:{app:Trainer;day:Day}){
+ const timing=weekLog(app.data,app.week).timing?.[day],active=!!timing?.startedAt&&!timing.endedAt,done=!!weekLog(app.data,app.week).done[day];
+ const minutes=sessionMinutes(timing,active?app.clock:undefined);
+ return <div className="session-clock"><div className="session-clock-top"><div><span className="eyebrow">WORKOUT DURATION</span><strong>{timing?.startedAt?formatDuration(minutes):'Ready when you are'}</strong><small>{active?'Session in progress · includes rest time':timing?.endedAt?'Finished · duration recorded':'Start when you begin your workout'}</small></div><span className={`clock-indicator ${active?'running':''}`}><Clock size={18}/></span></div>
+ {timing?.startedAt&&<div className="session-time-stamps">Started {new Date(timing.startedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}{timing.endedAt?` · Ended ${new Date(timing.endedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}</div>}
+ <div className="session-clock-actions">{!timing?.startedAt?<button className="button-secondary" onClick={()=>app.startSession(day)} disabled={done}><Play size={15}/> Start workout</button>:null}{active?<button className="button-primary" onClick={()=>app.finishSession(day)}><Square size={15}/> Finish workout</button>:null}
+ {timing?.startedAt&&timing.endedAt?<span className="session-done-chip"><CheckCircle2 size={16}/> Time saved</span>:null}</div>
+ </div>;
 }
 function Gym({app}:{app:Trainer}){
  const day=app.gymDay,plan=PLAN[day];if(plan.kind!=='gym')return null;
@@ -32,7 +41,7 @@ function Gym({app}:{app:Trainer}){
  <div className="exercise-footer"><label className="field"><span>Exercise notes</span><input value={entry?.notes||''} placeholder="Technique, setup, etc." onChange={e=>app.gymNotes(day,ex.name,e.target.value)}/></label><span className="muted tiny">{Math.round(volume).toLocaleString()} kg volume</span></div></article>
  })}
  <SessionNotes app={app} day={day}/></div>
- <div className="stack"><section className="card pane-pad"><span className="eyebrow">SESSION PROGRESS</span><div className="panel-number">{stats.logged}<span> / {stats.total} sets</span></div><div className="progress-track tall"><span style={{width:`${stats.total?stats.logged/stats.total*100:0}%`}}/></div><p className="muted small">Sets are logged when you tap Log set. Inputs save automatically.</p><button className={`button-primary full ${done?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{done?<><CheckCircle2 size={18}/> Workout completed</>:<><Check size={18}/> Mark workout complete</>}</button></section>
+ <div className="stack"><section className="card pane-pad session-progress-card"><div className="section-title"><div><span className="eyebrow">SESSION PROGRESS</span><h2>Your sets, at a glance.</h2></div></div><div className="set-progress-total"><strong>{stats.logged}</strong><div><span>of {stats.total} sets logged</span><small>{stats.total?Math.round(stats.logged/stats.total*100):0}% complete</small></div></div><div className="progress-track tall"><span style={{width:`${stats.total?stats.logged/stats.total*100:0}%`}}/></div><p className="muted small progress-help">Log set marks a finished set. Your weights and reps save automatically.</p><SessionClock app={app} day={day}/>{!(w.timing?.[day]?.startedAt&&!w.timing?.[day]?.endedAt)&&<button className={`button-primary full ${done?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{done?<><CheckCircle2 size={18}/> Undo completion</>:<><Check size={18}/> Mark workout complete</>}</button>}</section>
  <section className="card pane-pad"><span className="eyebrow">REST TIMER</span><div className="timer-number">{String(Math.floor(remaining/60)).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}</div><div className="rest-choices">{[60,90,120,180].map(v=><button key={v} className={app.data.restSeconds===v?'selected':''} onClick={()=>app.updatePreferences({restSeconds:v})}>{v===90?'1.5':v/60} min</button>)}</div><div className="row-actions"><button className="button-secondary" onClick={()=>app.startRest()}><Timer size={16}/> Start</button><button className="button-secondary" onClick={()=>app.extendRest()}>+15s</button><button className="button-secondary" onClick={app.stopRest}>Stop</button></div></section>
  <div className="tip-card"><strong>Double progression</strong><p>Build reps with good form. When every set reaches the top of its target range, increase weight slightly.</p></div></div></div>
  </div>;
@@ -49,7 +58,7 @@ function Swimming({app}:{app:Trainer}){
  {(log.intervals||[]).map((x,i)=><div className="interval-row" key={i}><span>{x.repeats} × {x.lengths*x.pool} m <small>· {x.rest}s rest</small></span><button className="icon-btn" aria-label={`Delete interval ${i+1}`} onClick={()=>app.deleteInterval(day,i)}><Minus size={16}/></button></div>)}
  <h3>Technique checklist</h3><div className="checklist">{plan.drills.map((drill,i)=><label key={drill} className="check-row"><input type="checkbox" checked={!!log.drills?.[i]} onChange={e=>app.toggleDrill(day,i,e.target.checked)}/>{drill}</label>)}</div>
  <label className="field"><span>Swimming notes</span><textarea rows={3} value={log.notes||''} onChange={e=>app.swimField(day,'notes',e.target.value)} placeholder="How did your breathing or technique feel?"/></label></section>
- <SessionNotes app={app} day={day}/></div><div className="stack"><section className="card pane-pad"><span className="eyebrow">FREESTYLE JOURNEY</span><div className="panel-number">{bestSwim(app.data)}<span> m</span></div><p className="muted small">Longest continuous freestyle swim, including your 25 m starting point.</p><div className="goal-list">{[25,50,100,200].map(m=><div key={m} className="goal-row"><span>{m} m</span>{bestSwim(app.data)>=m?<span className="text-success"><CheckCircle2 size={17}/> Reached</span>:<span className="muted">Next</span>}</div>)}</div><button className={`button-primary full ${completed?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{completed?'Swim completed':'Mark swim complete'} <Check size={17}/></button></section><div className="tip-card"><strong>Safe water skills</strong><p>Practise sculling and treading where you can stand or with an instructor before deep-water attempts.</p></div></div></div></div>;
+ <SessionNotes app={app} day={day}/></div><div className="stack"><section className="card pane-pad"><SessionClock app={app} day={day}/><div className="session-divide"/><span className="eyebrow">FREESTYLE JOURNEY</span><div className="panel-number">{bestSwim(app.data)}<span> m</span></div><p className="muted small">Longest continuous freestyle swim, including your 25 m starting point.</p><div className="goal-list">{[25,50,100,200].map(m=><div key={m} className="goal-row"><span>{m} m</span>{bestSwim(app.data)>=m?<span className="text-success"><CheckCircle2 size={17}/> Reached</span>:<span className="muted">Next</span>}</div>)}</div>{!(w.timing?.[day]?.startedAt&&!w.timing?.[day]?.endedAt)&&<button className={`button-primary full ${completed?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{completed?'Undo completion':'Mark swim complete'} <Check size={17}/></button>}</section><div className="tip-card"><strong>Safe water skills</strong><p>Practise sculling and treading where you can stand or with an instructor before deep-water attempts.</p></div></div></div></div>;
 }
 function Water({app}:{app:Trainer}){
  const [date,setDate]=useState(keyOf(new Date())),[custom,setCustom]=useState('330');
