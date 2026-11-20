@@ -674,6 +674,26 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
 .topbar-actions{flex-shrink:0}
 @media(max-width:670px){.topbar-name{gap:9px}.topbar-actions{gap:6px}}
 
+
+/* Swim session actions are at the top, mirroring the gym session clock. */
+.swim-session-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.swim-clock-status{display:flex;flex-direction:column;gap:6px;flex:1 1 240px}
+.swim-clock-heading{display:flex;align-items:center;gap:11px;justify-content:space-between;max-width:360px}
+.swim-clock-status .swim-session-time{font:820 clamp(1.2rem,2.4vw,1.7rem)/1.25 Manrope,'DM Sans',sans-serif;letter-spacing:-.035em}
+.swim-clock-status>small{font-size:.76rem}
+.swim-session-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px}
+.swim-session-actions button{min-height:44px}
+.swim-legacy-details>summary{display:flex;justify-content:space-between;align-items:center;gap:15px;cursor:pointer;list-style:none}
+.swim-legacy-details>summary::-webkit-details-marker{display:none}
+.swim-legacy-details>summary>span{display:flex;flex-direction:column;gap:6px}
+.swim-legacy-details>summary strong{font-size:1.05rem}
+.swim-legacy-details>summary small{font-size:.76rem}
+.swim-legacy-details>summary svg{flex-shrink:0;transition:transform .15s}
+.swim-legacy-details[open]>summary svg{transform:rotate(180deg)}
+.swim-legacy-details>summary:focus-visible{outline:2px solid var(--aqua);outline-offset:6px;border-radius:4px}
+.swim-legacy-details[open]>div{margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
+@media(max-width:670px){.swim-session-controls{align-items:stretch}.swim-session-actions{width:100%;justify-content:stretch}.swim-session-actions button{flex:1 1 160px;justify-content:center}}
+
 /* v3.2 Milestone 6 — stroke-specific swimming studio */
 .swim-log,.swim-log *{min-width:0}
 .swim-session-hero{display:flex;justify-content:space-between;align-items:center;gap:16px}

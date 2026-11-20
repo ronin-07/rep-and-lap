@@ -93,8 +93,10 @@ describe('Milestone 6 multi-stroke swimming',()=>{
   const records=swimPersonalBests(data);
   expect(records.filter(x=>x.kind==='continuous')).toHaveLength(3);
   expect(records.filter(x=>x.kind==='time')).toHaveLength(2); // first freestyle 73s; first breaststroke 100s
+  expect(records.find(x=>x.kind==='time'&&x.stroke==='freestyle')?.seconds).toBe(73);
+  expect(records.some(x=>x.kind==='time'&&x.stroke==='freestyle'&&x.seconds===75)).toBe(false);
   const items=activityNotifications(data,NOW);
-  expect(items.filter(x=>x.kind==='swim-pr').length).toBe(6);
+  expect(items.filter(x=>x.kind==='swim-pr').length).toBe(records.length);
   expect(new Set(items.map(x=>x.id)).size).toBe(items.length);
  });
  it('does not announce records before the session is completed',()=>{

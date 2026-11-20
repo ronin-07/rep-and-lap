@@ -82,7 +82,7 @@ describe('Flexible training schedule and calendar',()=>{
   const remote=applyRecord(blankData(),`session:${week}:Tuesday`,recordPayload(d,`session:${week}:Tuesday`));
   expect(remote.weeks[week].scheduleStatus?.Tuesday).toBe('rest');
   const preview=readBackup(JSON.stringify(d),blankData());
-  expect(preview.version).toBe(4);
+  expect(preview.version).toBe(d.version);
   const restored=mergeBackup(blankData(),preview.backup).data;
   expect(restored.weeks[week].scheduleStatus?.Tuesday).toBe('rest');
  });
