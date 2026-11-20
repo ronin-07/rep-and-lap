@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    function isValidEntry() {
+      return request.resource.data.keys().hasOnly(['recordKey', 'payload', 'updatedMs'])
+        && request.resource.data.keys().hasAll(['recordKey', 'payload', 'updatedMs'])
+        && request.resource.data.recordKey is string
+        && request.resource.data.recordKey.size() <= 160
+        && request.resource.data.payload is map
+        && request.resource.data.updatedMs is int;
+    }
+    match /users/{userId} {
+      allow read, write: if false;
+      match /gymSessions/{recordId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry()
+          && request.resource.data.recordKey == recordId
+          && recordId.matches('session:[0-9]{4}-[0-9]{2}-[0-9]{2}:(Monday|Tuesday|Wednesday)');
+      }
+      match /swimSessions/{recordId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry()
+          && request.resource.data.recordKey == recordId
+          && recordId.matches('session:[0-9]{4}-[0-9]{2}-[0-9]{2}:(Thursday|Friday|Saturday)');
+      }
+      match /weighIns/{recordId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry()
+          && request.resource.data.recordKey == recordId
+          && recordId.matches('weight:[0-9]{4}-[0-9]{2}-[0-9]{2}');
+      }
+      match /waterEntries/{recordId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry()
+          && request.resource.data.recordKey == recordId
+          && recordId.matches('water:[A-Za-z0-9_-]+');
+      }
+      match /settings/{recordId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry()
+          && recordId == 'main' && request.resource.data.recordKey == 'preferences';
+      }
+    }
+  }
+}
