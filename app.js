@@ -1,8 +1,8 @@
 /* Rep & Lap — local-first, zero-dependency workout tracker. */
 (()=>{
   'use strict';
-  const STORAGE_KEY='rep-and-lap-tracker-v2';
-  const OLD_STORAGE_KEY='rep-and-lap-tracker-v1';
+  const STORAGE_KEY='rep-and-lap-firebase-v1'; // New store: no Supabase history is imported automatically.
+  const OLD_STORAGE_KEY=null; // Previous Supabase cache remains untouched for backup.
   const THEME_KEY='rep-and-lap-theme';
   const SHEET_URL='https://docs.google.com/spreadsheets/d/1wXWgc62YyYDiqV9XPjyDYlgbsHwoxJQeUpl6htIvSew/edit?usp=drivesdk';
   const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -74,9 +74,9 @@
   const weekLabel=k=>{const a=dateFor(k),b=new Date(a);b.setDate(a.getDate()+6);const fmt=new Intl.DateTimeFormat('en-GB',{month:'short',day:'numeric'});return `${fmt.format(a)} – ${fmt.format(b)}`;};
   const wkShort=k=>new Intl.DateTimeFormat('en-GB',{month:'short',day:'numeric'}).format(dateFor(k));
   function blankData(){return {version:2,weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
-  function load(){
+  function load(accountId='guest'){
     try {
-      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||localStorage.getItem(OLD_STORAGE_KEY)||'null');
+      const saved=JSON.parse(localStorage.getItem(`${STORAGE_KEY}:${accountId}`)||'null');
       if(!saved||!saved.weeks||typeof saved.weeks!=='object')return blankData();
       const result={...blankData(),...saved,version:2};
       result.weights ||= {};result.waterLogs ||= {};result.setOverrides ||= {};result.restSeconds ||= 90;result.recordUpdates ||= {};result.pendingSync ||= {};result.reminders ||= {enabled:false,time:'18:00'};
@@ -90,21 +90,27 @@
       return result;
     }catch{return blankData();}
   }
-  let data=load();let week=todayWeek(),view='dashboard',gymDay='Monday',swimDay='Thursday';let toastTimer, syncTimer, syncing=false,waterDate=keyOf(new Date()),exerciseChoice='Barbell bench press';
+  // Load the last account's local cache before Firebase loads; essential when reopening offline.
+  const LAST_ACCOUNT_KEY='rep-and-lap-firebase-last-account';
+  let cachedAccount=null;
+  try {cachedAccount=JSON.parse(localStorage.getItem(LAST_ACCOUNT_KEY)||'null');}catch{}
+  let activeAccountId=cachedAccount?.id||'guest';
+  let data=load(activeAccountId);let week=todayWeek(),view='dashboard',gymDay='Monday',swimDay='Thursday';let toastTimer, syncTimer, syncing=false,waterDate=keyOf(new Date()),exerciseChoice='Barbell bench press';
   let restEnd=0,restDuration=90,restTick=null;
   let storageFailure=false,installPrompt=null,lastSyncAt=null;
   const REMINDER_SHOWN_KEY='rep-and-lap-last-reminder';
-  const configured=!!(window.REP_AND_LAP_SUPABASE?.url&&window.REP_AND_LAP_SUPABASE?.publishableKey);
-  const cloud={client:null,user:null,state:configured?'Not connected':'Not configured'};
+  const configured=!!(window.REP_AND_LAP_FIREBASE?.apiKey&&window.REP_AND_LAP_FIREBASE?.authDomain&&window.REP_AND_LAP_FIREBASE?.projectId&&window.REP_AND_LAP_FIREBASE?.appId);
+  const cloud={client:null,user:null,state:configured?'Connecting':'Not configured',ready:false,fromCache:true,unsubscribe:null};
+  const inFlight=new Map();
   let theme=localStorage.getItem(THEME_KEY)||'dark';
   function applyTheme(){document.documentElement.dataset.theme=theme;localStorage.setItem(THEME_KEY,theme);document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#080e1c':'#f4f6fd';const t=document.getElementById('themeToggle');if(t){t.innerHTML=ico(theme==='dark'?'sun':'moon',18);t.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';}}
   function pendingCount(){return Object.keys(data.pendingSync||{}).length;}
   function syncLabel(){
     if(storageFailure||cloud.state==='Sync error'||cloud.state==='Cloud setup error')return {text:'Needs attention',mode:'attention'};
-    if(syncing)return {text:'Syncing…',mode:'syncing'};
     if(!cloud.user)return {text:'Saved locally',mode:'local'};
     if(!navigator.onLine)return {text:'Saved locally · offline',mode:'local'};
-    if(pendingCount())return {text:'Saved locally · sync pending',mode:'local'};
+    if(syncing||pendingCount())return {text:'Syncing…',mode:'syncing'};
+    if(!cloud.ready||cloud.fromCache)return {text:'Checking cloud…',mode:'local'};
     return {text:'Synced',mode:'synced'};
   }
   function updateSyncUI(){
@@ -117,7 +123,7 @@
     if(settingsState)settingsState.textContent=status.text;
   }
   function persistData(){
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));storageFailure=false;}
+    try{localStorage.setItem(`${STORAGE_KEY}:${activeAccountId}`,JSON.stringify(data));storageFailure=false;}
     catch{storageFailure=true;notify('Storage is full or blocked. Export a backup before closing this page.');}
     updateSyncUI();
   }
@@ -131,7 +137,7 @@
       }
     }
     persistData();
-    if(keys&&cloud.user){clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,1100);}
+    if(keys&&cloud.user){clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,650);}
   }
   function getWeek(k=week){return data.weeks[k]||{done:{},gym:{},swim:{}};}
   function ensureWeek(k=week){return data.weeks[k] ||= {done:{},gym:{},swim:{}};}
@@ -348,7 +354,7 @@
        <article class="setting-card"><h3>Install Rep & Lap</h3><p>Keep your tracker one tap away. Your recent workouts are available without a connection.</p><div class="actions"><button class="primary-btn" type="button" data-action="install-app">${ico('download',15)} Install app</button>${installHelp()}</div></article>
        <article class="setting-card"><h3>Workout reminders</h3><p>Get a reminder for today's session while Rep & Lap is open. System notifications require permission.</p><div class="reminder-setting"><label class="reminder-toggle"><input id="reminders-enabled" type="checkbox" ${data.reminders?.enabled?'checked':''} /> Enable reminders</label><div class="field"><label for="reminder-time">Reminder time</label><input id="reminder-time" type="time" value="${escapeHTML(data.reminders?.time||'18:00')}" /></div></div><small class="setting-fine">Reminders work when the app is open. Background alerts are not supported.</small></article>
        <article class="setting-card"><h3>Appearance</h3><p>Choose the theme that feels best. Motion adjusts to your device’s accessibility settings.</p><div class="actions"><button class="outline-btn" type="button" data-action="toggle-theme">${ico(theme==='dark'?'sun':'moon',16)} Switch to ${theme==='dark'?'light':'dark'} mode</button></div></article>
-       <article class="setting-card"><h3>Cloud sync</h3><p>${cloudMessage}<br><strong>Status:</strong> <span id="settings-sync-status">${escapeHTML(syncLabel().text)}</span>.</p><div class="actions">${configured?cloud.user?`<button class="outline-btn" type="button" data-action="sync-now">${ico('cloud',15)} Sync now</button><button class="outline-btn" type="button" data-action="sign-out">Sign out</button>`:`<button class="google-signin-btn" type="button" data-action="sign-in-google"><span class="google-letter" aria-hidden="true">G</span><span>Continue with Google</span></button><details class="email-fallback"><summary>Prefer email? Use a one-time sign-in link</summary><div class="email-fallback-form"><label class="visually-hidden" for="sync-email">Email address</label><input type="email" id="sync-email" placeholder="you@example.com" autocomplete="email" /><button class="outline-btn" data-action="send-magic" type="button">Send link</button></div></details>`:'<span class="setup-hint">Cloud sync isn’t connected on this installation.</span>'}</div></article>
+       <article class="setting-card"><h3>Cloud sync</h3><p>${cloudMessage}<br><strong>Status:</strong> <span id="settings-sync-status">${escapeHTML(syncLabel().text)}</span>.</p><div class="actions">${configured?cloud.user?`<button class="outline-btn" type="button" data-action="sync-now">${ico('cloud',15)} Sync now</button><button class="outline-btn" type="button" data-action="sign-out">Sign out</button>`:`<button class="google-signin-btn" type="button" data-action="sign-in-google"><span class="google-letter" aria-hidden="true">G</span><span>Continue with Google</span></button>`:'<span class="setup-hint">Cloud sync isn’t connected on this installation.</span>'}</div></article>
        <article class="setting-card"><h3>Back up your tracker</h3><p>Download your full training history as a backup, or restore one you saved earlier.</p><div class="actions"><button class="primary-btn" type="button" data-action="export-json">${ico('download',15)} Download backup</button><button class="outline-btn" type="button" data-action="import-json">${ico('upload',15)} Restore backup</button></div></article>
        <article class="setting-card"><h3>Export CSV logs</h3><p>Export gym, swim, water and weight logs as CSV files.</p><div class="actions"><button class="outline-btn" type="button" data-action="export-csv" data-csv="gym">Gym CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="swim">Swim CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="checklist">Checklist CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="weight">Body weight CSV</button><button class="outline-btn" type="button" data-action="export-csv" data-csv="water">Water CSV</button></div></article>
        <article class="setting-card"><h3>Original Google Sheet</h3><p>View the spreadsheet copy of your original training plan.</p><div class="actions"><a href="${SHEET_URL}" class="primary-btn" target="_blank" rel="noopener noreferrer">${ico('external',15)} Open Google Sheet</a></div></article>
@@ -426,86 +432,102 @@
       if(value?.notes){w.sessionNotes ||= {};w.sessionNotes[day]=value.notes;}
     }
   }
-  async function initCloud(){
-    if(!configured){updateSyncUI();return;}
-    try{
-      if(!window.supabase?.createClient){cloud.state=navigator.onLine?'Cloud setup error':'Offline';updateSyncUI();return;}
-      cloud.client=window.supabase.createClient(window.REP_AND_LAP_SUPABASE.url,window.REP_AND_LAP_SUPABASE.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-      const {data:sessionData,error}=await cloud.client.auth.getSession();if(error)throw error;
-      if(sessionData?.session?.user){cloud.user=sessionData.session.user;cloud.state='Connected';updateSyncUI();await syncAll();}
-      cloud.client.auth.onAuthStateChange((ev,session)=>{
-        const next=session?.user||null,changed=(cloud.user?.id||null)!==(next?.id||null);
-        cloud.user=next;cloud.state=next?'Connected':'Not connected';
-        updateSyncUI();if(changed&&(view==='settings'||view==='profile'))render();
-        if(next&&changed)setTimeout(syncAll,300);
-      });
+  function watchFirebaseRecords(){
+    if(cloud.unsubscribe){cloud.unsubscribe();cloud.unsubscribe=null;}
+    if(!cloud.client||!cloud.user)return;
+    const userId=cloud.user.id;
+    cloud.ready=false;cloud.fromCache=true;
+    cloud.unsubscribe=cloud.client.watch(userId,(key,value,stamp,hasPendingWrites,fromCache)=>{
+      if(cloud.user?.id!==userId||hasPendingWrites)return;
+      if(!(key==='preferences'||/^(session|weight|water):/.test(key)))return;
+      // Keep unsent local edits until Firestore acknowledges the matching write.
+      if(data.pendingSync?.[key])return;
+      // Ignore stale IndexedDB cache, but trust the latest server snapshot even if device clocks differ.
+      if(fromCache && stamp<(data.recordUpdates[key]||0))return;
+      applyRecord(key,value);
+      data.recordUpdates[key]=stamp;
+      persistData();
+      if(!document.activeElement?.matches('input,textarea,select'))render();
+    },status=>{
+      if(cloud.user?.id!==userId)return;
+      cloud.ready=!!status.allServerReady;
+      cloud.fromCache=!status.allServerReady;
       updateSyncUI();
-    }catch(error){cloud.state='Cloud setup error';notify(error.message||'Unable to connect to cloud');updateSyncUI();}
+    },error=>{
+      if(cloud.user?.id!==userId)return;
+      cloud.state='Sync error';
+      updateSyncUI();
+      notify(`Firestore needs attention: ${error?.message||'check your access rules'}`);
+    });
+  }
+  function onFirebaseUser(user,error){
+    if(error){cloud.state='Cloud setup error';notify(error.message||'Could not restore Google sign-in');updateSyncUI();return;}
+    const nextId=user?.uid||'guest';
+    if((cloud.user?.id||'guest')===nextId && activeAccountId===nextId && cloud.unsubscribe){updateSyncUI();return;}
+    clearTimeout(syncTimer);
+    if(cloud.unsubscribe){cloud.unsubscribe();cloud.unsubscribe=null;}
+    inFlight.clear();syncing=false;
+    // Persist the outgoing account separately; never mix users' cached records.
+    persistData();
+    const accountChanged=activeAccountId!==nextId;
+    activeAccountId=nextId;
+    if(accountChanged)data=load(nextId);
+    cloud.user=user?{id:user.uid,email:user.email,displayName:user.displayName}:null;
+    cloud.state=user?'Connected':'Not connected';
+    cloud.ready=false;cloud.fromCache=true;
+    try {
+      if(user)localStorage.setItem(LAST_ACCOUNT_KEY,JSON.stringify({id:user.uid,email:user.email||''}));
+      else localStorage.removeItem(LAST_ACCOUNT_KEY);
+    }catch{}
+    persistData();render();
+    if(user){watchFirebaseRecords();syncAll();}
+  }
+  function initCloud(){
+    if(!configured){updateSyncUI();return;}
+    if(!window.RepLapFirebase){cloud.state='Connecting';updateSyncUI();return;}
+    if(cloud.client)return;
+    cloud.client=window.RepLapFirebase;
+    if(!cloud.client.ready){cloud.state='Cloud setup error';updateSyncUI();return;}
+    cloud.client.onUser(onFirebaseUser);
+    updateSyncUI();
   }
   async function signInWithGoogle(){
-    if(!cloud.client){notify('Configure Supabase first');return;}
-    if(location.protocol!=='https:' && location.hostname!=='localhost'){
+    if(!cloud.client?.ready){notify('Add your Firebase configuration in firebase-config.js first');return;}
+    if(location.protocol!=='https:'&&location.hostname!=='localhost'){
       notify('Open the published HTTPS website to sign in with Google');return;
     }
-    try{
-      // GitHub Pages callback is the project root; this URL must be allowlisted in Supabase Auth.
-      const redirectTo = new URL('./', location.href).href;
-      const {error}=await cloud.client.auth.signInWithOAuth({
-        provider:'google',
-        options:{redirectTo}
-      });
-      if(error)throw error;
-      // supabase-js redirects to Google; return completes automatically using detectSessionInUrl.
-    }catch(error){notify(error.message||'Google sign-in failed. Check the Google provider settings.');}
-  }
-  async function sendMagicLink(){
-    if(!cloud.client){notify('Configure Supabase first');return;}
-    const email=document.getElementById('sync-email')?.value?.trim();if(!email||!email.includes('@')){notify('Enter a valid email');return;}
-    const redirectTo=location.origin+location.pathname;
-    try{const {error}=await cloud.client.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});if(error)throw error;notify('Check your email for the sign-in link.');}
-    catch(e){notify(e.message||'Sign-in link failed');}
+    try {await cloud.client.signIn();}
+    catch(error){
+      const msg=error?.code==='auth/popup-blocked'?'Allow popups for this site and try again':
+        error?.code==='auth/unauthorized-domain'?'Add this GitHub Pages host to Firebase Authentication authorized domains':
+        error?.message||'Google sign-in could not complete';
+      notify(msg);
+    }
   }
   async function syncAll(){
-    if(syncing||!cloud.client||!cloud.user)return;
-    if(!navigator.onLine){updateSyncUI();return;}
-    syncing=true;cloud.state='Syncing';updateSyncUI();const user=cloud.user.id;
-    try{
-      let remote=[];
-      for(let start=0;start<10000;start+=1000){
-        const {data:page,error}=await cloud.client.from('training_records').select('record_key,payload,updated_at').eq('user_id',user).order('record_key',{ascending:true}).range(start,start+999);
-        if(error)throw error;remote.push(...page);if(page.length<1000)break;
-      }
-      const rmap=new Map(remote.map(x=>[x.record_key,x]));let changed=false;const outgoing=[];
-      data.pendingSync ||= {};
-      // Unsynced local changes always remain pending until a successful server acknowledgement.
-      for(const item of remote){
-        if(data.pendingSync[item.record_key])continue;
-        const rdate=Date.parse(item.updated_at)||0,ldate=data.recordUpdates[item.record_key]||0;
-        if(rdate>ldate){applyRecord(item.record_key,item.payload);data.recordUpdates[item.record_key]=rdate;changed=true;}
-      }
-      for(const [key,ts] of Object.entries(data.recordUpdates)){
-        const server=rmap.get(key),serverTime=server?(Date.parse(server.updated_at)||0):0;
-        if(data.pendingSync[key]||!server||ts>serverTime+100){
-          outgoing.push({user_id:user,record_key:key,payload:recordPayload(key),updated_at:new Date(Math.max(Date.now(),ts)).toISOString(),localTimestamp:ts});
-        }
-      }
-      for(let i=0;i<outgoing.length;i+=100){
-        const slice=outgoing.slice(i,i+100);
-        const {error}=await cloud.client.from('training_records').upsert(slice.map(({localTimestamp,...row})=>row),{onConflict:'user_id,record_key'});
-        if(error)throw error;
-        for(const entry of slice){
-          if(data.recordUpdates[entry.record_key]===entry.localTimestamp){
-            delete data.pendingSync[entry.record_key];
-            data.recordUpdates[entry.record_key]=Date.parse(entry.updated_at);
-          }
-        }
-        persistData();
-      }
-      if(changed)persistData();
-      lastSyncAt=Date.now();cloud.state='Synced';
-      if(changed&&!document.activeElement?.matches('input,textarea,select'))render();
-    }catch(error){cloud.state='Sync error';notify(`Cloud sync needs attention: ${error.message||'please retry'}`);}
-    finally{syncing=false;updateSyncUI();if(cloud.state==='Synced'&&pendingCount()) {clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,1600);}}
+    if(!cloud.client?.ready||!cloud.user||!navigator.onLine)return;
+    const userId=cloud.user.id;
+    for(const [key,stamp] of Object.entries(data.pendingSync||{})){
+      if(inFlight.has(key))continue;
+      let payload;
+      try {payload=recordPayload(key);} catch(error){console.warn('Unsupported local record',key,error);continue;}
+      inFlight.set(key,stamp);
+      cloud.client.put(userId,key,payload,stamp).then(()=>{
+        if(cloud.user?.id!==userId)return;
+        if(data.pendingSync?.[key]===stamp){delete data.pendingSync[key];persistData();}
+        lastSyncAt=Date.now();cloud.state='Connected';
+      }).catch(error=>{
+        if(cloud.user?.id!==userId)return;
+        cloud.state='Sync error';
+        notify(`Sync needs attention: ${error?.message||'try reconnecting'}`);
+      }).finally(()=>{
+        if(cloud.user?.id!==userId)return;
+        inFlight.delete(key);syncing=inFlight.size>0;
+        updateSyncUI();
+        if(data.pendingSync?.[key]&&data.pendingSync[key]!==stamp){clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,500);}
+      });
+    }
+    syncing=inFlight.size>0;updateSyncUI();
   }
   document.addEventListener('click',event=>{
     const nav=event.target.closest('[data-view]');if(nav){setView(nav.dataset.view);return;}
@@ -538,9 +560,9 @@
     }
     if(a==='toggle-theme'){theme=theme==='dark'?'light':'dark';applyTheme();render();return;}
     if(a==='sign-in-google'){signInWithGoogle();return;}
-    if(a==='send-magic'){sendMagicLink();return;}
+    
     if(a==='sync-now'){syncAll();return;}
-    if(a==='sign-out'){cloud.client?.auth.signOut().then(()=>{cloud.user=null;cloud.state='Not connected';updateSyncUI();render();notify('Signed out');});return;}
+    if(a==='sign-out'){cloud.client?.signOut().then(()=>notify('Signed out')).catch(e=>notify(e.message||'Sign-out failed'));return;}
     if(a==='export-json'){download(`rep-and-lap-backup-${keyOf(new Date())}.json`,JSON.stringify({...data,app:'Rep & Lap',backupVersion:1,exportedAt:new Date().toISOString()},null,2),'application/json');notify('Backup downloaded');return;}
     if(a==='import-json'){document.getElementById('importFile').click();return;}
     if(a==='export-csv'){exportCSV(target.dataset.csv);return;}
@@ -593,5 +615,6 @@
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkReminder();if(cloud.user)syncAll();}});
   setInterval(()=>{if(!document.hidden&&cloud.user)syncAll();},90000);
   setInterval(checkReminder,60_000);
+  window.addEventListener('rep-lap-firebase-ready',initCloud);
   applyTheme();render();initCloud();checkReminder();
 })();
