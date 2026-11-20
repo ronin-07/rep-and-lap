@@ -279,7 +279,7 @@ input[type='date']::-webkit-datetime-edit{padding:0;min-width:0}
 /* Safari's native date content must not impose its intrinsic inline width on a grid cell. */
 .form-grid,.form-grid>*{min-width:0;max-width:100%}
 .weigh-date-field{display:block;min-width:0;max-width:100%;width:100%;overflow:hidden}
-.weigh-date-field>span{display:block;margin-bottom:7px}
+.weigh-date-field>span:not(.date-control){display:block;margin-bottom:7px}
 input[type='date']{inline-size:100%;min-inline-size:0;max-inline-size:100%;box-sizing:border-box;
  overflow:hidden;white-space:nowrap;
  font-variant-numeric:tabular-nums;line-height:1.4}
@@ -419,3 +419,107 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
   .weigh-date-field {overflow:visible}
 }
 @media(prefers-reduced-motion:reduce){.date-control{transition:none}}
+
+
+/* pre-M5 hotfix: iPhone Body Weight date control must be a flex field,
+   not the generic label span. Prevent the wrapper losing its layout. */
+.weigh-date-field>.date-control {
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+  color:var(--text);
+  font-size:16px;
+  font-weight:700;
+  overflow:hidden;
+  border-radius:12px;
+}
+.weigh-date-field .date-control-value{color:var(--text);font-size:16px;line-height:1.4}
+.weigh-date-field .date-control-icon{display:block;flex:0 0 auto}
+.weigh-date-field .date-control-native{inset:0;min-width:0!important;width:100%!important}
+@media(max-width:670px){
+ .weigh-date-field{overflow:visible}
+ .weigh-date-field>.date-control{min-height:54px}
+ .weigh-date-field>.date-control-value{min-width:0}
+}
+
+/* One comfortable hover surface, rather than a tight inner highlight. */
+.schedule-list .schedule-item{
+  padding:19px 18px;
+  gap:5px;
+  border-radius:16px;
+  transition:background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.schedule-list .schedule-main{
+  width:100%;
+  padding:3px 2px 13px;
+  background:transparent;
+  border-radius:12px;
+  min-width:0;
+}
+.schedule-list .schedule-main:hover{background:transparent}
+.schedule-list .schedule-item:hover,
+.schedule-list .schedule-item:focus-within{
+  border-color:color-mix(in srgb,var(--purple) 40%,var(--border));
+  background:color-mix(in srgb,var(--purple) 9%,var(--panel2));
+  box-shadow:0 12px 28px rgba(3,8,25,.17);
+}
+.schedule-list .schedule-item:focus-within{outline:2px solid color-mix(in srgb,var(--purple) 65%,transparent);outline-offset:2px}
+.schedule-list .schedule-actions{padding-top:14px;gap:10px}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+  .schedule-list .schedule-item:hover{transform:translateY(-1px)}
+}
+@media(max-width:670px){
+  .schedule-list .schedule-item{padding:17px 15px;gap:5px}
+  .schedule-list .schedule-main{padding:3px 0 12px}
+  .schedule-list .schedule-actions{padding:14px 0 0;gap:9px}
+}
+
+/* Hydration goal celebration: water-filled badge, ripple and playful droplets. */
+.celebration-water{
+  overflow:hidden;
+  border-color:rgba(91,219,201,.65);
+  background:radial-gradient(circle at 50% 25%,rgba(91,219,201,.18),transparent 53%),
+    linear-gradient(155deg,#182b43,#132339);
+}
+.water-celebration-art{
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:164px;
+  height:150px;
+  margin:0 auto 10px;
+  isolation:isolate;
+}
+.water-drop-core{
+  width:108px;height:108px;border-radius:50%;
+  display:grid;place-items:center;
+  color:#e5fffc;
+  background:linear-gradient(160deg,#3eaeb1,#266c99);
+  box-shadow:inset 0 0 0 3px rgba(203,255,251,.23),0 14px 38px rgba(68,206,199,.26);
+  z-index:2;
+  animation:water-bounce .65s cubic-bezier(.18,.89,.32,1.4) both;
+}
+.water-ripple{
+  position:absolute;width:110px;height:110px;border:2px solid rgba(92,232,216,.65);
+  border-radius:50%;opacity:0;z-index:1;
+  animation:water-ripple 1.6s .2s ease-out both;
+}
+.ripple-two{animation-delay:.46s}
+.water-spark{position:absolute;width:11px;height:11px;background:#7ee9de;border-radius:60% 60% 60% 0;
+ transform:rotate(-45deg);z-index:1;animation:water-spark .9s .3s ease-out both}
+.spark-a{top:10px;left:23px;--spark-x:-13px;--spark-y:-19px}
+.spark-b{top:15px;right:21px;--spark-x:12px;--spark-y:-20px}
+.spark-c{bottom:11px;left:18px;--spark-x:-16px;--spark-y:17px}
+.spark-d{bottom:10px;right:18px;--spark-x:15px;--spark-y:18px}
+.celebration-water .eyebrow{color:#8ef0df}
+.celebration-water .button-primary{background:linear-gradient(110deg,#27a7a1,#547edb);color:white}
+@keyframes water-bounce{0%{opacity:0;transform:scale(.55)}60%{transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+@keyframes water-ripple{0%{opacity:.8;transform:scale(.55)}100%{opacity:0;transform:scale(1.5)}}
+@keyframes water-spark{0%{opacity:0;translate:0 0}45%{opacity:1}100%{opacity:0;translate:var(--spark-x) var(--spark-y)}}
+@media(prefers-reduced-motion:reduce){
+  .schedule-list .schedule-item,.water-drop-core,.water-ripple,.water-spark{animation:none!important;transition:none!important;transform:none!important}
+  .water-ripple,.water-spark{opacity:0}
+}

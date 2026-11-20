@@ -9,11 +9,11 @@ import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,download
 import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet} from '@/lib/firebase';
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
-import {history,loggedSet,num,setCount,validSet} from '@/lib/metrics';
+import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {stableSetId} from '@/lib/set-sync';
 
-export type Celebration = {title:string;body:string;kind:'session'|'pr'}|null;
+export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
 export function useTrainer(){
  const [hydrated,setHydrated]=useState(false);
  const [data,setData]=useState<TrackerData>(blankData);
@@ -395,9 +395,22 @@ export function useTrainer(){
   const w=d.weeks[week]??=weekBlank();w.sessionNotes??={};const notes=w.sessionNotes[day]??={};if(field==='sessionRpe')notes.sessionRpe=value===''?undefined:Number(value);else notes[field]=value;w.sessionNotes[day]=notes;
  },`session:${week}:${day}`);
  const addWater=(amount:number,date=keyOf(new Date()))=>{
-  if(amount<25||amount>2000){notify('Enter a drink between 25 and 2,000 mL.');return;}
+  if(!Number.isFinite(amount)||amount<25||amount>2000){notify('Enter a drink between 25 and 2,000 mL.');return;}
+  // Celebrate only when THIS device's user action crosses today's goal.
+  // Reopening the app, initial Firebase snapshots and a repeated daily goal
+  // must not retrigger the animation. This key is account- and date-scoped.
+  const crossedToday=date===keyOf(new Date())&&waterTotal(dataRef.current,date)<waterGoal(date)
+    &&waterTotal(dataRef.current,date)+amount>=waterGoal(date);
   const id=crypto.randomUUID();const at=new Date().toISOString();
   update(d=>{d.waterLogs[id]={date,at,ml:amount};},`water:${id}`);
+  if(crossedToday){
+    const celebratedKey=`replap-water-goal:${uidRef.current}:${date}`;
+    let shouldCelebrate=true;
+    try{if(localStorage.getItem(celebratedKey))shouldCelebrate=false;
+      else localStorage.setItem(celebratedKey,'1');}catch{}
+    if(shouldCelebrate)setCelebration({kind:'hydration',title:'Hydration hero! 💧',
+      body:`Bottle by bottle, you hit your ${(waterGoal(date)/1000).toFixed(1)} L goal. Your future self says cheers!`});
+  }
  };
  const deleteWater=(id:string)=>update(d=>{if(d.waterLogs[id])d.waterLogs[id].deleted=true;},`water:${id}`);
  const saveWeight=(date:string,kg:number,note:string)=>{
