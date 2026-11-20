@@ -7,6 +7,7 @@ import {PLAN,isGym} from '@/lib/plan';
 import {keyOf,dateFor,formatDate,weekOf} from '@/lib/dates';
 import {monthGrid,entriesForDate,weeklyAdherence} from '@/lib/scheduling';
 import type {CalendarItem} from '@/lib/scheduling';
+import DateInput from '@/components/DateInput';
 function monthTitle(month:string){return dateFor(`${month}-01`).toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
 function shiftMonth(month:string,offset:number){const d=dateFor(`${month}-01`);d.setMonth(d.getMonth()+offset);return keyOf(d).slice(0,7);}
 function statusLabel(status:CalendarItem['status']){return status==='rest'?'Recovery Day':status==='skipped'?'Workout Skipped':status==='completed'?'Workout Completed':'Workout Scheduled';}
@@ -39,7 +40,7 @@ export default function TrainingCalendar({app}:{app:Trainer}){
     <div className="calendar-session-meta"><span>{entry.day}</span><span>Original plan week: {entry.week}</span></div>
     <div className="calendar-session-actions"><button className="button-secondary" onClick={()=>openSession(entry.week,entry.day)}>View workout <ArrowRight size={16}/></button>
      {entry.status!=='completed'&&<>{entry.status==='rest'||entry.status==='skipped'?<button className="button-primary" onClick={()=>app.setScheduleStatus(entry.day,null,entry.week)}>Undo {entry.status==='rest'?'rest day':'skip'}</button>:<><button className="button-secondary" onClick={()=>app.setScheduleStatus(entry.day,'rest',entry.week)}><Moon size={15}/> Rest day</button><button className="button-secondary" onClick={()=>app.setScheduleStatus(entry.day,'skipped',entry.week)}><SkipForward size={15}/> Skip</button></>}
-      <details className="calendar-reschedule"><summary><CalendarClock size={16}/> Reschedule</summary><label className="field"><span>Choose new session date</span><input type="date" value={entry.date} onChange={e=>{if(e.target.value)app.rescheduleSession(entry.day,e.target.value,entry.week);}}/></label><p className="muted tiny">Existing sets stay in your history.</p></details></>}
+      <details className="calendar-reschedule"><summary><CalendarClock size={16}/> Reschedule</summary><label className="field"><span>Choose new session date</span><DateInput value={entry.date} onChange={e=>{if(e.target.value)app.rescheduleSession(entry.day,e.target.value,entry.week);}}/></label><p className="muted tiny">Existing sets stay in your history.</p></details></>}
     </div></div>)}</div>}
   </section>
  </div>;
