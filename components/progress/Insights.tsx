@@ -4,11 +4,11 @@ import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,Clock3,Droplets,Dumbbell,
 import type {Trainer} from '@/hooks/useTrainer';
 import {keyOf,shiftWeek,weekOf} from '@/lib/dates';
 import {formatDuration} from '@/lib/metrics';
-import {achievements,monthLabel,monthlyRecap,muscleCoverage,nextMonth,previousMonth} from '@/lib/insights';
+import {monthLabel,monthlyRecap,muscleCoverage,nextMonth,previousMonth} from '@/lib/insights';
 import type {Achievement} from '@/lib/insights';
 
 const ICONS={trophy:Trophy,water:Droplets,swim:Waves,dumbbell:Dumbbell,calendar:CalendarDays,sparkles:Sparkles};
-function AchievementTile({achievement}:{achievement:Achievement}){
+export function AchievementTile({achievement}:{achievement:Achievement}){
  const Icon=ICONS[achievement.icon];
  const ratio=Math.min(100,Math.round(100*achievement.value/achievement.target));
  const displayed=achievement.unit==='m'?achievement.value.toLocaleString():String(achievement.value);
@@ -29,8 +29,6 @@ export default function Insights({app}:{app:Trainer}){
  const maxSets=Math.max(1,...coverage.groups.map(g=>g.weightedSets));
  const recap=monthlyRecap(app.data,month);
  const previous=monthlyRecap(app.data,previousMonth(month));
- const badges=achievements(app.data);
- const earned=badges.filter(b=>b.unlocked).length;
  const hasMonthlyData=recap.completedSessions>0||recap.workingSets>0||recap.swimMeters>0||recap.hydrationLoggedDays>0;
  const compare=previous.completedSessions>0
   ?`${recap.completedSessions>previous.completedSessions?'+':''}${recap.completedSessions-previous.completedSessions} sessions compared with ${monthLabel(previous.month)}`
@@ -75,9 +73,6 @@ export default function Insights({app}:{app:Trainer}){
    </div>
    <p className="muted tiny">Session duration includes rests and is shown only for workouts with a completed timer. Lifting volume excludes deleted and unfinished sets. Load records compare the same exercise over time.</p>
   </section>
-  <section className="card pane-pad insight-section" aria-labelledby="achievement-heading">
-   <div className="section-title insight-title"><div><span className="eyebrow">ACHIEVEMENT CABINET</span><h2 id="achievement-heading">Small wins. Real progress.</h2><p className="muted small">Milestones unlock from your actual log history. No extra data collection required.</p></div><span className="achievement-counter"><Trophy size={17}/> {earned} / {badges.length} unlocked</span></div>
-   <div className="achievement-grid">{badges.map(b=><AchievementTile key={b.id} achievement={b}/>)}</div>
-  </section>
+  <button type="button" className="button-secondary insight-achievements-link" onClick={()=>app.goto('achievements')}><Trophy size={18}/> Open Achievements <ArrowRight size={18}/></button>
  </div>;
 }

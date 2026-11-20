@@ -29,7 +29,7 @@ function validateExercises(value:unknown){
 }
 function validateWeek(week:unknown){
   const w=safeRecord(week,'week',16);
-  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','scheduleStatus','routineOverrides']){
+  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides']){
     if(w[section]===undefined)continue;
     const daily=safeRecord(w[section],section,7);
     for(const [day,value] of Object.entries(daily)){
@@ -56,11 +56,12 @@ function validateWeek(week:unknown){
       }
       if(section==='swim'||section==='sessionNotes'||section==='timing')check(object(value),'Invalid session details');
       if(section==='completedAt')check(typeof value==='string'&&Number.isFinite(Date.parse(value)),'Invalid completion timestamp');
+      if(section==='completedOn')check(typeof value==='string'&&validDate(value),'Invalid actual completion date');
     }
   }
 }
 function hasSession(w:WeekLog,day:Day):boolean {
-  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day]||!!w.scheduleStatus?.[day]||!!w.routineOverrides?.[day as GymDay];
+  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day]||!!w.completedOn?.[day]||!!w.scheduleStatus?.[day]||!!w.routineOverrides?.[day as GymDay];
 }
 export function countRecords(data:TrackerData):BackupCounts {
   let sessions=0,sets=0;
@@ -116,7 +117,7 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
     for(const day of DAYS){
       if(!hasSession(incoming,day))continue;
       if(hasSession(existing,day)){duplicates++;continue;}
-      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','scheduleStatus','routineOverrides'] as const){
+      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides'] as const){
         const from=incoming[prop] as Record<string,unknown>|undefined;
         if(from&&hasOwn(from,day)){const into=(existing[prop]??={}) as Record<string,unknown>;into[day]=structuredClone(from[day]);}
       }

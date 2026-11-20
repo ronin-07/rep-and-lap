@@ -1,6 +1,6 @@
 import {DAYS,type Day,type TrackerData,type ScheduleStatus} from './types';
 import {PLAN} from './plan';
-import {keyOf,weekOf,dateFor} from './dates';
+import {keyOf,weekOf,dateFor,dateInWeek} from './dates';
 
 export type CalendarItem = {week:string;day:Day;date:string;status:'scheduled'|'completed'|ScheduleStatus;name:string};
 export function isValidDate(value:string):boolean {
@@ -16,11 +16,19 @@ export function statusFor(data:TrackerData,week:string,day:Day):'scheduled'|'com
  if(data.weeks[week]?.done?.[day])return 'completed';
  return data.weeks[week]?.scheduleStatus?.[day]??'scheduled';
 }
+/** Actual local calendar date, not the timestamp when a historical entry was added.
+ * Older records (without completedOn) retain their existing fallback behavior. */
 export function completedDate(data:TrackerData,week:string,day:Day):string {
- const record=data.weeks[week];const stamp=record?.completedAt?.[day]||record?.timing?.[day]?.endedAt;
+ const record=data.weeks[week];
+ const selected=record?.completedOn?.[day];
+ if(selected&&isValidDate(selected))return selected;
+ const stamp=record?.timing?.[day]?.endedAt||record?.completedAt?.[day];
  if(stamp&&!Number.isNaN(Date.parse(stamp)))return keyOf(new Date(stamp));
  return scheduledDate(data,week,day);
 }
+/** The immutable original weekday/date of the template, irrespective of reschedules. */
+export function originalPlannedDate(week:string,day:Day):string{return dateInWeek(week,day);}
+
 // Display planned sessions by their CURRENT calendar date, not their original weekday.
 // Completed sessions move to their actual completion date, even after rescheduling.
 export function entriesForDate(data:TrackerData,date:string):CalendarItem[] {
@@ -34,6 +42,18 @@ export function entriesForDate(data:TrackerData,date:string):CalendarItem[] {
   if(actualDate===date)result.push({week,day,date,status,name:PLAN[day].name});
  }
  return result.sort((a,b)=>a.week.localeCompare(b.week)||DAYS.indexOf(a.day)-DAYS.indexOf(b.day));
+}
+/** Calendar-only history anchors. A workout completed on another date should
+ * remain discoverable at its scheduled slot without being counted twice. */
+export function completedElsewhereForDate(data:TrackerData,date:string):Array<{week:string;day:Day;actualDate:string}> {
+ if(!isValidDate(date))return [];
+ const out:Array<{week:string;day:Day;actualDate:string}>=[];
+ for(const [week,log] of Object.entries(data.weeks))for(const day of DAYS){
+  if(!log.done?.[day]||scheduledDate(data,week,day)!==date)continue;
+  const actualDate=completedDate(data,week,day);
+  if(actualDate!==date)out.push({week,day,actualDate});
+ }
+ return out.sort((a,b)=>a.week.localeCompare(b.week)||DAYS.indexOf(a.day)-DAYS.indexOf(b.day));
 }
 export function isRecoveryDate(data:TrackerData,date:string):boolean {
  const entries=entriesForDate(data,date);

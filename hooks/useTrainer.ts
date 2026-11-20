@@ -33,6 +33,7 @@ export function useTrainer(){
  const [restState,setRestState]=useState<RestState|null>(null);
  const restEnd=restState?.endsAt??0;
  const [recoveryPrompt,setRecoveryPrompt]=useState<{week:string;day:Day}|null>(null);
+ const [completionRequest,setCompletionRequest]=useState<{week:string;day:Day;mode:'complete'|'edit'}|null>(null);
  const [clock,setClock]=useState(Date.now());
  const [online,setOnline]=useState(true);
  const [installPrompt,setInstallPrompt]=useState<Event|null>(null);
@@ -217,7 +218,7 @@ export function useTrainer(){
  const finishSession=(day:Day)=>{
   const at=new Date().toISOString();const isDone=!!dataRef.current.weeks[week]?.done?.[day];
   update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};const t=w.timing[day]??={};
-   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;
+   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;w.completedOn??={};w.completedOn[day]=keyOf(new Date(at));
   },`session:${week}:${day}`);
   if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
   if(!isDone)setRecoveryPrompt({week,day});
@@ -257,15 +258,33 @@ export function useTrainer(){
   notify('Pending sessions shifted. Check the dates for next-week overlaps.');
  };
  function dateForWeek(w:string,day:Day){const d=dateFor(w);d.setDate(d.getDate()+DAYS.indexOf(day));return keyOf(d);}
+ // Manual/backfilled completion asks for the actual training DATE. The timestamp
+ // remains an audit marker; choosing the planned date must not silently move the session.
+ const requestCompletion=(targetWeek:string,day:Day,mode:'complete'|'edit'='complete')=>{
+  const existing=dataRef.current.weeks[targetWeek];
+  if(mode==='edit'&&!existing?.done?.[day]){notify('This workout is not completed yet.');return;}
+  if(mode==='complete'&&existing?.done?.[day]){notify('This workout is already completed.');return;}
+  if(mode==='complete'&&existing?.timing?.[day]?.startedAt&&!existing.timing[day]?.endedAt){notify('Finish your active timer instead to save the actual workout time.');return;}
+  setCompletionRequest({week:targetWeek,day,mode});
+ };
+ const confirmCompletion=(date:string)=>{
+  const request=completionRequest;
+  if(!request||!isValidDate(date)||date>keyOf(new Date())){notify('Choose a valid completion date that is not in the future.');return;}
+  const {week:targetWeek,day,mode}=request;
+  if(mode==='edit'&&!dataRef.current.weeks[targetWeek]?.done?.[day]){setCompletionRequest(null);return;}
+  if(mode==='complete'&&dataRef.current.weeks[targetWeek]?.done?.[day]){setCompletionRequest(null);return;}
+  update(d=>{const item=d.weeks[targetWeek]??=weekBlank();item.completedOn??={};item.completedOn[day]=date;
+   if(mode==='complete'){item.done[day]=true;item.completedAt??={};item.completedAt[day]=new Date().toISOString();if(item.scheduleStatus)delete item.scheduleStatus[day];}
+  },`session:${targetWeek}:${day}`);
+  setCompletionRequest(null);
+  if(mode==='complete'){if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);setRecoveryPrompt({week:targetWeek,day});}
+  else notify('Actual training date updated. Original schedule unchanged.');
+ };
  const toggleDone=(day:Day)=>{
-  const was=!!dataRef.current.weeks[week]?.done?.[day];
-  if(was&&!confirm('Mark this session incomplete? All logged sets and workout time will be kept.'))return;
-  if(!was&&statusFor(dataRef.current,week,day)!=='scheduled'&&!confirm('Restore this skipped or rest session and mark it complete?'))return;
-  update(d=>{const item=d.weeks[week]??=weekBlank();item.done[day]=!was;if(!was&&item.scheduleStatus)delete item.scheduleStatus[day];item.completedAt??={};
-   if(was){delete item.completedAt[day];}
-   else {const at=new Date().toISOString();item.completedAt[day]=at;if(item.timing?.[day]?.startedAt&&!item.timing[day]?.endedAt)item.timing[day]!.endedAt=at;}
-  },`session:${week}:${day}`);
-  if(!was){if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);setRecoveryPrompt({week,day});}
+  const targetWeek=week,was=!!dataRef.current.weeks[targetWeek]?.done?.[day];
+  if(!was){requestCompletion(targetWeek,day);return;}
+  if(!confirm('Mark this session incomplete? All logged sets and workout time will be kept.'))return;
+  update(d=>{const item=d.weeks[targetWeek]??=weekBlank();item.done[day]=false;delete item.completedAt?.[day];delete item.completedOn?.[day];},`session:${targetWeek}:${day}`);
  };
  const editSet=(day:GymDay,exercise:string,index:number,change:(set:GymSet)=>void)=>{
   const next=structuredClone(dataRef.current);
@@ -451,8 +470,8 @@ export function useTrainer(){
   const rows:string[][]=[];
   if(kind==='water'){rows.push(['date','timestamp','millilitres']);for(const item of Object.values(dataRef.current.waterLogs))if(!item.deleted)rows.push([item.date,item.at,String(item.ml)]);}
   if(kind==='weight'){rows.push(['date','kg','notes']);for(const [date,item] of Object.entries(dataRef.current.weights))if(!item.deleted)rows.push([date,String(item.kg??''),item.note||'']);}
-  if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','rir','rpe','logged','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),String(s.rir??''),String(s.rpe??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']));}
-  if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'']);}
+  if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','rir','rpe','logged','scheduled_date','started_at','ended_at','completed_at','actual_training_date']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),String(s.rir??''),String(s.rpe??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'',x.completedOn?.[day as Day]||'']));}
+  if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at','actual_training_date']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'',x.completedOn?.[day as Day]||'']);}
   const csv=rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
   downloadFile(`rep-and-lap-${kind}-${keyOf(new Date())}.csv`,csv,'text/csv');
  };
@@ -467,6 +486,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

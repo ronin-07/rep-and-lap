@@ -1,7 +1,8 @@
 import {describe,it,expect} from 'vitest';
 import {blankData,weekBlank,recordPayload,applyRecord} from '../lib/storage';
-import {entriesForDate,scheduledDate,statusFor,trainingStreak,weeklyAdherence,monthGrid,isValidDate} from '../lib/scheduling';
-import {sessionForDate} from '../lib/metrics';
+import {entriesForDate,scheduledDate,statusFor,trainingStreak,weeklyAdherence,monthGrid,isValidDate,completedDate,originalPlannedDate,completedElsewhereForDate} from '../lib/scheduling';
+import {sessionForDate,calendarCompleted} from '../lib/metrics';
+import {monthlyRecap} from '../lib/insights';
 import {readBackup,mergeBackup} from '../lib/backup';
 const week='2026-11-16';
 const create=()=>{const d=blankData();d.weeks[week]=weekBlank();return d;};
@@ -26,6 +27,42 @@ describe('Flexible training schedule and calendar',()=>{
   d.weeks[week].completedAt!.Monday='2026-11-20T12:00:00.000Z';
   expect(entriesForDate(d,'2026-11-19').some(x=>x.week===week&&x.day==='Monday')).toBe(false);
   expect(entriesForDate(d,'2026-11-20').some(x=>x.status==='completed'&&x.week===week)).toBe(true);
+ });
+ it('backfills an older workout without moving it to the day the user clicked Complete',()=>{
+  const d=create();d.weeks[week].done.Thursday=true;
+  d.weeks[week].completedAt!.Thursday='2026-11-20T16:00:00.000Z'; // marked today
+  d.weeks[week].completedOn!.Thursday='2026-11-19'; // actually trained yesterday
+  expect(completedDate(d,week,'Thursday')).toBe('2026-11-19');
+  expect(entriesForDate(d,'2026-11-19').some(e=>e.week===week&&e.day==='Thursday'&&e.status==='completed')).toBe(true);
+  expect(entriesForDate(d,'2026-11-20').some(e=>e.week===week&&e.day==='Thursday')).toBe(false);
+  expect(calendarCompleted(d,week)).toMatchObject({completed:1,swim:1});
+  expect(weeklyAdherence(d,week).completed).toBe(1);
+ });
+ it('honors actual training dates across months while preserving the original planned date',()=>{
+  const d=create();d.weeks[week].done.Thursday=true;
+  d.weeks[week].schedule!.Thursday='2026-11-25'; // workout was rescheduled
+  d.weeks[week].completedAt!.Thursday='2026-12-02T12:00:00.000Z';
+  d.weeks[week].completedOn!.Thursday='2026-12-01';
+  expect(originalPlannedDate(week,'Thursday')).toBe('2026-11-19');
+  expect(scheduledDate(d,week,'Thursday')).toBe('2026-11-25');
+  expect(completedDate(d,week,'Thursday')).toBe('2026-12-01');
+  expect(entriesForDate(d,'2026-11-25').some(x=>x.week===week&&x.day==='Thursday')).toBe(false);
+  expect(completedElsewhereForDate(d,'2026-11-25')).toMatchObject([{week,day:'Thursday',actualDate:'2026-12-01'}]);
+  expect(entriesForDate(d,'2026-12-01').some(x=>x.week===week&&x.day==='Thursday')).toBe(true);
+  expect(monthlyRecap(d,'2026-11').completedSessions).toBe(0);
+  expect(monthlyRecap(d,'2026-12').completedSessions).toBe(1);
+  expect(weeklyAdherence(d,week).completed).toBe(1);
+ });
+ it('round-trips the selected training date through Firestore and backup safely',()=>{
+  const d=create();d.weeks[week].done.Thursday=true;
+  d.weeks[week].completedAt!.Thursday='2026-11-20T18:00:00.000Z';
+  d.weeks[week].completedOn!.Thursday='2026-11-19';
+  const saved=applyRecord(blankData(),`session:${week}:Thursday`,recordPayload(d,`session:${week}:Thursday`));
+  expect(saved.weeks[week].completedOn?.Thursday).toBe('2026-11-19');
+  const read=readBackup(JSON.stringify(d),blankData());
+  expect(mergeBackup(blankData(),read.backup).data.weeks[week].completedOn?.Thursday).toBe('2026-11-19');
+  const invalid=structuredClone(d);invalid.weeks[week].completedOn!.Thursday='2026-02-30';
+  expect(()=>readBackup(JSON.stringify(invalid),blankData())).toThrow(/completion date/);
  });
  it('intentional recovery days keep a streak, but skips break it',()=>{
   const d=create();for(const day of ['Monday','Wednesday','Friday'] as const){d.weeks[week].done[day]=true;d.weeks[week].completedAt![day]=new Date(`${scheduledDate(d,week,day)}T12:00:00`).toISOString();}

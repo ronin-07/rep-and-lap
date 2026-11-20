@@ -581,3 +581,38 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
 @media(max-width:670px){.insight-section{padding:19px 16px}.insight-title h2{font-size:1.28rem}.muscle-grid,.recap-grid,.achievement-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.muscle-tile,.achievement-tile{padding:13px 11px}.muscle-tile-heading{margin-bottom:12px}.muscle-tile-heading strong{font-size:.82rem}.recap-metric{padding:14px 12px}.recap-metric>span{font-size:.71rem;line-height:1.3}.recap-metric strong{font-size:1.36rem}.achievement-state{font-size:.61rem}.achievement-tile>p{font-size:.71rem}.month-pager,.insight-week-picker{gap:8px}.month-pager strong,.insight-week-picker strong{min-width:0;flex:1;font-size:.88rem}.insight-week-picker button,.month-pager button{min-height:44px;min-width:44px}.achievement-counter{font-size:.74rem}}
 @media(max-width:365px){.muscle-grid,.recap-grid,.achievement-grid{grid-template-columns:1fr}.recap-metric{gap:7px}.achievement-tile>p{min-height:0}.insight-title h2{font-size:1.2rem}}
 @media(prefers-reduced-motion:reduce){.muscle-bar span,.achievement-track span,.muscle-tile{transition:none!important;transform:none!important}}
+
+/* v3.2 calendar dates + separate mobile insights/achievements navigation */
+@media(max-width:900px){.progress-tabs .progress-insights-desktop{display:none!important}}
+.insight-achievements-link{display:inline-flex;align-items:center;justify-content:center;gap:10px;margin:7px 0 5px;min-height:48px}
+.calendar-session-meta{align-items:center;gap:9px 15px}
+.calendar-session-meta span{overflow-wrap:anywhere}
+.completion-overlay{z-index:1300;padding:16px;overflow-y:auto;align-items:center;justify-content:center}
+.completion-date-modal{width:min(510px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:13px}
+.completion-modal-head{display:flex;align-items:center;justify-content:space-between}
+.completion-modal-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--aqua) 16%,var(--panel));color:var(--aqua)}
+.completion-date-modal h2{font-size:clamp(1.35rem,4vw,1.8rem);line-height:1.23;margin:0}
+.completion-options{display:flex;flex-direction:column;gap:9px}
+.completion-choice{display:flex;align-items:center;gap:12px;min-height:62px;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:13px;cursor:pointer}
+.completion-choice:has(input:checked){border-color:var(--purple);background:color-mix(in srgb,var(--purple) 11%,var(--panel2))}
+.completion-choice:has(input:disabled){opacity:.48;cursor:not-allowed}
+.completion-choice input{width:19px;height:19px;flex-shrink:0;accent-color:var(--purple)}
+.completion-choice span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.completion-choice strong{font-size:.91rem}
+.completion-choice small{font-size:.79rem;color:var(--muted)}
+.completion-custom-date{margin-top:1px}
+.completion-custom-date .date-control{width:100%;min-width:0}
+.completion-preview{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:.79rem;line-height:1.5;padding:12px 13px;background:color-mix(in srgb,var(--aqua) 8%,var(--panel2));border-radius:11px}
+.completion-preview svg{flex-shrink:0;color:var(--aqua)}
+.completion-note{color:var(--coral);font-size:.79rem}
+.completion-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:3px}
+.completion-actions button{min-height:45px}
+@media(max-width:670px){.completion-date-modal{padding:19px 16px}.completion-actions button{flex:1}.completion-overlay{align-items:center}}
+
+.calendar-history-anchor{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:17px;border:1px dashed color-mix(in srgb,var(--purple) 46%,var(--border));border-radius:15px;background:var(--panel2)}
+.calendar-history-anchor>svg{color:var(--purple);flex-shrink:0}
+.calendar-history-anchor>div{flex:1;min-width:170px}
+.calendar-history-anchor strong{font-size:.92rem}
+.calendar-history-anchor p{font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:4px}
+.calendar-history-anchor button{display:inline-flex;align-items:center;gap:6px;min-height:44px}
+@media(max-width:670px){.calendar-history-anchor{align-items:flex-start}.calendar-history-anchor button{width:100%;justify-content:center}}

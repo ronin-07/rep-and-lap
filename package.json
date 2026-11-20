@@ -1,6 +1,6 @@
 {
   "name": "replap",
-  "version": "3.2.0-m5-preview",
+  "version": "3.2.0-m5-calendar-preview",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",

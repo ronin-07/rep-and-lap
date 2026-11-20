@@ -2,7 +2,7 @@ export const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturda
 export type Day = typeof DAYS[number];
 export type GymDay = 'Monday'|'Tuesday'|'Wednesday';
 export type SwimDay = 'Thursday'|'Friday'|'Saturday';
-export type View = 'home'|'workout'|'progress'|'profile'|'settings'|'conflicts'|'calendar';
+export type View = 'home'|'workout'|'progress'|'profile'|'settings'|'conflicts'|'calendar'|'insights'|'achievements';
 export type TrackingTab = 'gym'|'swim'|'water'|'weight';
 export type ProgressTab = 'overview'|'strength'|'swimming'|'weight'|'hydration'|'insights';
 export type ScheduleStatus = 'rest'|'skipped';
@@ -38,6 +38,8 @@ export interface WeekLog {
   timing?:Partial<Record<Day,SessionTiming>>;
   schedule?:Partial<Record<Day,string>>;
   completedAt?:Partial<Record<Day,string>>;
+  /** Actual local date of training, independent of when a user tapped Complete. */
+  completedOn?:Partial<Record<Day,string>>;
   scheduleStatus?:Partial<Record<Day,ScheduleStatus>>;
   routineOverrides?:Partial<Record<GymDay,RoutineExercise[]>>;
 }
