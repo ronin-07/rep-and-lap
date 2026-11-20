@@ -97,7 +97,7 @@
   const configured=!!(window.REP_AND_LAP_SUPABASE?.url&&window.REP_AND_LAP_SUPABASE?.publishableKey);
   const cloud={client:null,user:null,state:configured?'Not connected':'Not configured'};
   let theme=localStorage.getItem(THEME_KEY)||'dark';
-  function applyTheme(){document.documentElement.dataset.theme=theme;localStorage.setItem(THEME_KEY,theme);document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#080e1c':'#f5f7ff';const t=document.getElementById('themeToggle');if(t){t.innerHTML=ico(theme==='dark'?'sun':'moon',18);t.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';}}
+  function applyTheme(){document.documentElement.dataset.theme=theme;localStorage.setItem(THEME_KEY,theme);document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#080e1c':'#f4f6fd';const t=document.getElementById('themeToggle');if(t){t.innerHTML=ico(theme==='dark'?'sun':'moon',18);t.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';}}
   function pendingCount(){return Object.keys(data.pendingSync||{}).length;}
   function syncLabel(){
     if(storageFailure||cloud.state==='Sync error'||cloud.state==='Cloud setup error')return {text:'Needs attention',mode:'attention'};
@@ -527,7 +527,7 @@
     if(a==='stop-rest'){stopRest();return;}
     if(a==='extend-rest'){restEnd+=15000;renderRestTimer();return;}
     if(a==='use-previous'){const {day,exercise,set}=target.dataset,previous=getLastWeekSets(day,exercise)[Number(set)];if(!validLoggedSet(previous))return;const entry=ensureExercise(day,exercise);entry.sets[Number(set)] ||= {};entry.sets[Number(set)].kg=previous.kg;entry.sets[Number(set)].done=false;save(sessionKey(day));render();notify('Previous weight copied; enter your reps');return;}
-    if(a==='finish-set'){const {day,exercise,set}=target.dataset,entry=ensureExercise(day,exercise),current=entry.sets[Number(set)]||{};if(!validSet(current)){notify('Enter weight and reps before logging the set');return;}const oldPR=exercisePersonalBest(day,exercise);current.done=!current.done;entry.sets[Number(set)]=current;save(sessionKey(day));const completed=current.done;render();if(completed){startRest();if(oldPR!==null&&number(current.kg)>oldPR){celebrate('New personal record!',`${exercise}: ${number(current.kg)} kg. Your heaviest logged set yet.`,'pr');}else notify('Set logged · rest timer started');}else notify('Set marked as not completed');return;}
+    if(a==='finish-set'){const {day,exercise,set}=target.dataset,entry=ensureExercise(day,exercise),current=entry.sets[Number(set)]||{};if(!validSet(current)){notify('Enter weight and reps before logging the set');return;}const hasEarlierSession=previousExercise(day,exercise)!==null;const oldPR=exercisePersonalBest(day,exercise);current.done=!current.done;entry.sets[Number(set)]=current;save(sessionKey(day));const completed=current.done;render();if(completed){startRest();if(hasEarlierSession&&oldPR!==null&&number(current.kg)>oldPR){celebrate('New personal record!',`${exercise}: ${number(current.kg)} kg. Your heaviest logged set yet.`,'pr');}else notify('Set logged · rest timer started');}else notify('Set marked as not completed');return;}
 
     if(a==='adjust-sets'){adjustSets(target.dataset.day,target.dataset.exercise,Number(target.dataset.delta));return;}
     if(a==='delete-weight'){removeWeight(target.dataset.date);return;}

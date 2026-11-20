@@ -487,3 +487,17 @@ main.content{animation:pageGlide .38s cubic-bezier(.18,.8,.2,1) both}
 @media(max-width:690px){.session-notes-grid{grid-template-columns:1fr}.session-notes-grid .field:last-child{grid-column:auto}}
 @media(max-width:590px){.saved-state{max-width:126px;font-size:10px;overflow:hidden;text-overflow:ellipsis}.reminder-setting{align-items:stretch}.reminder-setting .field{max-width:none}}
 @media(prefers-reduced-motion:reduce){.saved-state .save-indicator{animation:none!important}}
+
+/* iOS Safari / installed PWA polish — 2026-11 hotfix */
+:root[data-theme="dark"]{--bg:#080e1c}
+html{background-color:var(--bg,#080e1c);min-height:100%;overscroll-behavior-y:none}
+body{background-color:var(--bg,#080e1c);min-height:100svh;overscroll-behavior-y:none}
+.app-shell{min-height:100svh}
+.settings-shortcut{display:grid;place-items:center;padding:0;line-height:0;vertical-align:middle}
+.settings-shortcut svg{display:block;width:20px;height:20px;flex:none}
+#closeCelebration{display:inline-flex;align-items:center;justify-content:center;gap:9px;white-space:nowrap;line-height:1.25}
+#closeCelebration svg{display:block;flex:none}
+/* Safari supports these only in standalone display; browser toolbars are OS-owned. */
+@media(max-width:910px) and (display-mode:standalone){
+  .topbar{height:calc(65px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)}
+}
