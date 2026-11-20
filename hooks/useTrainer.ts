@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise} from '@/lib/types';
+import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise,type SwimActivity,type SwimStroke,type SwimMode,type SwimDifficulty,type SwimRoutine,type SwimSegment,type SwimIntervalSet} from '@/lib/types';
 import {PLAN} from '@/lib/plan';
 import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory,restoredSessionRoutine,freezeExistingRoutines,weeksToFreezeBeforeTemplateChange} from '@/lib/routines';
 import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
@@ -12,6 +12,7 @@ import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,typ
 import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {stableSetId} from '@/lib/set-sync';
+import {blankSegment,swimRoutine,swimPersonalBests,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke} from '@/lib/swimming';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
 export function useTrainer(){
@@ -393,7 +394,85 @@ export function useTrainer(){
   const id=`set-kg-${stableSetId(target.exercise,target.index)}`;
   setTimeout(()=>{const field=document.getElementById(id) as HTMLInputElement|null;field?.scrollIntoView({behavior:'smooth',block:'center'});field?.focus({preventScroll:true});},60);
  };
- const closeRecoveryPrompt=()=>{const prompt=recoveryPrompt;setRecoveryPrompt(null);if(prompt)setCelebration({title:'Session complete!',body:`${PLAN[prompt.day].name} is in the books.`,kind:'session'});};
+ const closeRecoveryPrompt=()=>{
+  const prompt=recoveryPrompt;setRecoveryPrompt(null);if(!prompt)return;
+  if(['Thursday','Friday','Saturday'].includes(prompt.day)){
+    const records=swimPersonalBests(dataRef.current).filter(e=>e.week===prompt.week&&e.day===prompt.day);
+    for(const best of records.slice().reverse()){
+      const receipt=`replap-swim-pr-celebrated:${uidRef.current}:${best.id}`;
+      let already=false;try{already=!!localStorage.getItem(receipt);}catch{}
+      if(already)continue;
+      try{localStorage.setItem(receipt,'1');}catch{}
+      setCelebration({kind:'pr',title:`New ${SWIM_ACTIVITY_LABELS[best.stroke]} record!`,
+        body:best.kind==='continuous'?`You swam ${best.meters} metres without stopping!`:`Fastest logged ${best.meters} m: ${best.seconds?.toFixed(1)} seconds. Keep it up!`});
+      return;
+    }
+  }
+  setCelebration({title:'Session complete!',body:`${PLAN[prompt.day].name} is in the books.`,kind:'session'});
+ };
+ const swimPlanEdit=(day:SwimDay,routine:SwimRoutine)=>{
+  if(!routine.name.trim()||routine.name.length>80||routine.activities.length>15){notify('Choose a session name and up to 15 activities.');return;}
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.swimRoutineOverrides??={};w.swimRoutineOverrides[day]=structuredClone(routine);},`session:${week}:${day}`);
+ };
+ const beginSwimRoutine=(day:SwimDay)=>{
+  const plan=swimRoutine(dataRef.current,week,day);
+  update(d=>{const w=d.weeks[week]??=weekBlank(),log=w.swim[day]??={};
+   if(log.segments?.length)return;
+   log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
+   log.segments=plan.activities.map(item=>blankSegment(item.activity,isStroke(item.activity)?d.swimModes[item.activity]||item.mode||SWIM_MODE_DEFAULTS[item.activity]:item.mode||'learning'));
+  },`session:${week}:${day}`);
+ };
+ const addSwimSegment=(day:SwimDay,activity:SwimActivity)=>{
+  update(d=>{const w=d.weeks[week]??=weekBlank(),log=w.swim[day]??={};
+    log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
+    log.segments??=[];if(log.segments.length>=25)return;
+    log.segments.push(blankSegment(activity,isStroke(activity)?d.swimModes[activity]||SWIM_MODE_DEFAULTS[activity]:'learning'));
+  },`session:${week}:${day}`);
+ };
+ const updateSwimSegment=(day:SwimDay,id:string,patch:Partial<SwimSegment>)=>update(d=>{
+  const s=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!s)return;
+  Object.assign(s,patch);
+ },`session:${week}:${day}`);
+ const removeSwimSegment=(day:SwimDay,id:string)=>{
+  const log=dataRef.current.weeks[week]?.swim?.[day];const segment=log?.segments?.find(x=>x.id===id);if(!segment)return;
+  if(!confirm(`Remove this ${segment.activity} entry? The lengths, intervals and notes recorded in this segment will be deleted.`))return;
+  update(d=>{const log=d.weeks[week]?.swim?.[day];if(log)log.segments=log.segments?.filter(x=>x.id!==id);},`session:${week}:${day}`);
+ };
+ const toggleSwimTechnique=(day:SwimDay,id:string,step:string,done:boolean)=>update(d=>{
+  const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!item)return;
+  item.technique??={};item.technique[step]=done;
+ },`session:${week}:${day}`);
+ const addSwimInterval=(day:SwimDay,id:string,interval:Omit<SwimIntervalSet,'id'>)=>{
+  if(!Number.isInteger(interval.repeats)||interval.repeats<1||interval.repeats>50||!Number.isInteger(interval.lengths)||interval.lengths<1||interval.lengths>40||interval.restSeconds<0||interval.restSeconds>1800){notify('Check interval repetitions, lengths and rest seconds.');return;}
+  update(d=>{const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!item)return;
+   item.intervals??=[];item.intervals.push({...interval,id:crypto.randomUUID()});
+  },`session:${week}:${day}`);
+ };
+ const removeSwimInterval=(day:SwimDay,id:string,intervalId:string)=>update(d=>{
+  const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(item)item.intervals=item.intervals?.filter(x=>x.id!==intervalId);
+ },`session:${week}:${day}`);
+ const editSwimPreference=(patch:Partial<Pick<TrackerData,'swimPoolDefault'|'swimTargets'|'swimModes'>>)=>{
+  if(patch.swimPoolDefault!==undefined&&(patch.swimPoolDefault<10||patch.swimPoolDefault>100))return;
+  update(d=>{Object.assign(d,patch);},'preferences');
+ };
+ const saveSwimDefault=(day:SwimDay)=>{
+  const routine=swimRoutine(dataRef.current,week,day);
+  if(!confirm(`Save "${routine.name}" as the default ${day} swim routine? Existing sessions and records will remain unchanged.`))return;
+  const freeze=Object.entries(dataRef.current.weeks).filter(([w,x])=>w!==week&&(!!x.swim?.[day]||!!x.done?.[day]||!!x.swimRoutineOverrides?.[day])).map(([w])=>w);
+  update(d=>{for(const w of freeze){const entry=d.weeks[w];entry.swimRoutineOverrides??={};entry.swimRoutineOverrides[day]??=swimRoutine(d,w,day);}
+   d.swimTemplates[day]=structuredClone(routine);
+  },['preferences',...freeze.map(w=>`session:${w}:${day}`)]);
+  notify('Swim routine saved as default.');
+ };
+ const restoreSwimDefault=(day:SwimDay)=>{
+  if(!dataRef.current.swimTemplates[day])return;
+  if(!confirm(`Restore the original RepLap ${day} swim plan for future sessions? Logged swims and the current plan will remain unchanged.`))return;
+  const freeze=Array.from(new Set([week,...Object.entries(dataRef.current.weeks).filter(([w,x])=>!!x.swim?.[day]||!!x.done?.[day]).map(([w])=>w)]));
+  update(d=>{for(const w of freeze){const entry=d.weeks[w];entry.swimRoutineOverrides??={};entry.swimRoutineOverrides[day]??=swimRoutine(d,w,day);}
+    delete d.swimTemplates[day];
+  },['preferences',...freeze.map(w=>`session:${w}:${day}`)]);
+  notify('Original swim default restored for future sessions.');
+ };
  const swimField=(day:SwimDay,field:string,value:string|number|boolean)=>update(d=>{
   const w=d.weeks[week]??=weekBlank(),item=w.swim[day]??={drills:{}};
   (item as unknown as Record<string,unknown>)[field]=value;
@@ -401,7 +480,7 @@ export function useTrainer(){
  },`session:${week}:${day}`);
  const changeLengths=(day:SwimDay,change:number)=>update(d=>{
   const w=d.weeks[week]??=weekBlank(),item=w.swim[day]??={drills:{}};
-  const count=Math.max(0,num(item.lengths)+change);item.lengths=count;item.poolLength=num(item.poolLength)||25;item.distance=count*num(item.poolLength);
+  const count=Math.max(0,num(item.lengths)+change);item.lengths=count;item.poolLength=num(item.poolLength)||validPool(d.swimPoolDefault);item.distance=count*num(item.poolLength);
  },`session:${week}:${day}`);
  const toggleDrill=(day:SwimDay,index:number,value:boolean)=>update(d=>{
   const w=d.weeks[week]??=weekBlank(),item=w.swim[day]??={drills:{}};item.drills??={};item.drills[index]=value;
@@ -471,7 +550,15 @@ export function useTrainer(){
   if(kind==='water'){rows.push(['date','timestamp','millilitres']);for(const item of Object.values(dataRef.current.waterLogs))if(!item.deleted)rows.push([item.date,item.at,String(item.ml)]);}
   if(kind==='weight'){rows.push(['date','kg','notes']);for(const [date,item] of Object.entries(dataRef.current.weights))if(!item.deleted)rows.push([date,String(item.kg??''),item.note||'']);}
   if(kind==='gym'){rows.push(['week','day','exercise','set','set_id','kg','reps','rir','rpe','logged','scheduled_date','started_at','ended_at','completed_at','actual_training_date']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,exs] of Object.entries(x.gym))for(const [name,e] of Object.entries(exs||{}))e.sets.forEach((s,i)=>rows.push([w,day,name,String(i+1),s.id||'',String(s.kg??''),String(s.reps??''),String(s.rir??''),String(s.rpe??''),s.done?'yes':'no',x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'',x.completedOn?.[day as Day]||'']));}
-  if(kind==='swim'){rows.push(['week','day','duration','distance','longest freestyle','rest','RPE','sculling','treading','scheduled_date','started_at','ended_at','completed_at','actual_training_date']);for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim))if(s)rows.push([w,day,String(s.duration??''),String(s.distance??''),String(s.longest??''),String(s.rest??''),String(s.rpe??''),String(s.sculling??''),String(s.treading??''),x.schedule?.[day as Day]||dateForWeek(w,day as Day),x.timing?.[day as Day]?.startedAt||'',x.timing?.[day as Day]?.endedAt||'',x.completedAt?.[day as Day]||'',x.completedOn?.[day as Day]||'']);}
+  if(kind==='swim'){
+   rows.push(['week','day','activity','mode','segment_id','pool_m','practice_minutes','lengths','continuous_m','timed_distance_m','timed_seconds','difficulty','intervals_json','technique_json','notes','legacy_distance_m','legacy_continuous_m','scheduled_date','actual_training_date']);
+   for(const [w,x] of Object.entries(dataRef.current.weeks))for(const [day,s] of Object.entries(x.swim)){
+    if(!s)continue;
+    const base=[w,day] as string[],pool=String(s.poolLength??25),scheduled=x.schedule?.[day as Day]||dateForWeek(w,day as Day),actual=x.completedOn?.[day as Day]||'';
+    if(s.segments?.length)for(const seg of s.segments){rows.push([...base,seg.activity,seg.mode,seg.id,pool,String(seg.minutes??''),String(seg.lengths??''),String(seg.longestContinuous??''),String(seg.timedMeters??''),String(seg.timedSeconds??''),seg.difficulty||'',JSON.stringify(seg.intervals||[]),JSON.stringify(seg.technique||{}),seg.notes||'',String(s.distance??''),String(s.longest??''),scheduled,actual]);}
+    else rows.push([...base,'legacy','','',pool,String(s.duration??''),String(s.lengths??''),String(s.longest??''),'','','','',JSON.stringify(s.drills||{}),s.notes||'',String(s.distance??''),String(s.longest??''),scheduled,actual]);
+   }
+  }
   const csv=rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
   downloadFile(`rep-and-lap-${kind}-${keyOf(new Date())}.csv`,csv,'text/csv');
  };
@@ -486,6 +573,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

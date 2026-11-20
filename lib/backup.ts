@@ -1,6 +1,7 @@
 import {DAYS,type Day,type GymDay,type SwimDay,type TrackerData,type WeekLog} from './types';
 import {blankData,weekBlank} from './storage';
 import {normalizeSets} from './set-sync';
+import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,validPool} from './swimming';
 
 export interface BackupCounts {sessions:number;sets:number;weighIns:number;drinks:number}
 export interface BackupPreview {backup:TrackerData;counts:BackupCounts;duplicates:number;newRecords:number;version:number;exportedAt?:string}
@@ -27,15 +28,58 @@ function validateExercises(value:unknown){
   seen.add(ex.name);
  }
 }
+const ACTIVITY_NAMES=new Set(Object.keys(SWIM_ACTIVITY_LABELS));
+function validateSwimRoutine(value:unknown){
+ const plan=safeRecord(value,'swim plan',5);
+ check(Object.keys(plan).every(k=>['name','description','activities'].includes(k)),'Unexpected swim plan fields');
+ check(typeof plan.name==='string'&&plan.name.length<=80&&plan.name.trim().length>0,'Invalid swim plan title');
+ check(typeof plan.description==='string'&&plan.description.length<=240,'Invalid swim description');
+ check(Array.isArray(plan.activities)&&plan.activities.length<=15,'Invalid planned activities');
+ for(const item of plan.activities){const row=safeRecord(item,'planned swim activity',5);
+  check(typeof row.activity==='string'&&ACTIVITY_NAMES.has(row.activity),'Invalid swim activity');
+  if(row.mode!==undefined)check(row.mode==='learning'||row.mode==='advanced','Invalid swim tracking mode');
+  if(row.plannedMinutes!==undefined)check(typeof row.plannedMinutes==='number'&&Number.isFinite(row.plannedMinutes)&&row.plannedMinutes>=0&&row.plannedMinutes<=240,'Invalid planned duration');
+ }
+}
+function validateSwim(value:unknown){
+ const entry=safeRecord(value,'swim log',18);
+ for(const k of ['duration','distance','longest','rest','rpe','sculling','treading','poolLength','lengths'])if(entry[k]!==undefined)check(saneScalar(entry[k],200000),'Invalid legacy swim measurement');
+ if(entry.notes!==undefined)check(typeof entry.notes==='string'&&entry.notes.length<=5000,'Invalid swim note');
+ if(entry.breaststroke!==undefined)check(typeof entry.breaststroke==='string'&&entry.breaststroke.length<=60,'Invalid learning status');
+ if(entry.drills!==undefined){const keys=safeRecord(entry.drills,'legacy drill checks',60);for(const done of Object.values(keys))check(typeof done==='boolean','Invalid legacy drill state');}
+ if(entry.intervals!==undefined){check(Array.isArray(entry.intervals)&&entry.intervals.length<=80,'Invalid legacy intervals');for(const value of entry.intervals){const row=safeRecord(value,'legacy interval',8);for(const field of ['repeats','lengths','rest','pool'])check(typeof row[field]==='number'&&Number.isFinite(row[field]),'Invalid legacy interval field');}}
+ if(entry.segments!==undefined){check(Array.isArray(entry.segments)&&entry.segments.length<=25,'Invalid swim segments');const ids=new Set<string>();
+  for(const value of entry.segments){const row=safeRecord(value,'swim segment',18);
+   check(typeof row.id==='string'&&row.id.length<=100&&!ids.has(row.id),'Invalid or duplicate swim segment ID');ids.add(row.id);
+   check(typeof row.activity==='string'&&ACTIVITY_NAMES.has(row.activity),'Unknown swimming stroke or drill');
+   check(row.mode==='learning'||row.mode==='advanced','Invalid stroke mode');
+   for(const field of ['minutes','lengths','longestContinuous','timedMeters','timedSeconds'])if(row[field]!==undefined)check(saneScalar(row[field],200000),'Invalid swim measurement');
+   if(row.skillLevel!==undefined)check(['Not started','Learning','Basic','Comfortable','Confident'].includes(String(row.skillLevel)),'Invalid swim skill level');
+   if(row.difficulty!==undefined)check(['','Easy','Moderate','Difficult'].includes(String(row.difficulty)),'Invalid difficulty');
+   if(row.notes!==undefined)check(typeof row.notes==='string'&&row.notes.length<=5000,'Swim notes too long');
+   if(row.technique!==undefined){const checks=safeRecord(row.technique,'technique checks',50);for(const [key,flag] of Object.entries(checks))check(key.length<=150&&typeof flag==='boolean','Invalid technique state');}
+   if(row.intervals!==undefined){check(Array.isArray(row.intervals)&&row.intervals.length<=60,'Invalid interval list');
+    for(const item of row.intervals){const x=safeRecord(item,'interval set',8);
+     check(typeof x.id==='string'&&x.id.length<=100,'Invalid interval ID');
+     check(typeof x.repeats==='number'&&Number.isInteger(x.repeats)&&x.repeats>=1&&x.repeats<=50,'Invalid repetitions');
+     check(typeof x.lengths==='number'&&Number.isInteger(x.lengths)&&x.lengths>=1&&x.lengths<=40,'Invalid lengths');
+     check(typeof x.restSeconds==='number'&&x.restSeconds>=0&&x.restSeconds<=1800,'Invalid rest');
+     if(x.secondsPerRepeat!==undefined)check(saneScalar(x.secondsPerRepeat,10000),'Invalid timed interval');
+    }
+   }
+  }
+ }
+}
 function validateWeek(week:unknown){
   const w=safeRecord(week,'week',16);
-  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides']){
+  for(const section of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides','swimRoutineOverrides']){
     if(w[section]===undefined)continue;
     const daily=safeRecord(w[section],section,7);
     for(const [day,value] of Object.entries(daily)){
       check(DAYS.includes(day as Day),`Unexpected day in ${section}`);
       if(section==='scheduleStatus')check(value==='rest'||value==='skipped','Invalid schedule status');
       if(section==='routineOverrides'){check(['Monday','Tuesday','Wednesday'].includes(day),'Invalid gym routine day');validateExercises(value);}
+      if(section==='swimRoutineOverrides'){check(['Thursday','Friday','Saturday'].includes(day),'Invalid swim routine day');validateSwimRoutine(value);}
       if(section==='done')check(typeof value==='boolean',`Invalid completion flag`);
       if(section==='schedule')check(typeof value==='string'&&validDate(value),`Invalid scheduled date`);
       if(section==='gym'){
@@ -54,14 +98,15 @@ function validateWeek(week:unknown){
           if(ex.notes!==undefined)check(typeof ex.notes==='string'&&ex.notes.length<=5000,'Exercise note too long');
         }
       }
-      if(section==='swim'||section==='sessionNotes'||section==='timing')check(object(value),'Invalid session details');
+      if(section==='swim')validateSwim(value);
+      if(section==='sessionNotes'||section==='timing')check(object(value),'Invalid session details');
       if(section==='completedAt')check(typeof value==='string'&&Number.isFinite(Date.parse(value)),'Invalid completion timestamp');
       if(section==='completedOn')check(typeof value==='string'&&validDate(value),'Invalid actual completion date');
     }
   }
 }
 function hasSession(w:WeekLog,day:Day):boolean {
-  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day]||!!w.completedOn?.[day]||!!w.scheduleStatus?.[day]||!!w.routineOverrides?.[day as GymDay];
+  return hasOwn(w.done||{},day)||!!w.gym?.[day as GymDay]||!!w.swim?.[day as SwimDay]||!!w.sessionNotes?.[day]||!!w.timing?.[day]||!!w.schedule?.[day]||!!w.completedAt?.[day]||!!w.completedOn?.[day]||!!w.scheduleStatus?.[day]||!!w.routineOverrides?.[day as GymDay]||!!w.swimRoutineOverrides?.[day as SwimDay];
 }
 export function countRecords(data:TrackerData):BackupCounts {
   let sessions=0,sets=0;
@@ -75,7 +120,7 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
   check(text.length<=5_000_000,'Backup exceeds 5 MB');
   const raw=safeRecord(JSON.parse(text) as unknown,'backup',35);
   const version=raw.version??1;
-  check(typeof version==='number'&&Number.isInteger(version)&&version>=1&&version<=4,'Unsupported backup version');
+  check(typeof version==='number'&&Number.isInteger(version)&&version>=1&&version<=5,'Unsupported backup version');
   const weeks=safeRecord(raw.weeks,'weeks',520),weights=safeRecord(raw.weights??{},'weigh-ins',6000),water=safeRecord(raw.waterLogs??{},'drinks',50000);
   for(const [day,w] of Object.entries(weeks)){check(validDate(day),'Invalid week date');validateWeek(w);}
   for(const [day,value] of Object.entries(weights)){
@@ -99,6 +144,10 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
     base.setOverrides={...overrides} as Record<string,number>;
   }
   if(raw.routineTemplates!==undefined){const templates=safeRecord(raw.routineTemplates,'routine templates',3);for(const [day,value] of Object.entries(templates)){check(['Monday','Tuesday','Wednesday'].includes(day),'Invalid routine template day');validateExercises(value);}base.routineTemplates=templates as TrackerData['routineTemplates'];}
+  if(raw.swimTemplates!==undefined){const templates=safeRecord(raw.swimTemplates,'swim routines',3);for(const [day,value] of Object.entries(templates)){check(['Thursday','Friday','Saturday'].includes(day),'Invalid swim routine day');validateSwimRoutine(value);}base.swimTemplates=templates as TrackerData['swimTemplates'];}
+  if(raw.swimPoolDefault!==undefined){check(typeof raw.swimPoolDefault==='number'&&raw.swimPoolDefault>=10&&raw.swimPoolDefault<=100,'Invalid default pool length');base.swimPoolDefault=raw.swimPoolDefault;}
+  if(raw.swimTargets!==undefined){const values=safeRecord(raw.swimTargets,'swim targets',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&typeof value==='number'&&value>=25&&value<=10000,'Invalid swim goal');base.swimTargets=values as TrackerData['swimTargets'];}
+  if(raw.swimModes!==undefined){const values=safeRecord(raw.swimModes,'swim modes',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&(value==='learning'||value==='advanced'),'Invalid swim mode');base.swimModes=values as TrackerData['swimModes'];}
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];
   if(typeof raw.restSeconds==='number'&&raw.restSeconds>=15&&raw.restSeconds<=600)base.restSeconds=raw.restSeconds;
   if(raw.effortMode==='off'||raw.effortMode==='rir'||raw.effortMode==='rpe')base.effortMode=raw.effortMode;
@@ -117,7 +166,7 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
     for(const day of DAYS){
       if(!hasSession(incoming,day))continue;
       if(hasSession(existing,day)){duplicates++;continue;}
-      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides'] as const){
+      for(const prop of ['done','gym','swim','sessionNotes','timing','schedule','completedAt','completedOn','scheduleStatus','routineOverrides','swimRoutineOverrides'] as const){
         const from=incoming[prop] as Record<string,unknown>|undefined;
         if(from&&hasOwn(from,day)){const into=(existing[prop]??={}) as Record<string,unknown>;into[day]=structuredClone(from[day]);}
       }
@@ -134,6 +183,9 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
   }
   // The user's saved routine templates are portable preferences, but never overwrite an existing template during Merge.
   let addedTemplate=false;for(const day of ['Monday','Tuesday','Wednesday'] as const){if(!data.routineTemplates[day]&&source.routineTemplates[day]){data.routineTemplates[day]=structuredClone(source.routineTemplates[day]);addedTemplate=true;}}
+  for(const day of ['Thursday','Friday','Saturday'] as const)if(!data.swimTemplates[day]&&source.swimTemplates[day]){data.swimTemplates[day]=structuredClone(source.swimTemplates[day]);addedTemplate=true;}
+  // Merge conservatively: existing training preferences always win.
+  for(const stroke of SWIM_STROKES){if(!data.swimTargets[stroke]&&source.swimTargets[stroke]){data.swimTargets[stroke]=source.swimTargets[stroke];addedTemplate=true;}}
   if(addedTemplate)changedKeys.push('preferences');
   return {data:normalizeSets(data),changedKeys,duplicates,newRecords};
 }

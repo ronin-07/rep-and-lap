@@ -8,6 +8,8 @@ import {summary,weeklyChart,hydrationChart,weightTrend,history,bestSwim,weightEn
 import {LineChart,MiniBars} from '@/components/Charts';
 import {weeklyTrainingTime,trainingTimeWeeks,swimmingInsights,paceLabel,progressionAdvice} from '@/lib/training-intelligence';
 import {weeklyAdherence} from '@/lib/scheduling';
+import {strokeInsights,SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,swimTotals} from '@/lib/swimming';
+import type {SwimStroke} from '@/lib/types';
 import Insights from './Insights';
 import {exercisesFor} from '@/lib/routines';
 export default function Progress({app}:{app:Trainer}){
@@ -58,10 +60,45 @@ function ActivityHeatmap({app}:{app:Trainer}){
 }
 
 function SwimmingProgress({app}:{app:Trainer}){
- const insight=swimmingInsights(app.data);
- const goals=[25,50,75,100,200];
- return <div className="stack"><div className="stats-grid"><MiniStat label="Longest continuous" value={insight.bestContinuous?`${insight.bestContinuous} m`:'—'} icon={<Swim/>}/><MiniStat label="Total logged distance" value={`${insight.totalMeters.toLocaleString()} m`} icon={<Activity/>}/><MiniStat label="Latest pace (estimated)" value={paceLabel(insight.latestPace)} icon={<Swim/>}/><MiniStat label="Logged swim sessions" value={String(insight.sessions.length)} icon={<CheckCircle2/>}/></div>
- <section className="card pane-pad stack"><span className="eyebrow">CONTINUOUS FREESTYLE GOALS</span><h2>From 25 m to 100 m — and beyond.</h2><div className="goal-list">{goals.map(v=><div className="goal-row" key={v}><strong>{v} m continuous</strong><span>{insight.bestContinuous>=v?'✓ Achieved':'○ Not yet logged'}</span></div>)}</div><p className="muted small">A 4 × 25 m session counts as 100 m total distance but not 100 m continuous. Milestones require an entered continuous-distance result.</p></section>
- <section className="card pane-pad stack"><span className="eyebrow">DISTANCE PROGRESSION</span><h2>Swim sessions over time.</h2><LineChart points={insight.sessions.map(x=>({date:x.date.slice(5),value:x.meters}))} unit="m" stroke="#5bdbc9"/><p className="muted small">Pace is calculated from total session duration ÷ total distance. It includes rest and is not a timed continuous-swim pace.</p></section>
- {insight.sessions.length>0&&<section className="card pane-pad stack"><span className="eyebrow">SESSION HISTORY</span><h2>Last swims</h2>{insight.sessions.slice(-6).reverse().map(x=><div key={`${x.date}-${x.day}`} className="recent-session-row"><div><strong>{x.day} · {x.date}</strong><small>{x.meters} m total · {x.continuousMeters||'—'} m continuous</small></div><strong>{paceLabel(x.pacePer100)}</strong></div>)}</section>}</div>
+ const [selected,setSelected]=React.useState<SwimStroke>('freestyle');
+ const totals=swimmingInsights(app.data);
+ const stroke=strokeInsights(app.data,selected);
+ const target=app.data.swimTargets?.[selected]??SWIM_TARGET_DEFAULTS[selected];
+ const [targetDraft,setTargetDraft]=React.useState(String(target));
+ React.useEffect(()=>setTargetDraft(String(target)),[target,selected]);
+ const bestTimes=Object.entries(stroke.bestTimes).sort(([a],[b])=>Number(a)-Number(b));
+ const recentSegments=Object.entries(app.data.weeks).flatMap(([week,w])=>SWIM_DAYS.flatMap(day=>{
+  const segments=w.swim?.[day]?.segments||[];
+  return segments.filter(segment=>segment.activity===selected).map(segment=>({week,day,segment}));
+ })).sort((a,b)=>b.week.localeCompare(a.week));
+ const practiced=new Set(recentSegments.flatMap(({segment})=>Object.keys(segment.technique||{}).filter(key=>segment.technique?.[key])));
+ const technique=SWIM_CHECKLIST[selected];
+ const progress=Math.min(100,Math.round(stroke.bestContinuous/Math.max(1,target)*100));
+ return <div className="stack">
+ <section className="card pane-pad stack"><span className="eyebrow">SWIMMING BY STROKE</span><h2>Every stroke has its own journey.</h2>
+  <p className="muted small">Select a stroke to see its distance, longest uninterrupted swim, practice time, technique steps and timed personal records.</p>
+  <div className="swim-stroke-tabs" role="group" aria-label="Choose swimming stroke">{SWIM_STROKES.map(key=><button type="button" key={key} className={selected===key?'selected':''} aria-pressed={selected===key} onClick={()=>setSelected(key)}>{SWIM_ACTIVITY_LABELS[key]}</button>)}</div>
+ </section>
+ <div className="stats-grid"><MiniStat label={`${SWIM_ACTIVITY_LABELS[selected]} continuous`} value={stroke.bestContinuous?`${stroke.bestContinuous} m`:'—'} icon={<Swim/>}/><MiniStat label="Distance logged" value={`${stroke.totalMeters.toLocaleString()} m`} icon={<Activity/>}/><MiniStat label="Practice time" value={`${Math.round(stroke.practiceMinutes)} min`} icon={<CheckCircle2/>}/><MiniStat label="Best timed pace" value={paceLabel(stroke.bestPace)} icon={<Swim/>}/></div>
+ <section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">PERSONAL SWIM GOAL</span><h2>{SWIM_ACTIVITY_LABELS[selected]} — {target} m continuous</h2></div></div>
+ <div className="progress-track tall"><span style={{width:`${progress}%`,background:'linear-gradient(90deg,#53d4c1,#a995ff)'}}/></div>
+ <div className="swim-goal-summary"><span>{stroke.bestContinuous} / {target} m</span><strong>{stroke.goalReached?'Goal achieved!':`${progress}% completed`}</strong></div>
+ <div className="swim-field-row"><label className="field swim-goal-input"><span>Change your continuous-distance target (m)</span><input type="number" inputMode="numeric" min="25" max="10000" step="25" value={targetDraft} onChange={e=>setTargetDraft(e.target.value)}/></label><button className="button-secondary" disabled={Number(targetDraft)===target} onClick={()=>{const value=Number(targetDraft);if(Number.isInteger(value)&&value>=25&&value<=10000)app.editSwimPreference({swimTargets:{...app.data.swimTargets,[selected]:value}});else app.notify('Select a goal between 25 and 10,000 metres.');}}>Save goal</button></div>
+ <p className="muted small">Total distance from interval sets counts toward volume, but does not automatically count as a continuous-swimming record.</p></section>
+ <section className="card pane-pad stack"><span className="eyebrow">STROKE TECHNIQUE</span><h2>Practice the fundamentals.</h2>
+ <div className="swim-goal-summary"><span>{practiced.size} of {technique.length} technique steps practiced</span><strong>{recentSegments.length} recorded segments</strong></div><div className="swim-learning-level">Current learning level: <strong>{stroke.latestSkillLevel||'Not recorded'}</strong></div>
+ <div className="checklist">{technique.map(step=><div className="check-row swim-progress-step" key={step}><span aria-hidden="true">{practiced.has(step)?'✓':'○'}</span><span>{step}</span></div>)}</div>
+ <p className="muted tiny">Completed steps reflect checklists in saved swim logs. They are not a formal swimming proficiency certification.</p></section>
+ <section className="card pane-pad stack"><span className="eyebrow">CONTINUOUS DISTANCE PROGRESSION</span><h2>Going the distance.</h2>
+ {stroke.sessions.length?<LineChart points={stroke.sessions.map(x=>({date:x.date.slice(5),value:x.continuous}))} unit="m" stroke="#50d7bf"/>:<p className="muted small">Log your first {SWIM_ACTIVITY_LABELS[selected].toLowerCase()} swim to see a progression chart.</p>}
+ <p className="muted tiny">The chart uses manually logged uninterrupted distance, not summed interval repetitions.</p></section>
+ <section className="card pane-pad stack"><span className="eyebrow">TIMED PERSONAL RECORDS</span><h2>Fastest effort by distance.</h2>
+ {bestTimes.length?bestTimes.map(([distance,seconds])=><div className="recent-session-row" key={distance}><div><strong>{distance} m {SWIM_ACTIVITY_LABELS[selected]}</strong><small>Best timed attempt</small></div><strong>{Number(seconds).toFixed(1)}s</strong></div>):<p className="muted small">Advanced swim logs with a timed effort will appear here. Timed intervals that report only an average pace are not treated as personal-best attempts.</p>}
+ </section>
+ <section className="card pane-pad stack"><span className="eyebrow">SESSION HISTORY</span><h2>Recent {SWIM_ACTIVITY_LABELS[selected].toLowerCase()} sessions.</h2>
+ {stroke.sessions.length?stroke.sessions.slice(-8).reverse().map((entry,i)=><div key={`${entry.week}:${entry.day}:${i}`} className="recent-session-row"><div><strong>{entry.date} · {entry.day}</strong><small>{entry.meters} m total · {entry.continuous} m continuous · {entry.minutes} min practice</small></div><strong>{entry.pacePer100!==null?paceLabel(entry.pacePer100):'—'}</strong></div>):<p className="muted small">No recorded sessions for this stroke yet.</p>}
+ </section>
+ <section className="card pane-pad stack"><span className="eyebrow">ALL SWIMMING</span><h2>Combined volume</h2><div className="stats-grid"><MiniStat label="All strokes + drills" value={`${totals.totalMeters.toLocaleString()} m`} icon={<Activity/>}/><MiniStat label="Sessions with data" value={String(totals.sessions.length)} icon={<CheckCircle2/>}/></div>
+ <p className="muted tiny">Combined volume includes recorded drill lengths. The stroke selector above keeps swimming speed and continuous-distance records separate for each stroke.</p></section>
+ </div>;
 }

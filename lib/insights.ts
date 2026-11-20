@@ -8,6 +8,7 @@ import {dateFor, keyOf} from './dates';
 import {completedDate, scheduledDate} from './scheduling';
 import {FULL_EXERCISE_LIBRARY, exercisesFor} from './routines';
 import {loggedSet, num, sessionMinutes, waterGoal} from './metrics';
+import {swimTotals} from './swimming';
 
 type MuscleGroup = 'Chest' | 'Back' | 'Shoulders' | 'Biceps' | 'Triceps' |
  'Quads' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Core';
@@ -171,7 +172,7 @@ export function monthlyRecap(data:TrackerData,month:string):MonthRecap {
    }
   }else{
    const swim=log.swim?.[day as typeof SWIM_DAYS[number]];
-   if(swim){swimMeters+=Math.max(0,num(swim.distance));continuousBestMeters=Math.max(continuousBestMeters,Math.max(0,num(swim.longest)));}
+   if(swim){const x=swimTotals(swim,data.swimPoolDefault);swimMeters+=x.meters;continuousBestMeters=Math.max(continuousBestMeters,x.bestContinuous);}
   }
  }
  for(const entry of Object.values(data.waterLogs)){
@@ -201,7 +202,7 @@ export function achievements(data:TrackerData):Achievement[]{
  for(const log of Object.values(data.weeks)){
   for(const day of DAYS)if(log.done?.[day])sessions++;
   for(const day of GYM_DAYS)for(const ex of Object.values(log.gym?.[day]||{}))workingSets+=(ex.sets||[]).filter(loggedSet).length;
-  for(const day of SWIM_DAYS){const swim=log.swim?.[day];if(swim){swimMeters+=Math.max(0,num(swim.distance));continuous=Math.max(continuous,Math.max(0,num(swim.longest)));}}
+  for(const day of SWIM_DAYS){const swim=log.swim?.[day];if(swim){const x=swimTotals(swim,data.swimPoolDefault);swimMeters+=x.meters;continuous=Math.max(continuous,x.bestContinuous);}}
  }
  for(const item of Object.values(data.waterLogs))if(!item.deleted&&item.ml>0)hydrated.set(item.date,(hydrated.get(item.date)||0)+item.ml);
  const waterDays=[...hydrated.entries()].filter(([date,ml])=>ml>=waterGoal(date)).length;

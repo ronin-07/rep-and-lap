@@ -1,3 +1,7 @@
+> **v3.2 Milestone 6 — Swimming Studio preview:** multi-stroke and drill logging, 50 m pool defaults, editable swim plans, Learning/Advanced tracking, technique checklists, interval and nonstop records, per-stroke progress and PB notifications. See [`RELEASE-MILESTONE-6.md`](./RELEASE-MILESTONE-6.md) for full rollout/testing instructions. Keep `main` unchanged until the final release.
+
+> **v3.2 Activity Notification Bell:** see [`RELEASE-ACTIVITY-NOTIFICATIONS.md`](./RELEASE-ACTIVITY-NOTIFICATIONS.md).
+
 > **v3.2 Preview — Milestone 5 implemented on `feature/v3.2`.** New Progress → Insights: muscle coverage, monthly recap and achievement cabinet. See [RELEASE-MILESTONE-5.md](RELEASE-MILESTONE-5.md) for testing and final release criteria. Keep production `main` unchanged until verified.
 
 # RepLap — React + TypeScript + Next.js on Vercel
@@ -16,7 +20,7 @@ The app name shown in the interface stays **Rep & Lap**; use **`replap`** as the
 - Profile and Settings as separate screens; mobile bottom tabs; dark/light mode; iPhone input font size >=16px to avoid Safari focus zoom.
 - Google sign-in, Firestore synchronization, offline local caching and pending sync queue, PWA installation, JSON backup/restore.
 
-Milestone 5 adds no Firestore changes; Milestones 1–2 **do require the v3.2 development rules** for independent gym-set documents. It uses the same `users/{uid}` Firestore collections and `rep-and-lap-firebase-v1:<uid>` local-storage format. **Important:** browser-local storage does NOT move between the old `github.io` URL and the new `vercel.app` URL. Sync signed-in records and download a JSON backup before switching.
+Milestone 6 adds no Firestore changes; Milestones 1–2 **do require the v3.2 development rules** for independent gym-set documents. It uses the same `users/{uid}` Firestore collections and `rep-and-lap-firebase-v1:<uid>` local-storage format. **Important:** browser-local storage does NOT move between the old `github.io` URL and the new `vercel.app` URL. Sync signed-in records and download a JSON backup before switching.
 
 ## Hosting changes from the GitHub Pages version
 

@@ -5,6 +5,7 @@ import {weekOf, dateFor, keyOf} from './dates';
 import {completedDate} from './scheduling';
 import {num, loggedSet, sessionMinutes} from './metrics';
 import {exercisesFor} from './routines';
+import {swimTotals,strokeInsights,segmentTimed,effectivePool} from './swimming';
 
 export type TrainingWeek = {week:string; minutes:number; sessions:number; averageMinutes:number|null};
 export function weeklyTrainingTime(data:TrackerData, week:string):TrainingWeek {
@@ -63,10 +64,11 @@ export function swimmingPerformance(data:TrackerData):SwimPerformance[]{
  const out:SwimPerformance[]=[];
  for(const [week,entry] of Object.entries(data.weeks))for(const day of SWIM_DAYS){
   const swim=entry.swim?.[day];if(!swim)continue;
-  const meters=num(swim.distance),continuousMeters=num(swim.longest);
-  const duration=num(swim.duration);
+  const totals=swimTotals(swim,data.swimPoolDefault);const meters=totals.meters,continuousMeters=totals.freestyleBest;
+  const duration=swim.segments?.length?totals.minutes:num(swim.duration);
   const durationMinutes=duration>0?duration:(entry.done?.[day]?sessionMinutes(entry.timing?.[day]):null);
-  const pacePer100=meters>0&&durationMinutes!==null&&durationMinutes>0?(durationMinutes*60*100)/meters:null;
+  const timed=swim.segments?.flatMap(seg=>{const t=segmentTimed(seg,effectivePool(swim,data.swimPoolDefault));return t?[t]:[];})||[];
+  const pacePer100=timed.length?Math.min(...timed.map(t=>t.seconds*100/t.meters)):swim.segments?.length?null:meters>0&&durationMinutes!==null&&durationMinutes>0?(durationMinutes*60*100)/meters:null;
   if(meters>0||continuousMeters>0||durationMinutes!==null)out.push({date:completedDate(data,week,day),day,meters,continuousMeters,durationMinutes,pacePer100});
  }
  return out.sort((a,b)=>a.date.localeCompare(b.date));

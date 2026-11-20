@@ -673,3 +673,80 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
 .topbar-name{min-width:0;flex:1}.topbar-name strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topbar-actions{flex-shrink:0}
 @media(max-width:670px){.topbar-name{gap:9px}.topbar-actions{gap:6px}}
+
+/* v3.2 Milestone 6 — stroke-specific swimming studio */
+.swim-log,.swim-log *{min-width:0}
+.swim-session-hero{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.swim-session-hero h2{font-size:clamp(1.35rem,3vw,2rem);margin:7px 0}
+.swim-session-hero .icon-wrap{flex-shrink:0}
+.swim-top-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:15px}
+.swim-top-grid>.card{min-width:0}
+.swim-field-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.swim-field-row>.field{flex:1 1 155px;min-width:0}
+.swim-field-row>.button-secondary{min-height:50px;white-space:nowrap}
+.swim-field-date{flex:1 1 230px}
+.swim-field-date>.date-control{width:100%;min-width:0}
+.swim-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.swim-summary-grid>div{background:var(--panel2);border:1px solid var(--border);border-radius:15px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.swim-summary-grid small{color:var(--muted);font-size:.79rem;line-height:1.4}
+.swim-summary-grid strong{font-size:clamp(1.2rem,2.7vw,1.65rem);line-height:1.22;font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.swim-start-empty{padding:17px;display:flex;align-items:flex-start;flex-wrap:wrap;justify-content:space-between;gap:15px;background:var(--panel2);border-radius:14px;border:1px dashed var(--border)}
+.swim-start-empty p{flex:1;min-width:200px;margin:0}
+.swim-start-empty button{min-height:46px}
+.swim-add-activity{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
+.swim-add-activity>.field,.swim-add-activity>select{flex:1 1 220px;min-width:0}
+.swim-add-activity>button{flex:0 0 auto;min-height:48px}
+.swim-segment{border:1px solid var(--border);background:var(--panel2);border-radius:17px;overflow:hidden;padding:0;margin:5px 0}
+.swim-segment-head{display:flex;gap:9px;align-items:center;justify-content:space-between;padding:15px}
+.swim-segment-title{display:flex;gap:12px;align-items:center;flex:1;text-align:left;border:0;background:none;color:var(--text);min-height:48px;padding:0;cursor:pointer}
+.swim-segment-title>svg:first-child{flex:0 0 auto;color:var(--aqua)}
+.swim-segment-title>span{flex:1;display:flex;flex-direction:column;gap:4px}
+.swim-segment-title strong{font-size:.98rem;line-height:1.4}
+.swim-segment-title small{font-size:.77rem;color:var(--muted);line-height:1.5}
+.swim-segment-title>svg:last-child{flex-shrink:0;color:var(--muted)}
+.swim-segment-body{padding:16px 18px 20px;border-top:1px solid var(--border)}
+.swim-segment-body h4,.swim-routine-editor h3{font-size:.95rem;margin:4px 0;color:var(--text)}
+.swim-technique{padding:14px;background:color-mix(in srgb,var(--aqua) 6%,var(--panel));border:1px solid color-mix(in srgb,var(--aqua) 20%,var(--border));border-radius:13px}
+.swim-technique h4{margin:0 0 10px}
+.swim-technique .checklist{margin:0}
+.swim-advanced{border-top:1px solid var(--border);padding-top:15px}
+.swim-length-group{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.swim-length-value{display:flex;align-items:baseline;gap:12px;margin-top:7px}
+.swim-length-value strong{font-size:2rem;line-height:1;font-variant-numeric:tabular-nums}
+.swim-length-value small{color:var(--aqua);font-weight:800;white-space:nowrap}
+.swim-length-actions{display:flex;align-items:center;gap:7px;min-width:0}
+.swim-length-actions .icon-btn{flex-shrink:0}
+.swim-length-actions input{width:85px;min-width:60px;text-align:center;font-weight:800;font-size:1.1rem}
+.swim-field-readout{padding:11px 15px;min-width:145px;background:var(--panel);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:5px}
+.swim-field-readout small{color:var(--muted);font-size:.72rem}
+.swim-field-readout strong{font-variant-numeric:tabular-nums}
+.swim-interval-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+.swim-interval-form>button{grid-column:1/-1;justify-self:start;min-height:44px}
+.swim-interval-line{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid var(--border);background:var(--panel);border-radius:11px;font-size:.82rem}
+.swim-interval-line span{overflow-wrap:anywhere}
+.swim-plan-line{display:flex;align-items:center;gap:5px;padding:10px;border:1px solid var(--border);border-radius:11px;background:var(--panel2);flex-wrap:wrap}
+.swim-plan-line>strong{flex:1 1 130px;font-size:.83rem}
+.swim-plan-line>.field{flex:0 1 95px}
+.swim-plan-line .field span{font-size:.67rem}
+.swim-plan-line input{min-height:41px}
+.swim-plan-line>.icon-btn{flex:0 0 34px;width:34px;height:34px}
+.swim-routine-editor{margin-top:8px;padding:17px;border:1px solid var(--border);border-radius:15px;background:var(--panel2)}
+.swim-routine-editor>.row-actions{flex-wrap:wrap}
+.swim-routine-editor>.row-actions button{min-height:44px}
+.swim-session-footer .swim-session-time{display:block;font-size:clamp(1.35rem,3vw,1.85rem)}
+.swim-stroke-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.swim-stroke-tabs button{min-width:0;min-height:48px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:12px;font-weight:700;font-size:.78rem;padding:9px 6px;overflow-wrap:anywhere}
+.swim-stroke-tabs button.selected{color:var(--text);border-color:var(--aqua);background:color-mix(in srgb,var(--aqua) 12%,var(--panel2))}
+.swim-goal-summary{display:flex;gap:12px;justify-content:space-between;align-items:center;font-size:.85rem;color:var(--muted);flex-wrap:wrap}
+.swim-goal-summary strong{color:var(--aqua)}
+.swim-goal-input{max-width:390px!important}
+.swim-progress-step{display:flex;gap:12px;align-items:flex-start;cursor:default}
+.swim-progress-step span:first-child{color:var(--aqua);font-weight:800}
+.activity-notification-icon.kind-swim-pr{color:var(--aqua);background:color-mix(in srgb,var(--aqua) 14%,var(--panel))}
+@media(max-width:800px){.swim-top-grid{grid-template-columns:minmax(0,1fr)}.swim-interval-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:570px){.swim-summary-grid{gap:7px}.swim-summary-grid>div{padding:13px 10px}.swim-summary-grid strong{font-size:1.14rem}.swim-summary-grid small{font-size:.69rem}.swim-segment-head{padding:12px}.swim-segment-body{padding:13px}.swim-stroke-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.swim-field-row>button{width:100%;justify-content:center}.swim-start-empty>button,.swim-add-activity>button{width:100%;justify-content:center}.swim-session-hero{align-items:flex-start}.swim-plan-line{gap:6px}.swim-plan-line>.field{flex:1 1 90px}.swim-length-actions input{width:64px}.swim-routine-editor>.row-actions button{flex:1 1 150px}.swim-interval-form{gap:8px}.swim-interval-form>.field>span{font-size:.74rem}}
+@media(max-width:350px){.swim-summary-grid{grid-template-columns:1fr}.swim-summary-grid>div{flex-direction:row;justify-content:space-between;align-items:center}.swim-length-group{flex-direction:column;align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.swim-segment,.swim-stroke-tabs button{transition:none!important}}
+.swim-validation-warning{font-size:.78rem;line-height:1.45;color:var(--coral);padding:9px 12px;border:1px solid color-mix(in srgb,var(--coral) 32%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--coral) 9%,var(--panel))}
+.swim-learning-level{padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:.83rem;color:var(--muted)}
+.swim-learning-level strong{color:var(--aqua)}

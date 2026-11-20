@@ -9,9 +9,10 @@ import {dateFor} from './dates';
 import {completedDate, scheduledDate} from './scheduling';
 import {achievements} from './insights';
 import {loggedSet, num, waterGoal} from './metrics';
+import {swimTotals,swimPersonalBests,SWIM_ACTIVITY_LABELS,sessionDisplayName} from './swimming';
 
-export type ActivityKind = 'session' | 'hydration' | 'achievement';
-export type ActivityDestination = 'calendar' | 'water' | 'achievements';
+export type ActivityKind = 'session' | 'hydration' | 'achievement' | 'swim-pr';
+export type ActivityDestination = 'calendar' | 'water' | 'achievements' | 'swimming';
 export interface ActivityNotification {
  id: string;
  kind: ActivityKind;
@@ -69,7 +70,7 @@ export function activityNotifications(data:TrackerData,now=Date.now()):ActivityN
   const stamp=record.timing?.[day]?.endedAt || record.completedAt?.[day];
   const eventTime=timestamp(stamp,actualDate);
   if(record.done?.[day])actions.push({id:`session:${week}:${day}:${stamp||actualDate}`,at:eventTime,kind:'sessions',value:1,
-   event:{id:`session:${week}:${day}:${stamp||actualDate}`,kind:'session',title:`${PLAN[day].name} logged`,
+   event:{id:`session:${week}:${day}:${stamp||actualDate}`,kind:'session',title:`${sessionDisplayName(data,week,day)} logged`,
     detail:`${day} session · Trained ${shortDate(actualDate)}`,occurredAt:eventTime,destination:'calendar'}});
   if(GYM_DAYS.includes(day as GymDay)){
    for(const exercise of Object.values(record.gym?.[day as GymDay]||{}))for(const set of exercise.sets||[]){
@@ -81,12 +82,21 @@ export function activityNotifications(data:TrackerData,now=Date.now()):ActivityN
   }else{
    const swim=record.swim?.[day as SwimDay];
    if(swim){
-    const meters=Math.max(0,num(swim.distance));
-    const continuous=Math.max(0,num(swim.longest));
+    const totals=swimTotals(swim,data.swimPoolDefault);const meters=totals.meters;
+    const continuous=totals.bestContinuous;
     if(meters>0)actions.push({id:`swim-distance:${week}:${day}`,at:eventTime,kind:'pool',value:meters});
     if(continuous>0)actions.push({id:`swim-continuous:${week}:${day}`,at:eventTime,kind:'nonstop',value:continuous});
    }
   }
+ }
+ // One event for each newly established continuous-distance or timed-distance best.
+ // IDs are deterministic from the record; rescans don't create duplicate entries.
+ for(const event of swimPersonalBests(data)){
+  const when=timestamp(data.weeks[event.week]?.completedAt?.[event.day],event.date);
+  const display=SWIM_ACTIVITY_LABELS[event.stroke];
+  const title=event.kind==='continuous'?`${display} nonstop record: ${event.meters} m`:`${display} ${event.meters} m time record`;
+  const detail=event.kind==='continuous'?`New continuous-swim best · ${shortDate(event.date)}`:`${event.seconds?.toFixed(1)} seconds · ${shortDate(event.date)}`;
+  actions.push({id:event.id,at:when,kind:'pool',value:0,event:{id:event.id,kind:'swim-pr',title,detail,occurredAt:when,destination:'swimming'}});
  }
  // Build hydration completions by date, using the drink which first crossed the goal.
  const drinks=new Map<string,Array<{id:string;at:number;ml:number}>>();

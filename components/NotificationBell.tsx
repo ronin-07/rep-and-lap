@@ -1,10 +1,10 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Bell,CheckCheck,CheckCircle2,Droplets,Trophy,X} from 'lucide-react';
+import {Bell,CheckCheck,CheckCircle2,Droplets,Trophy,Waves,X} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import {activityNotifications,parseReadReceipts,readReceiptKey,type ActivityNotification} from '@/lib/activity-notifications';
 
-const iconFor={session:CheckCircle2,hydration:Droplets,achievement:Trophy};
+const iconFor={session:CheckCircle2,hydration:Droplets,achievement:Trophy,'swim-pr':Waves};
 
 /** A lightweight activity inbox; no browser push permission is requested. */
 export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>void}){
@@ -39,6 +39,7 @@ export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>v
  const visit=(item:ActivityNotification)=>{
   markRead([item.id]);setOpen(false);
   if(item.destination==='water')app.goto('workout','water');
+  else if(item.destination==='swimming'){app.setProgressTab('swimming');app.goto('progress');}
   else app.goto(item.destination);
  };
  return <div className="activity-bell" ref={ref}>
