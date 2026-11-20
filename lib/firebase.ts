@@ -1,0 +1,49 @@
+'use client';
+import {getApp,getApps,initializeApp,type FirebaseApp} from 'firebase/app';
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,setPersistence,browserLocalPersistence,onAuthStateChanged,type Auth,type User} from 'firebase/auth';
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,memoryLocalCache,collection,onSnapshot,doc,setDoc,type Firestore,type Unsubscribe} from 'firebase/firestore';
+import type {UserInfo} from './types';
+
+export const firebaseConfig={
+ apiKey:process.env.NEXT_PUBLIC_FIREBASE_API_KEY||'',
+ authDomain:process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN||'',
+ projectId:process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID||'',
+ appId:process.env.NEXT_PUBLIC_FIREBASE_APP_ID||'',
+ messagingSenderId:process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID||'',
+};
+export const firebaseConfigured=!!(firebaseConfig.apiKey&&firebaseConfig.authDomain&&firebaseConfig.projectId&&firebaseConfig.appId);
+let app:FirebaseApp|undefined,auth:Auth|undefined,db:Firestore|undefined;
+function init(){
+ if(!firebaseConfigured)return false;
+ if(!app){app=getApps().length?getApp():initializeApp(firebaseConfig);auth=getAuth(app);
+   // Firestore persistence is enabled before the database is ever used.
+   try { db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})}); }
+   catch {db=initializeFirestore(app,{localCache:memoryLocalCache()});} // Safari private mode and restricted IndexedDB.
+ }
+ return true;
+}
+export function observeAuth(callback:(user:UserInfo|null)=>void,onError:(e:Error)=>void):Unsubscribe {
+ if(!init())return ()=>{};
+ void setPersistence(auth!,browserLocalPersistence).catch(onError);
+ return onAuthStateChanged(auth!,u=>callback(u?toUserInfo(u):null),onError);
+}
+export function toUserInfo(u:User):UserInfo{return {uid:u.uid,name:u.displayName||'Member',email:u.email||'',photoURL:u.photoURL};}
+export async function googleSignIn(){if(!init())throw new Error('Set Firebase NEXT_PUBLIC environment variables first');const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});return signInWithPopup(auth!,provider);}
+export async function googleSignOut(){if(auth)await signOut(auth);}
+const COLLECTIONS=['gymSessions','swimSessions','weighIns','waterEntries','settings'] as const;
+function colFor(key:string){if(key==='preferences')return 'settings';if(key.startsWith('weight:'))return 'weighIns';if(key.startsWith('water:'))return 'waterEntries';if(key.startsWith('session:'))return ['Monday','Tuesday','Wednesday'].includes(key.split(':')[2])?'gymSessions':'swimSessions';throw new Error('Unexpected record key');}
+export function watchRecords(uid:string,onRecord:(key:string,payload:unknown,stamp:number,localWrite:boolean,fromCache:boolean)=>void,onStatus:(allServerReady:boolean,pending:boolean)=>void,onError:(e:Error)=>void):Unsubscribe {
+ if(!db)return ()=>{};
+ const synced=new Set<string>();const subscriptions=COLLECTIONS.map(name=>onSnapshot(collection(db!,'users',uid,name),{includeMetadataChanges:true},s=>{
+  for(const change of s.docChanges())if(change.type!=='removed'){
+   const value=change.doc.data();if(typeof value.recordKey==='string')onRecord(value.recordKey,value.payload,Number(value.updatedMs)||0,change.doc.metadata.hasPendingWrites,s.metadata.fromCache);
+  }
+  if(!s.metadata.fromCache)synced.add(name);
+  onStatus(synced.size===COLLECTIONS.length,s.metadata.hasPendingWrites);
+ },onError));
+ return ()=>subscriptions.forEach(fn=>fn());
+}
+export function writeRecord(uid:string,key:string,payload:unknown,updatedMs:number):Promise<void>{
+ if(!db)return Promise.reject(new Error('Firebase unavailable'));
+ const c=colFor(key);return setDoc(doc(db,'users',uid,c,key==='preferences'?'main':key),{recordKey:key,payload,updatedMs});
+}
