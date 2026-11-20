@@ -1,7 +1,7 @@
 {
   "name": "Rep & Lap — Training Tracker",
   "short_name": "Rep & Lap",
-  "description": "Gym, swimming and body weight tracking with optional cloud sync.",
+  "description": "Gym, swimming, water and body weight tracking with optional cloud sync.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f6f8fc",

@@ -132,3 +132,115 @@ body:before{content:"";position:fixed;pointer-events:none;inset:-40vh -40vw auto
 [data-theme="dark"] .email-fallback-form input{background:#202d47;color:#e7efff;border-color:#43516e}
 @media(max-width:590px){.google-signin-btn{width:100%}.email-fallback-form{flex-direction:column;align-items:stretch}.email-fallback-form input,.email-fallback-form button{width:100%}}
 @media(prefers-reduced-motion:reduce){.google-signin-btn{transition:none!important}}
+
+/* ───────────────── Rep & Lap V2.1 — Hydration & quick training ───────────────── */
+[hidden]{display:none!important}
+.settings-shortcut{color:#7b76ee;font-size:19px;line-height:1}
+.hydration-mini{display:grid;grid-template-columns:54px minmax(0,1fr) auto;align-items:center;gap:18px;padding:22px 26px;margin:-8px 0 31px;border:1px solid #b6e3e0;border-radius:20px;background:linear-gradient(112deg,#edfafa,#edf5ff 55%,#f8f4ff);box-shadow:0 9px 24px #3c818013}
+.hydration-mini-icon{width:53px;height:53px;border-radius:17px;display:grid;place-items:center;color:#129eab;background:linear-gradient(140deg,#c2f8f1,#d1e7ff)}
+.hydration-mini .eyebrow{margin-bottom:5px;color:#0d929d;font-size:9px}
+.hydration-mini-main strong{font-size:21px;font-weight:850;letter-spacing:-.6px}
+.hydration-mini-main strong span{font-size:12px;color:#668395;font-weight:650;letter-spacing:0}
+.hydration-mini-main small{color:#67949b;font-size:11px}
+.hydration-mini-main .water-track{height:6px;max-width:460px;margin:8px 0 5px}
+.hydration-mini-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.hydration-mini-actions .primary-btn,.hydration-mini-actions .outline-btn{white-space:nowrap;display:flex;align-items:center;gap:6px;justify-content:center}
+.water-track{height:9px;background:#d7e7f1;border-radius:30px;overflow:hidden}
+.water-track span{display:block;height:100%;border-radius:30px;background:linear-gradient(90deg,#2ac2c3,#7272ef);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.water-layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:20px;align-items:start}
+.water-main{display:grid;gap:16px;min-width:0}.water-aside{display:grid;gap:16px;min-width:0}
+.water-card{padding:25px}.water-card h2{margin:0;font-size:25px;letter-spacing:-.7px}
+.water-date-row{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}
+.water-date-actions{display:flex;gap:6px;align-items:center}
+.water-date-actions input{width:151px;min-width:0;background:var(--surface,#fff);border:1px solid #dde4ee;border-radius:9px;padding:9px;color:var(--ink);font-size:12px}
+.water-date-actions .compact{padding:9px;display:grid;place-items:center}
+.water-focus{display:flex;align-items:center;gap:28px;padding:6px 0 23px}
+.water-ring{--water-pct:0%;width:158px;height:158px;flex:0 0 158px;display:grid;place-items:center;background:conic-gradient(#31c9cc 0 var(--water-pct),#e5eff7 var(--water-pct) 100%);border-radius:100%;box-shadow:0 12px 25px #18adbb17;animation:waterAppear .65s ease-out}
+.water-ring-inner{width:122px;height:122px;border-radius:100%;background:var(--surface,#fff);display:flex;align-items:center;justify-content:center;flex-direction:column}
+.water-ring-inner>span{font-size:35px;font-weight:900;letter-spacing:-1.4px;color:var(--ink)}
+.water-ring-inner>small{font-size:11px;color:var(--muted)}
+.water-kicker{font-size:10px;font-weight:850;color:#1c9ca9;letter-spacing:1.4px}
+.water-big{font-size:31px;letter-spacing:-1.3px;font-weight:900;margin-top:8px;color:var(--ink);white-space:nowrap}
+.water-big small{font-size:15px;font-weight:700;color:#8795a8;letter-spacing:0}
+.water-focus-text p{font-size:13px;color:var(--ink);font-weight:700;margin:10px 0}
+.water-subline{font-size:11px;color:var(--muted);line-height:1.55}
+.water-card>.water-track{margin-bottom:24px}
+.water-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.water-quick-btn{min-width:0;min-height:84px;border-radius:13px;border:1px solid #d7eaf1;background:linear-gradient(175deg,#f9feff,#eefafc);padding:13px 8px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;color:#1d819a;transition:transform .15s,box-shadow .15s,border-color .15s}
+.water-quick-btn span{display:flex;gap:3px;align-items:center;font-size:14px;font-weight:850;white-space:nowrap}.water-quick-btn small{color:#7a9fa9;font-size:10px}
+.water-quick-btn:hover{transform:translateY(-2px);box-shadow:0 8px 17px #22b0c51c;border-color:#7bd3dd}
+.water-form{margin-top:21px;display:flex;gap:10px;align-items:end}
+.water-form .field{flex:1;min-width:0}.water-form .primary-btn{min-height:42px;white-space:nowrap}
+.water-entry{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border)}
+.water-entry:last-child{border-bottom:0}.water-entry>div{flex:1;display:grid;gap:4px}.water-entry strong{font-size:14px}.water-entry small{color:var(--muted);font-size:11px}
+.water-entry-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#e8f9fc;color:#219bb4}
+.water-empty{color:var(--muted);line-height:1.6;font-size:12px}
+.water-goal-number{font-weight:900;font-size:39px;letter-spacing:-1.5px;margin:12px 0;color:#1598a7}
+.water-goal-number small{font-size:18px}.water-goal-rows{margin-top:18px;border-top:1px solid var(--border)}
+.water-goal-rows>div{display:flex;justify-content:space-between;gap:8px;padding:13px 0;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)}
+.water-goal-rows b{color:var(--ink)}.water-fine{font-size:11px;line-height:1.65;color:var(--muted)}
+.water-v3{display:flex;align-items:center;gap:8px;font-size:11px;border-radius:11px;padding:12px;background:#eff0ff;color:#665bd2;font-weight:700;line-height:1.5}
+.water-bars{display:grid;grid-template-columns:repeat(7,1fr);height:184px;gap:8px;margin-top:13px;align-items:end}
+.water-bar-item{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.water-bar-item small{font-size:9px;color:var(--muted);font-weight:750}.water-bar-item b{font-size:9px;color:var(--muted);font-weight:650}
+.water-bar{height:123px;width:100%;background:var(--surface-alt,#eff5fc);border-radius:7px;display:flex;align-items:end;overflow:hidden}
+.water-bar>span{height:0;width:100%;min-height:0;border-radius:7px 7px 0 0;background:linear-gradient(0deg,#43caca,#777af2);transition:height .35s ease}
+/* Gym workout logging */
+.previous-set{font-size:10px;color:var(--muted);text-align:center;padding:6px 1px 0;min-height:18px}
+.set-actions{display:grid;grid-template-columns:1fr;gap:5px;margin-top:7px}
+.set-actions button{font-size:10px;border-radius:8px;padding:8px 6px;min-height:33px;border:1px solid var(--border);background:var(--surface-soft,#f4f6fb);color:var(--ink);font-weight:800}
+.set-actions button.finish-set{background:#e4f8f0;color:#14896e;border-color:#c2ebdd}
+.set-actions button.finish-set.finished{background:#2bbd96;color:white;border-color:#2bbd96}
+.set-box.is-done{border-color:#4fcd9c;background:#f0fffa;box-shadow:0 2px 14px #1fa98213}
+.timer-choices{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.timer-choices button{border:1px solid var(--border);border-radius:10px;background:var(--surface-soft,#f3f5fb);font-size:11px;padding:9px;font-weight:750;color:var(--ink)}
+.timer-choices button.active{background:#716cf1;color:#fff;border-color:#716cf1}
+.rest-settings{margin-top:15px}
+.rest-dock{position:fixed;right:26px;bottom:27px;z-index:19;width:330px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:16px 18px 15px;background:linear-gradient(120deg,#181e42,#30396e);color:white;border:1px solid #7c7bcf;border-radius:17px;box-shadow:0 17px 36px #09153250}
+.rest-dock-heading{display:flex;gap:9px;align-items:center}
+.rest-dock-icon{width:36px;height:36px;border-radius:11px;background:#6f6bd9;display:grid;place-items:center}
+.rest-dock-heading div{display:grid;gap:3px}.rest-dock-heading strong{font-size:12px}.rest-dock-heading small{color:#b5bfe4;font-size:10px}
+.rest-clock{font-size:30px;letter-spacing:-1px;font-weight:900;font-variant-numeric:tabular-nums}
+.rest-dock-buttons{grid-column:1/-1;display:flex;gap:8px}
+.rest-dock-buttons button{border:1px solid #6273a6;background:#3b4776;color:#eef1ff;border-radius:8px;padding:8px 11px;font-weight:800;font-size:11px;flex:1}
+.rest-progress{grid-column:1/-1;height:5px;border-radius:9px;background:#424a75;overflow:hidden}
+.rest-progress span{display:block;height:100%;background:linear-gradient(90deg,#4de2c2,#aaa5ff);transition:width .5s linear}
+.exercise-insight{margin-top:22px}.exercise-insight .field{max-width:390px}
+.exercise-pr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:17px}
+.exercise-pr-grid>div{padding:17px;border:1px solid var(--border);border-radius:13px;background:var(--surface-soft,#fafbff);display:grid;gap:6px}
+.exercise-pr-grid small{font-size:10px;color:var(--muted)}.exercise-pr-grid strong{font-size:21px;font-weight:850}
+.exercise-insight .chart-panel{margin-top:15px;box-shadow:none}
+/* Responsive */
+@media(max-width:1150px){.water-layout{grid-template-columns:minmax(0,1fr) 235px}.water-focus{gap:18px}.water-ring{width:136px;height:136px;flex-basis:136px}.water-ring-inner{width:105px;height:105px}.water-big{font-size:27px}}
+@media(max-width:910px){.water-layout{grid-template-columns:minmax(0,1fr)}.water-aside{grid-template-columns:1fr 1fr;gap:12px}.rest-dock{bottom:87px;right:15px}.hydration-mini{grid-template-columns:48px minmax(0,1fr)}.hydration-mini-actions{grid-column:1/-1;justify-content:stretch}.hydration-mini-actions>*{flex:1}.water-main{gap:13px}}
+@media(max-width:590px){.topbar .top-actions{gap:7px}.topbar .theme-toggle{width:33px;height:33px}.mobile-nav button{min-width:0;flex:1;padding:5px 2px}.mobile-nav svg{width:19px;height:19px}
+.hydration-mini{padding:17px;border-radius:16px;gap:12px;margin:0 0 25px}.hydration-mini-icon{width:45px;height:45px}.hydration-mini-main strong{font-size:19px}.hydration-mini-main strong span{font-size:10px}
+.water-card{padding:17px}.water-date-row{flex-direction:column;align-items:stretch;gap:10px}.water-date-actions{width:100%}.water-date-actions input{flex:1;width:100%;min-width:0}.water-focus{gap:12px}.water-ring{width:123px;height:123px;flex-basis:123px}.water-ring-inner{width:95px;height:95px}.water-ring-inner>span{font-size:27px}.water-big{font-size:25px}.water-big small{font-size:12px}.water-focus-text p{font-size:12px}.water-kicker{font-size:9px}.water-subline{font-size:10px}
+.water-quick{grid-template-columns:repeat(2,minmax(0,1fr))}.water-quick-btn{min-height:70px}.water-form{flex-direction:column;align-items:stretch}.water-form .field,.water-form button{width:100%}
+.water-aside{grid-template-columns:1fr}.exercise-pr-grid{grid-template-columns:1fr 1fr}.exercise-pr-grid>div:last-child{grid-column:1/-1}
+.rest-dock{left:11px;right:11px;bottom:82px;width:auto;padding:12px 15px}.rest-clock{font-size:25px}
+}
+[data-theme="dark"] .hydration-mini{background:linear-gradient(105deg,#183941,#1c2945,#222444);border-color:#2a5b64}
+[data-theme="dark"] .hydration-mini-icon{background:#214d5b;color:#88e8e3}
+[data-theme="dark"] .hydration-mini-main strong span,[data-theme="dark"] .hydration-mini-main small{color:#91becb}
+[data-theme="dark"] .water-track{background:#2d4560}
+[data-theme="dark"] .water-card,[data-theme="dark"] .water-list,[data-theme="dark"] .water-aside .pane{background:#152038;border-color:#2b3956}
+[data-theme="dark"] .water-date-actions input{background:#111b30;color:#eaf0ff;border-color:#34445f}
+[data-theme="dark"] .water-ring{background:conic-gradient(#39c5d5 0 var(--water-pct),#2e3c55 var(--water-pct) 100%)}
+[data-theme="dark"] .water-ring-inner{background:#152038}
+[data-theme="dark"] .water-quick-btn{background:#1c304c;border-color:#35506a;color:#8cdbf4}
+[data-theme="dark"] .water-quick-btn small{color:#8bb7c8}
+[data-theme="dark"] .water-entry{border-color:#293952}
+[data-theme="dark"] .water-entry-icon{background:#214056;color:#8bdbed}
+[data-theme="dark"] .water-v3{background:#292a57;color:#c7bdff}
+[data-theme="dark"] .set-box.is-done{background:#173e35;border-color:#2e967c}
+[data-theme="dark"] .set-actions button{background:#202f4b;color:#c5d4ec;border-color:#3b4b66}
+[data-theme="dark"] .set-actions button.finish-set{background:#1e5149;border-color:#347e71;color:#a9f3df}
+[data-theme="dark"] .set-actions button.finish-set.finished{background:#22886d;color:white}
+[data-theme="dark"] .timer-choices button{background:#22344e;color:#d9eaff}
+[data-theme="dark"] .timer-choices button.active{background:#6d66db;color:white}
+[data-theme="dark"] .exercise-pr-grid>div{background:#202d47}
+@keyframes waterAppear{from{transform:scale(.93);opacity:.5}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.water-ring{animation:none!important}.water-quick-btn,.water-track span{transition:none!important}}
+
+@media(max-width:910px){.toast{bottom:107px;right:14px;max-width:calc(100vw - 28px)}}
