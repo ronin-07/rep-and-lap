@@ -1,5 +1,5 @@
-import type {Day, GymDay, SwimDay} from './types';
-export interface ExercisePlan {name:string;sets:number;reps:string;muscles:string}
+import type {Day, GymDay, SwimDay, RoutineExercise} from './types';
+export type ExercisePlan = RoutineExercise;
 export interface GymPlan {kind:'gym';name:string;subtitle:string;exercises:ExercisePlan[]}
 export interface SwimPlan {kind:'swim';name:string;subtitle:string;description:string;drills:string[]}
 export const PLAN:Record<Day,GymPlan|SwimPlan> = {

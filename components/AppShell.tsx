@@ -1,16 +1,38 @@
 'use client';
-import {useEffect} from 'react';
-import {Activity,ArrowRight,Check,Cloud,CloudOff,CloudUpload,Download,Dumbbell,House,Menu,Moon,Settings2,Sun,Trophy,UserRound,WifiOff,X} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {Activity,ArrowLeft,ArrowRight,Check,Cloud,CloudOff,CloudUpload,Download,Dumbbell,Droplets,House,Menu,Moon,CalendarDays,Settings2,Sun,Trophy,UserRound,WifiOff,X,ShieldAlert} from 'lucide-react';
 import {useTrainer} from '@/hooks/useTrainer';
 import Dashboard from './dashboard/Dashboard';
 import Workout from './workout/Workout';
 import Progress from './progress/Progress';
 import Profile from './Profile';
 import Settings from './Settings';
-const NAV=[{key:'home',label:'Home',icon:House},{key:'workout',label:'Workout',icon:Dumbbell},{key:'progress',label:'Progress',icon:Activity},{key:'profile',label:'Profile',icon:UserRound}] as const;
+import Conflicts from './Conflicts';
+import RestDock from './workout/RestDock';
+import TrainingCalendar from './progress/TrainingCalendar';
+import Insights from './progress/Insights';
+import Achievements from './progress/Achievements';
+import NotificationBell from './NotificationBell';
+import CompletionDateDialog from './workout/CompletionDateDialog';
+import RecoveryCheckIn from './workout/RecoveryCheckIn';
+const NAV=[{key:'home',label:'Home',icon:House},{key:'workout',label:'Log',icon:Dumbbell},{key:'progress',label:'Progress',icon:Activity},{key:'profile',label:'Profile',icon:UserRound}] as const;
+const DESKTOP_CALENDAR = {key:'calendar' as const,label:'Calendar',icon:CalendarDays};
+const DESKTOP_ACHIEVEMENTS = {key:'achievements' as const,label:'Achievements',icon:Trophy};
 export default function AppShell(){
  const app=useTrainer();
- const active=app.view==='settings'?'profile':app.view;
+ const active=app.view==='settings'||app.view==='conflicts'?'profile':app.view==='calendar'?'calendar':app.view;
+ const [conflictNotice,setConflictNotice]=useState(false);
+ const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+ const seenConflicts=useRef(new Set<string>());
+ useEffect(()=>{setMobileMenuOpen(false);},[app.view]);
+ useEffect(()=>{
+  if(!mobileMenuOpen)return;
+  const dismiss=(event:PointerEvent)=>{const target=event.target;if(target instanceof Element&&!target.closest('.mobile-extra-nav,.mobile-menu-trigger'))setMobileMenuOpen(false);};
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileMenuOpen(false);};
+  document.addEventListener('pointerdown',dismiss);document.addEventListener('keydown',escape);
+  return ()=>{document.removeEventListener('pointerdown',dismiss);document.removeEventListener('keydown',escape);};
+ },[mobileMenuOpen]);
+ useEffect(()=>{const active=new Set(app.conflicts.map(({local})=>local.key));for(const key of seenConflicts.current)if(!active.has(key))seenConflicts.current.delete(key);const newlyDetected=app.conflicts.some(({local})=>!seenConflicts.current.has(local.key));active.forEach(key=>seenConflicts.current.add(key));if(newlyDetected&&app.view!=='conflicts')setConflictNotice(true);if(!active.size||app.view==='conflicts')setConflictNotice(false);},[app.conflicts,app.view]);
  useEffect(()=>{
    const viewport=window.visualViewport;
    if(!viewport)return;
@@ -19,14 +41,25 @@ export default function AppShell(){
    return ()=>{viewport.removeEventListener('resize',update);document.body.classList.remove('keyboard-open');};
  },[]);
  if(!app.hydrated)return <main className="loading-shell"><div className="loading-logo">R<span>&</span>L</div><p>Loading your training…</p></main>;
- return <div className="app-layout"><aside className="desktop-sidebar"><div className="brand"><span className="brand-logo"><Dumbbell size={25}/></span><div><strong>Rep <span>&</span> Lap</strong><small>TRAINING, IN MOTION</small></div></div>
- <nav className="desktop-nav" aria-label="Main navigation">{NAV.map(item=><button key={item.key} className={active===item.key?'active':''} onClick={()=>app.goto(item.key)}><item.icon size={20}/>{item.label}</button>)}</nav>
+ return <div className={`app-layout ${app.restState&&app.view==='workout'&&app.trackingTab==='gym'?'rest-open':''}`}><aside className="desktop-sidebar"><div className="brand"><span className="brand-logo"><Dumbbell size={25}/></span><div><strong>Rep <span>&</span> Lap</strong><small>TRAINING, IN MOTION</small></div></div>
+ <nav className="desktop-nav" aria-label="Main navigation">{[...NAV,DESKTOP_CALENDAR,DESKTOP_ACHIEVEMENTS].map(item=><button key={item.key} className={app.view===item.key||active===item.key?'active':''} onClick={()=>app.goto(item.key)}><item.icon size={20}/>{item.label}</button>)}</nav>
  <div className="sidebar-footer"><button className={app.view==='settings'?'sidebar-settings active':'sidebar-settings'} onClick={()=>app.goto('settings')}><Settings2 size={19}/> Settings</button><div className="sidebar-account"><span className="sidebar-avatar"><UserRound size={21}/></span><span><strong>{app.user?.name||'Guest athlete'}</strong><small>{app.user?'Google connected':'Saved locally'}</small></span></div></div></aside>
- <div className="content-shell"><header className="topbar"><div className="topbar-name"><span className="live-dot"/><strong>{app.view==='home'?'Dashboard':app.view==='workout'?'Workout log':app.view==='progress'?'Progress':app.view==='profile'?'Profile':'Settings'}</strong></div><div className="topbar-actions"><span className={`sync-status ${app.syncMode}`} title="Cloud synchronization status">{app.syncMode==='synced'?<Cloud size={15}/>:app.syncMode==='syncing'?<CloudUpload size={15}/>:app.online?<CloudOff size={15}/>:<WifiOff size={15}/>}<span>{app.syncMode==='synced'?'Synced':app.syncMode==='syncing'?'Syncing…':app.syncMode==='checking'?'Checking…':app.syncMode==='needs-attention'?'Needs attention':'Saved locally'}</span></span><button className="icon-btn theme-toggle" onClick={()=>app.setTheme(app.theme==='dark'?'light':'dark')} title="Toggle theme" aria-label="Toggle color theme">{app.theme==='dark'?<Sun size={20}/>:<Moon size={20}/>}</button><button className="icon-btn settings-top" onClick={()=>app.goto('settings')} aria-label="Open settings"><Settings2 size={20}/></button></div></header>
- <main className="app-main" id="main-content">{app.view==='home'?<Dashboard app={app}/>:app.view==='workout'?<Workout app={app}/>:app.view==='progress'?<Progress app={app}/>:app.view==='profile'?<Profile app={app}/>:<Settings app={app}/>}</main>
- <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{NAV.map(item=><button key={item.key} className={active===item.key?'active':''} onClick={()=>app.goto(item.key)}><item.icon size={22} strokeWidth={active===item.key?2.3:1.8}/><span>{item.label}</span></button>)}</nav>
+ <div className="content-shell"><header className="topbar"><div className="topbar-name"><span className="live-dot"/><strong>{app.view==='home'?'Dashboard':app.view==='workout'?'Training log':app.view==='progress'?'Progress':app.view==='profile'?'Profile':app.view==='calendar'?'Calendar':app.view==='insights'?'Training insights':app.view==='achievements'?'Achievements':app.view==='conflicts'?'Conflicts':'Settings'}</strong></div><div className="topbar-actions">{app.conflicts.length?<button className="conflicts-trigger" onClick={()=>{app.goto('conflicts');setConflictNotice(false);}} aria-label={`${app.conflicts.length} set conflicts require review`}><ShieldAlert size={17}/><span>Conflicts</span><b>{app.conflicts.length}</b></button>:<span className={`sync-status ${app.syncMode}`} title="Cloud synchronization status">{app.syncMode==='synced'?<Cloud size={15}/>:app.syncMode==='syncing'?<CloudUpload size={15}/>:app.online?<CloudOff size={15}/>:<WifiOff size={15}/>}<span>{app.syncMode==='synced'?'Synced':app.syncMode==='syncing'?'Syncing…':app.syncMode==='checking'?'Checking…':app.syncMode==='needs-attention'?'Needs attention':'Saved locally'}</span></span>}<NotificationBell app={app} onOpen={()=>setMobileMenuOpen(false)}/><button className="icon-btn theme-toggle" onClick={()=>app.setTheme(app.theme==='dark'?'light':'dark')} title="Toggle theme" aria-label="Toggle color theme">{app.theme==='dark'?<Sun size={20}/>:<Moon size={20}/>}</button><button className="icon-btn settings-top" onClick={()=>app.goto('settings')} aria-label="Open settings"><Settings2 size={20}/></button><button className="icon-btn mobile-menu-trigger" onClick={()=>setMobileMenuOpen(open=>!open)} aria-expanded={mobileMenuOpen} aria-controls="mobile-extra-navigation" aria-label="Open navigation menu">{mobileMenuOpen?<X size={21}/>:<Menu size={21}/>}</button></div>{mobileMenuOpen&&<div className="mobile-extra-nav" id="mobile-extra-navigation" role="navigation" aria-label="More destinations"><button onClick={()=>{app.goto('calendar');setMobileMenuOpen(false);}}><CalendarDays size={19}/> Training calendar</button><button onClick={()=>{app.goto('insights');setMobileMenuOpen(false);}}><Activity size={19}/> Training insights</button><button onClick={()=>{app.goto('achievements');setMobileMenuOpen(false);}}><Trophy size={19}/> Achievements</button><button onClick={()=>{app.goto('settings');setMobileMenuOpen(false);}}><Settings2 size={19}/> Settings</button>{app.conflicts.length>0&&<button onClick={()=>{app.goto('conflicts');setMobileMenuOpen(false);}}><ShieldAlert size={19}/> Review conflicts ({app.conflicts.length})</button>}</div>}</header>
+ <main className="app-main" id="main-content">{app.view==='home'?<Dashboard app={app}/>:app.view==='workout'?<Workout app={app}/>:app.view==='progress'?<Progress app={app}/>:app.view==='profile'?<Profile app={app}/>:app.view==='calendar'?<div className="stack-xl"><button className="calendar-back-home" onClick={()=>app.goto('home')}><ArrowLeft size={16}/> Back to Home</button><div className="page-header"><div><span className="eyebrow">YOUR PLAN</span><h1>Training calendar.</h1><p>Recovery, completed sessions and flexible scheduling, all in one place.</p></div></div><TrainingCalendar app={app}/></div>:app.view==='insights'?<div className="stack-xl"><button className="calendar-back-home" onClick={()=>app.goto('progress')}><ArrowLeft size={16}/> Back to Progress</button><div className="page-header"><div><span className="eyebrow">TRAINING INTELLIGENCE</span><h1>Your insights.</h1><p>Muscle coverage and monthly performance, in one place.</p></div></div><Insights app={app}/></div>:app.view==='achievements'?<div className="stack-xl"><button className="calendar-back-home" onClick={()=>app.goto('progress')}><ArrowLeft size={16}/> Back to Progress</button><div className="page-header"><div><span className="eyebrow">YOUR MILESTONES</span><h1>Achievements.</h1><p>Every milestone backed by your recorded training.</p></div></div><Achievements app={app}/></div>:app.view==='conflicts'?<Conflicts app={app}/>:<Settings app={app}/>}</main>
+ <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{NAV.map(item=><button key={item.key} className={active===item.key?'active':''} onClick={()=>{if(item.key==='progress'&&app.progressTab==='insights')app.setProgressTab('overview');app.goto(item.key);}}><item.icon size={22} strokeWidth={active===item.key?2.3:1.8}/><span>{item.label}</span></button>)}</nav>
  </div>
- {app.celebration&&<div className="overlay" role="dialog" aria-modal="true" aria-label={app.celebration.title} onClick={()=>app.setCelebration(null)}><div className="celebration card" onClick={e=>e.stopPropagation()}><span className="celebration-trophy"><Trophy size={42}/></span><div className="eyebrow">A MOMENT TO CELEBRATE</div><h2>{app.celebration.title}</h2><p>{app.celebration.body}</p><button className="button-primary" onClick={()=>app.setCelebration(null)}>Keep going <ArrowRight size={18}/></button></div></div>}
+ <RestDock app={app}/>
+ <RecoveryCheckIn app={app}/>
+ <CompletionDateDialog app={app}/>
+ {app.conflicts.length>0&&conflictNotice&&app.view!=='conflicts'&&<div className="conflict-notice" role="alert"><ShieldAlert size={23}/><div><strong>Sync conflict detected</strong><small>{app.conflicts.length} {app.conflicts.length===1?'set needs':'sets need'} your decision</small></div><button className="button-primary" onClick={()=>{setConflictNotice(false);app.goto('conflicts');}}>Review</button><button className="icon-btn" aria-label="Dismiss conflict notification" onClick={()=>setConflictNotice(false)}><X size={17}/></button></div>}
+ {app.celebration&&<div className="overlay" role="presentation" onClick={()=>app.setCelebration(null)}>
+  <div className={`celebration card ${app.celebration.kind==='hydration'?'celebration-water':''}`} role="dialog" aria-modal="true" aria-label={app.celebration.title} onClick={e=>e.stopPropagation()}>
+   {app.celebration.kind==='hydration'?<div className="water-celebration-art" aria-hidden="true"><span className="water-ripple ripple-one"/><span className="water-ripple ripple-two"/><span className="water-drop-core"><Droplets size={46}/></span><span className="water-spark spark-a"/><span className="water-spark spark-b"/><span className="water-spark spark-c"/><span className="water-spark spark-d"/></div>:<span className="celebration-trophy"><Trophy size={42}/></span>}
+   <div className="eyebrow">{app.celebration.kind==='hydration'?'DAILY WATER GOAL COMPLETE':'A MOMENT TO CELEBRATE'}</div>
+   <h2>{app.celebration.title}</h2><p>{app.celebration.body}</p>
+   <button className="button-primary" onClick={()=>app.setCelebration(null)}>{app.celebration.kind==='hydration'?'Stay hydrated':'Keep going'} <ArrowRight size={18}/></button>
+  </div>
+ </div>}
  {app.toast&&<div className="toast" role="status">{app.toast}</div>}
  </div>;
 }

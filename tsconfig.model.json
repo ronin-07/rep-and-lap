@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ]
+  },
+  "include": [
+    "lib/types.ts",
+    "lib/dates.ts",
+    "lib/plan.ts",
+    "lib/routines.ts",
+    "lib/scheduling.ts",
+    "lib/metrics.ts",
+    "lib/session-timing.ts",
+    "lib/swim-session.ts",
+    "lib/storage.ts",
+    "lib/set-sync.ts",
+    "lib/backup.ts",
+    "lib/workout-flow.ts",
+    "lib/training-intelligence.ts",
+    "lib/swimming.ts",
+    "lib/insights.ts",
+    "lib/activity-notifications.ts"
+  ]
+}
