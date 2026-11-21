@@ -1,12 +1,13 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Check,CheckCircle2,ChevronDown,ChevronUp,Clock,Plus,Minus,Play,Square,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
+import {Check,CheckCircle2,ChevronDown,ChevronUp,Clock,Plus,Minus,Play,Pause,Square,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {SwimDay,SwimActivity,SwimStroke,SwimSegment,SwimRoutine,SwimMode} from '@/lib/types';
 import {SWIM_DAYS,PLAN} from '@/lib/plan';
-import {weekLog,formatDuration,sessionMinutes,plannedDate} from '@/lib/metrics';
+import {weekLog,plannedDate} from '@/lib/metrics';
 import {SWIM_ACTIVITY_LABELS,SWIM_STROKES,SWIM_DRILLS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,SWIM_SKILL_LEVELS,swimRoutine,swimTotals,swimNumber,effectivePool,segmentDistance,segmentContinuous,isStroke} from '@/lib/swimming';
 import {statusFor} from '@/lib/scheduling';
+import {formatSessionClock,sessionClockState} from '@/lib/session-timing';
 import DateInput from '@/components/DateInput';
 import SessionNotes from '@/components/workout/SessionNotes';
 
@@ -26,21 +27,29 @@ export default function SwimLogger({app}:Props){
  const [currentPool,setCurrentPool]=useState(String(pool));
  useEffect(()=>setCurrentPool(String(pool)),[pool,day,app.week]);
  useEffect(()=>setDefaultPool(String(app.data.swimPoolDefault||50)),[app.data.swimPoolDefault]);
- const status=statusFor(app.data,app.week,day),active=!!timing?.startedAt&&!timing?.endedAt;
+ const status=statusFor(app.data,app.week,day),clockState=sessionClockState(timing);
+ const active=clockState==='running',paused=clockState==='paused';
+ const stopped=clockState==='stopped'&&!completed;
+ const shownClock=(active||paused)&&timing?.startedAt?Math.max(app.clock,Date.parse(timing.startedAt)):undefined;
  return <div className="stack swim-log">
-  <div className="day-tabs" role="group" aria-label="Swimming day">{SWIM_DAYS.map(d=><button key={d} className={day===d?'active':''} onClick={()=>app.setSwimDay(d)}><small>{d.slice(0,3)}</small><strong>{swimRoutine(app.data,app.week,d).name}</strong></button>)}</div>
+  <div className="day-tabs" role="group" aria-label="Swimming day">{SWIM_DAYS.map(d=><button key={d} className={day===d?'active':''} onClick={()=>app.setSwimDay(d)}><small>{d.slice(0,3)}{record.timing?.[d]?.endedAt&&!record.done[d]?' · Log pending':''}</small><strong>{swimRoutine(app.data,app.week,d).name}</strong></button>)}</div>
   <section className="card pane-pad swim-session-hero"><div><span className="eyebrow">{day.toUpperCase()} · SWIM SESSION</span><h2>{plan.name}</h2><p className="muted">{plan.description}</p></div><span className="icon-wrap aqua"><Waves/></span></section>
-  <section className="card pane-pad swim-session-controls" aria-label="Swimming session controls">
+  <section className={`card pane-pad swim-session-controls ${stopped?'swim-ready-to-log':''}`} aria-label="Swimming session timer and completion">
    <div className="swim-clock-status"><div className="swim-clock-heading"><span className="eyebrow">SESSION CLOCK</span><span className={`clock-indicator ${active?'running':''}`} aria-hidden="true"><Clock size={18}/></span></div>
-    <strong className="swim-session-time">{timing?.startedAt?formatDuration(sessionMinutes(timing,active?app.clock:undefined)):'Ready when you are'}</strong>
-    <small className="muted">{active?'Session in progress · includes breaks':timing?.endedAt?'Finished · total time saved':'Start when you get into the pool'}</small>
+    <strong className="swim-session-time" role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,shownClock):'Ready when you are'}</strong>
+    <small className="muted">{paused?'Swim paused · paused time excluded':active?'Swim timer running · pauses excluded':stopped?'Timer stopped · log your laps and notes, or continue swimming':completed?'Swim completed · undo to continue or restart':'Start before swimming, or log a swim without a timer'}</small>
+    {timing?.startedAt&&<small className="muted swim-session-stamps">Started {new Date(timing.startedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}{timing.pausedAt?` · Paused ${new Date(timing.pausedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:timing.endedAt?` · Stopped ${new Date(timing.endedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}</small>}
    </div>
    <div className="swim-session-actions">
-    {!timing?.startedAt&&!completed?<button className="button-secondary" onClick={()=>app.startSession(day)}><Play size={16}/> Start session</button>:null}
-    {active?<button className="button-primary" onClick={()=>app.finishSession(day)}><Square size={16}/> Finish session</button>:null}
-    {!active?<button className={`button-primary ${completed?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{completed?<><CheckCircle2 size={16}/> Undo completion</>:<><Check size={16}/> Mark swim complete</>}</button>:null}
-    {timing?.startedAt&&timing.endedAt?<span className="session-done-chip"><CheckCircle2 size={16}/> Time saved</span>:null}
+    {clockState==='ready'&&!completed&&<button className="button-secondary" onClick={()=>app.startSession(day)}><Play size={16}/> Start timer</button>}
+    {active&&!completed&&<button className="button-secondary" onClick={()=>app.pauseSession(day)}><Pause size={16}/> Pause</button>}
+    {paused&&!completed&&<button className="button-secondary" onClick={()=>app.resumeSession(day)}><Play size={16}/> Resume</button>}
+    {(active||paused)&&!completed&&<button className="button-primary" onClick={()=>app.stopSwimSession(day)}><Square size={16}/> Stop timer</button>}
+    {stopped&&<><button className="button-secondary" onClick={()=>app.resumeSession(day)}><Play size={16}/> Continue swim</button><button className="button-secondary" onClick={()=>app.restartSession(day)}><RotateCcw size={16}/> Restart timer</button></>}
+    {clockState!=='running'&&clockState!=='paused'&&!completed&&<button className="button-primary" onClick={()=>app.completeSwimSession(day)}><Check size={16}/> {stopped?'Save & complete swim':'Mark swim complete'}</button>}
+    {completed&&<button className="button-secondary" onClick={()=>app.toggleDone(day)}><CheckCircle2 size={16}/> Undo completion</button>}
    </div>
+   {stopped&&<p className="muted tiny swim-clock-note">Continue preserves your earlier active time. Restart resets only the clock; your laps and notes stay saved.</p>}
   </section>
   {(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped swim'}</strong><p>Restore this session to record a swim.</p><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore session</button></div>}
   <div className="swim-top-grid">

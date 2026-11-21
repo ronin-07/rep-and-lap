@@ -101,7 +101,19 @@ function validateWeek(week:unknown){
         }
       }
       if(section==='swim')validateSwim(value);
-      if(section==='sessionNotes'||section==='timing')check(object(value),'Invalid session details');
+      if(section==='sessionNotes')check(object(value),'Invalid session details');
+      if(section==='timing'){
+        const clock=safeRecord(value,'session clock',4);
+        const isStamp=(input:unknown)=>typeof input==='string'&&Number.isFinite(Date.parse(input));
+        for(const field of ['startedAt','endedAt','pausedAt'])if(clock[field]!==undefined)check(isStamp(clock[field]),`Invalid ${field} timestamp`);
+        if(clock.pausedDurationMs!==undefined)check(typeof clock.pausedDurationMs==='number'&&Number.isSafeInteger(clock.pausedDurationMs)&&clock.pausedDurationMs>=0,'Invalid paused duration');
+        if(clock.pausedAt!==undefined){
+          check(isStamp(clock.startedAt)&&clock.endedAt===undefined,'A paused clock must be running');
+          check(Date.parse(clock.pausedAt as string)>=Date.parse(clock.startedAt as string),'Pause precedes session start');
+        }
+        if(clock.startedAt!==undefined&&clock.endedAt!==undefined)
+          check(Date.parse(clock.endedAt as string)>=Date.parse(clock.startedAt as string),'Session ends before it starts');
+      }
       if(section==='completedAt')check(typeof value==='string'&&Number.isFinite(Date.parse(value)),'Invalid completion timestamp');
       if(section==='completedOn')check(typeof value==='string'&&validDate(value),'Invalid actual completion date');
     }

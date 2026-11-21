@@ -19,6 +19,8 @@
     "lib/routines.ts",
     "lib/scheduling.ts",
     "lib/metrics.ts",
+    "lib/session-timing.ts",
+    "lib/swim-session.ts",
     "lib/storage.ts",
     "lib/set-sync.ts",
     "lib/backup.ts",

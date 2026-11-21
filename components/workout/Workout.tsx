@@ -1,18 +1,19 @@
 'use client';
 import {useState} from 'react';
 import {progressionAdvice} from '@/lib/training-intelligence';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Square,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {GymDay,SwimDay,Day,SwimInterval,SwimLog} from '@/lib/types';
 import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
 import {stableSetId} from '@/lib/set-sync';
 import {previousCompletedSet} from '@/lib/workout-flow';
 import {labelWeek,shiftWeek,keyOf,dateFor,formatDate} from '@/lib/dates';
-import {setCount,gymStats,weekLog,num,loggedSet,validSet,history,bestSwim,waterGoal,waterEntries,waterTotal,weightEntries,weightTrend,plannedDate,sessionMinutes,formatDuration} from '@/lib/metrics';
+import {setCount,gymStats,weekLog,num,loggedSet,validSet,history,bestSwim,waterGoal,waterEntries,waterTotal,weightEntries,weightTrend,plannedDate} from '@/lib/metrics';
 import SessionNotes from './SessionNotes';
 import RoutineEditor from './RoutineEditor';
 import {exercisesFor} from '@/lib/routines';
 import {statusFor} from '@/lib/scheduling';
+import {formatSessionClock,sessionClockState} from '@/lib/session-timing';
 import {LineChart,MiniBars} from '@/components/Charts';
 import DateInput from '@/components/DateInput';
 import SwimLogger from '@/components/swimming/SwimLogger';
@@ -27,12 +28,22 @@ export default function Workout({app}:{app:Trainer}){
  </div>
 }
 function SessionClock({app,day}:{app:Trainer;day:Day}){
- const timing=weekLog(app.data,app.week).timing?.[day],active=!!timing?.startedAt&&!timing.endedAt,done=!!weekLog(app.data,app.week).done[day];
- const minutes=sessionMinutes(timing,active?app.clock:undefined);
- return <div className="session-clock"><div className="session-clock-top"><div><span className="eyebrow">WORKOUT DURATION</span><strong>{timing?.startedAt?formatDuration(minutes):'Ready when you are'}</strong><small>{active?'Session in progress · includes rest time':timing?.endedAt?'Finished · duration recorded':'Start when you begin your workout'}</small></div><span className={`clock-indicator ${active?'running':''}`}><Clock size={18}/></span></div>
- {timing?.startedAt&&<div className="session-time-stamps">Started {new Date(timing.startedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}{timing.endedAt?` · Ended ${new Date(timing.endedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}</div>}
- <div className="session-clock-actions">{!timing?.startedAt?<button className="button-secondary" onClick={()=>app.startSession(day)} disabled={done}><Play size={15}/> Start workout</button>:null}{active?<button className="button-primary" onClick={()=>app.finishSession(day)}><Square size={15}/> Finish workout</button>:null}
- {timing?.startedAt&&timing.endedAt?<span className="session-done-chip"><CheckCircle2 size={16}/> Time saved</span>:null}</div>
+ const record=weekLog(app.data,app.week),timing=record.timing?.[day],state=sessionClockState(timing),done=!!record.done[day];
+ const clock=state==='running'||state==='paused'?Math.max(app.clock,Date.parse(timing!.startedAt!)):undefined;
+ return <div className="session-clock" aria-label="Gym session stopwatch"><div className="session-clock-top"><div><span className="eyebrow">WORKOUT DURATION</span>
+  <strong role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,clock):'Ready when you are'}</strong>
+  <small>{state==='paused'?'Paused · break time excluded':state==='running'?'In progress · includes workout rest time':state==='stopped'?(done?'Workout completed · active duration saved':'Incomplete · continue or restart the clock'):'Start when you begin your workout'}</small>
+ </div><span className={`clock-indicator ${state==='running'?'running':''}`}><Clock size={18}/></span></div>
+ {timing?.startedAt&&<div className="session-time-stamps">Started {new Date(timing.startedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}{timing.pausedAt?` · Paused ${new Date(timing.pausedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:timing.endedAt?` · Finished ${new Date(timing.endedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}</div>}
+ <div className="session-clock-actions">
+  {state==='ready'&&!done&&<button className="button-secondary" onClick={()=>app.startSession(day)}><Play size={15}/> Start workout</button>}
+  {state==='running'&&!done&&<button className="button-secondary" onClick={()=>app.pauseSession(day)}><Pause size={15}/> Pause</button>}
+  {state==='paused'&&!done&&<button className="button-secondary" onClick={()=>app.resumeSession(day)}><Play size={15}/> Resume</button>}
+  {(state==='running'||state==='paused')&&!done&&<button className="button-primary" onClick={()=>app.finishSession(day)}><Square size={15}/> Finish workout</button>}
+  {state==='stopped'&&!done&&<><button className="button-primary" onClick={()=>app.resumeSession(day)}><Play size={15}/> Continue workout</button><button className="button-secondary" onClick={()=>app.restartSession(day)}><RotateCcw size={15}/> Restart timer</button></>}
+  {state==='stopped'&&done&&<span className="session-done-chip"><CheckCircle2 size={16}/> Time saved</span>}
+ </div>
+ {state==='stopped'&&!done&&<p className="muted tiny">Continue keeps previously tracked active time. Restart resets only the timer, not your logged sets.</p>}
  </div>;
 }
 function Gym({app}:{app:Trainer}){

@@ -4,6 +4,8 @@ import {weekOf,daysAgo,keyOf,dateFor} from './dates';
 import {exercisesFor} from './routines';
 import {scheduledDate,completedDate,entriesForDate,trainingStreak} from './scheduling';
 import {swimTotals,swimPersonalBests,swimRoutine} from './swimming';
+import {elapsedSessionMs} from './session-timing';
+import type {SessionTiming} from './types';
 export const num=(v:unknown)=>Number.isFinite(Number(v))?Number(v):0;
 export const hasVal=(v:unknown)=>v!==undefined&&v!==null&&v!==''&&Number.isFinite(Number(v));
 export const validSet=(s?:GymSet)=>!!s&&hasVal(s.kg)&&hasVal(s.reps)&&num(s.kg)>=0&&num(s.reps)>0;
@@ -60,11 +62,9 @@ export function hydrationChart(data:TrackerData,n=7){return Array.from({length:n
 // Session dates belong to the original training-plan week, even if a missed
 // session is subsequently moved to another calendar day. This preserves records.
 export const plannedDate=scheduledDate;
-export function sessionMinutes(timing?:{startedAt?:string;endedAt?:string},now?:number):number|null{
- if(!timing?.startedAt)return null;
- const start=Date.parse(timing.startedAt),end=timing.endedAt?Date.parse(timing.endedAt):now;
- if(!Number.isFinite(start)||end===undefined||!Number.isFinite(end)||end<start)return null;
- return Math.floor((end-start)/60000);
+export function sessionMinutes(timing?:SessionTiming,now?:number):number|null{
+ const duration=elapsedSessionMs(timing,now);
+ return duration===null?null:Math.floor(duration/60000);
 }
 export function formatDuration(minutes:number|null):string{
  if(minutes===null)return 'Not tracked';

@@ -678,7 +678,7 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
 /* Swim session actions are at the top, mirroring the gym session clock. */
 .swim-session-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .swim-clock-status{display:flex;flex-direction:column;gap:6px;flex:1 1 240px}
-.swim-clock-heading{display:flex;align-items:center;gap:11px;justify-content:space-between;max-width:360px}
+.swim-clock-heading{display:flex;align-items:center;gap:11px;justify-content:flex-start}
 .swim-clock-status .swim-session-time{font:820 clamp(1.2rem,2.4vw,1.7rem)/1.25 Manrope,'DM Sans',sans-serif;letter-spacing:-.035em}
 .swim-clock-status>small{font-size:.76rem}
 .swim-session-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px}
@@ -770,3 +770,32 @@ input[type='date']::-webkit-calendar-picker-indicator{flex-shrink:0;margin-inlin
 .swim-validation-warning{font-size:.78rem;line-height:1.45;color:var(--coral);padding:9px 12px;border:1px solid color-mix(in srgb,var(--coral) 32%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--coral) 9%,var(--panel))}
 .swim-learning-level{padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:.83rem;color:var(--muted)}
 .swim-learning-level strong{color:var(--aqua)}
+
+
+/* Completion animation for both gym and swim; no animation dependency or data changes. */
+.celebration-session{overflow:hidden;background:radial-gradient(circle at 50% 14%,rgba(90,223,195,.24),transparent 53%),linear-gradient(145deg,#1c3142,#232d56);border-color:rgba(101,232,203,.55);animation:session-panel-in .45s cubic-bezier(.2,.9,.2,1) both}
+.session-celebration-art{width:164px;height:164px;position:relative;display:grid;place-items:center;margin:0 auto 8px;isolation:isolate}
+.session-celebration-halo{position:absolute;inset:16px;border:2px solid rgba(94,239,208,.55);border-radius:50%;box-shadow:0 0 34px rgba(74,219,184,.25);animation:session-halo 1.3s ease-out both}
+.session-celebration-check{position:relative;z-index:2;width:112px;height:112px;border-radius:50%;background:linear-gradient(135deg,#55e3c7,#588ce9);color:#0c2634;display:grid;place-items:center;box-shadow:0 0 0 10px rgba(95,226,196,.10),0 15px 34px rgba(7,22,38,.33);animation:session-check-in .58s .11s cubic-bezier(.17,1.35,.35,1) both}
+.session-celebration-particles{position:absolute;inset:0;pointer-events:none;z-index:3}
+.session-celebration-particles span{position:absolute;top:50%;left:50%;height:9px;width:5px;border-radius:3px;background:#7decd6;opacity:0;animation:session-particle 1s .23s ease-out both;--angle:0deg}
+.session-celebration-particles span:nth-child(2n){background:#e9baee;width:8px;height:8px}
+.session-celebration-particles span:nth-child(3n){background:#f8cb89;height:6px}
+.session-celebration-particles span:nth-child(1){--angle:0deg}.session-celebration-particles span:nth-child(2){--angle:30deg}.session-celebration-particles span:nth-child(3){--angle:60deg}.session-celebration-particles span:nth-child(4){--angle:90deg}
+.session-celebration-particles span:nth-child(5){--angle:120deg}.session-celebration-particles span:nth-child(6){--angle:150deg}.session-celebration-particles span:nth-child(7){--angle:180deg}.session-celebration-particles span:nth-child(8){--angle:210deg}
+.session-celebration-particles span:nth-child(9){--angle:240deg}.session-celebration-particles span:nth-child(10){--angle:270deg}.session-celebration-particles span:nth-child(11){--angle:300deg}.session-celebration-particles span:nth-child(12){--angle:330deg}
+@keyframes session-panel-in{from{opacity:0;transform:translateY(28px) scale(.87)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes session-check-in{from{opacity:0;transform:scale(.3) rotate(-24deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes session-halo{0%{opacity:0;transform:scale(.5)}40%{opacity:.9}100%{opacity:.35;transform:scale(1.25)}}
+@keyframes session-particle{0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--angle)) translateY(0) scale(.3)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--angle)) translateY(-102px) scale(.25)}}
+.swim-ready-to-log{border-color:rgba(95,226,196,.42);background:linear-gradient(135deg,rgba(87,213,184,.10),transparent 65%),var(--card-grad)}
+.swim-session-stamps{font-size:.72rem!important}
+@media(prefers-reduced-motion:reduce){.celebration-session,.session-celebration-halo,.session-celebration-check,.session-celebration-particles span{animation:none!important}.session-celebration-particles{display:none}}
+
+.swim-clock-heading .clock-indicator{width:29px;height:29px;border-radius:10px}
+
+/* Session stopwatch: active time excludes pauses, and controls wrap on mobile. */
+.session-clock-top strong,.swim-clock-status .swim-session-time{font-variant-numeric:tabular-nums}
+.session-clock-actions button,.swim-session-actions button{min-height:44px}
+.swim-clock-note{flex-basis:100%;margin:0}
+@media(max-width:670px){.session-clock-actions button{flex:1 1 125px;justify-content:center}}

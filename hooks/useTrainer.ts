@@ -13,6 +13,8 @@ import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/li
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {stableSetId} from '@/lib/set-sync';
 import {blankSegment,swimRoutine,swimPersonalBests,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
+import {stoppedSwimTiming,completeStoppedSwim} from '@/lib/swim-session';
+import {sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming} from '@/lib/session-timing';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
 export function useTrainer(){
@@ -31,6 +33,7 @@ export function useTrainer(){
  const [syncMode,setSyncMode]=useState<SyncMode>('saved-local');
  const [toast,setToast]=useState('');
  const [celebration,setCelebration]=useState<Celebration>(null);
+ const [queuedCelebration,setQueuedCelebration]=useState<Celebration>(null);
  const [restState,setRestState]=useState<RestState|null>(null);
  const restEnd=restState?.endsAt??0;
  const [recoveryPrompt,setRecoveryPrompt]=useState<{week:string;day:Day}|null>(null);
@@ -181,7 +184,9 @@ export function useTrainer(){
   const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length))void flush();},30000);
   return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);document.removeEventListener('visibilitychange',handleVisibility);clearInterval(interval);};
  },[hydrated,flush]);
- useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),15000);return ()=>clearInterval(interval);},[hydrated]);
+ const visibleTiming=data.weeks[week]?.timing?.[trackingTab==='swim'?swimDay:gymDay];
+ const liveClock=view==='workout'&&(trackingTab==='gym'||trackingTab==='swim')&&sessionClockState(visibleTiming)==='running';
+ useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),liveClock?1000:15000);return ()=>clearInterval(interval);},[hydrated,liveClock]);
  useEffect(()=>{
    if(!restEnd)return;
    setClock(Date.now());
@@ -207,23 +212,84 @@ export function useTrainer(){
  },[]);
  const startSession=(day:Day)=>{
   const session=dataRef.current.weeks[week]?.timing?.[day];
-  if(session?.startedAt&&!session.endedAt){notify('This session is already running.');return;}
-  if(dataRef.current.weeks[week]?.done?.[day]||session?.endedAt){notify('This session was already finished.');return;}
+  if(sessionClockState(session)!=='ready'){notify('Use Pause, Resume or Restart timer for this session.');return;}
+  if(dataRef.current.weeks[week]?.done?.[day]){notify('Undo completion before starting another timer.');return;}
   if(statusFor(dataRef.current,week,day)!=='scheduled'&&!confirm('This was marked as a rest or skipped day. Restore the workout and start?'))return;
-  const at=new Date().toISOString();
+  const startedMs=Date.now();const at=new Date(startedMs).toISOString();setClock(startedMs);
   update(d=>{const w=d.weeks[week]??=weekBlank();if(w.scheduleStatus)delete w.scheduleStatus[day];w.timing??={};w.timing[day]={startedAt:at};
     if(PLAN[day].kind==='gym'){w.routineOverrides??={};w.routineOverrides[day as GymDay]??=cloneExercises(exercisesFor(d,week,day as GymDay));}
+    else {w.swimRoutineOverrides??={};w.swimRoutineOverrides[day as SwimDay]??=swimRoutine(d,week,day as SwimDay);}
   },`session:${week}:${day}`);
-  notify('Workout timer started. You can keep logging sets.');
+  notify(PLAN[day].kind==='swim'?'Swim timer started. Log laps and drills when you return.':'Workout timer started. You can keep logging sets.');
+ };
+ // Pauses and subsequent resumes are persisted in the same session record as
+ // the start/end timestamps. Old sessions have an implicit zero paused duration.
+ const pauseSession=(day:Day)=>{
+  const entry=dataRef.current.weeks[week],at=new Date().toISOString();
+  if(entry?.done?.[day]){notify('Undo completion before changing the clock.');return;}
+  const next=pauseSessionTiming(entry?.timing?.[day],at);
+  if(!next){notify('Start a running session before pausing.');return;}
+  setClock(Date.parse(at));
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
+  if(PLAN[day].kind==='gym'&&restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
+  notify('Workout paused. Paused time will not count toward the session duration.');
+ };
+ const resumeSession=(day:Day)=>{
+  const entry=dataRef.current.weeks[week];
+  if(entry?.done?.[day]){notify('Undo completion before continuing this session.');return;}
+  if(statusFor(dataRef.current,week,day)!=='scheduled'){notify('Restore this session on the calendar before continuing.');return;}
+  const at=new Date().toISOString(),next=resumeSessionTiming(entry?.timing?.[day],at);
+  if(!next){notify('Only a paused or stopped session can be resumed.');return;}
+  setClock(Date.parse(at));
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
+  notify('Session resumed. Earlier active time and your logged data are preserved.');
+ };
+ const restartSession=(day:Day)=>{
+  const entry=dataRef.current.weeks[week];
+  if(entry?.done?.[day]){notify('Undo completion before restarting the timer.');return;}
+  if(statusFor(dataRef.current,week,day)!=='scheduled'){notify('Restore this session on the calendar before restarting.');return;}
+  if(sessionClockState(entry?.timing?.[day])!=='stopped'){notify('Stop the session before restarting its clock.');return;}
+  if(!confirm('Restart the session timer from 0? This resets only the elapsed time; all logged sets, laps and notes are kept.'))return;
+  const at=new Date().toISOString(),next=restartSessionTiming(entry?.timing?.[day],at);
+  if(!next){notify('Could not restart this timer.');return;}
+  setClock(Date.parse(at));
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
+  notify('Timer restarted from zero. Your workout log is unchanged.');
  };
  const finishSession=(day:Day)=>{
-  const at=new Date().toISOString();const isDone=!!dataRef.current.weeks[week]?.done?.[day];
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};const t=w.timing[day]??={};
-   if(!t.endedAt)t.endedAt=at;w.timing[day]=t;w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;w.completedOn??={};w.completedOn[day]=keyOf(new Date(at));
+  if(PLAN[day].kind==='swim'){notify('Stop your swim timer, log the swim, then save it.');return;}
+  const entry=dataRef.current.weeks[week],at=new Date().toISOString();
+  if(entry?.done?.[day]){notify('Undo completion before changing the session.');return;}
+  const stopped=stopSessionTiming(entry?.timing?.[day],at);
+  if(!stopped){notify('Start or resume the session clock before finishing.');return;}
+  setClock(Date.parse(at));
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;
+   w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;w.completedOn??={};w.completedOn[day]=keyOf(new Date(at));
   },`session:${week}:${day}`);
   if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
-  if(!isDone)setRecoveryPrompt({week,day});
-  else notify('Session end time recorded.');
+  setRecoveryPrompt({week,day});
+ };
+ // Swimming is finalized separately so the user can enter laps after leaving the pool.
+ const stopSwimSession=(day:SwimDay)=>{
+  if(dataRef.current.weeks[week]?.done?.[day]){notify('Undo completion before changing this swim.');return;}
+  const at=new Date().toISOString();
+  const stopped=stoppedSwimTiming(dataRef.current.weeks[week]?.timing?.[day],at);
+  if(!stopped){notify('No running or paused swim timer to stop.');return;}
+  setClock(Date.parse(at));
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;},`session:${week}:${day}`);
+  notify('Swim time saved. Enter your laps and notes, then save the session.');
+ };
+ const completeSwimSession=(day:SwimDay)=>{
+  const entry=dataRef.current.weeks[week],timing=entry?.timing?.[day];
+  if(entry?.done?.[day]){notify('This swim has already been completed.');return;}
+  if(timing?.startedAt&&!timing.endedAt){notify('Stop the swim timer before saving your workout.');return;}
+  if(!timing?.startedAt){requestCompletion(week,day);return;} // Manual log: ask for the actual date.
+  if(!timing.endedAt||!stoppedSwimTiming({startedAt:timing.startedAt},timing.endedAt)){
+   notify('Swim timer timestamps are invalid. The session has not been completed.');return;
+  }
+  const at=new Date().toISOString();
+  update(d=>{const w=d.weeks[week]??=weekBlank();completeStoppedSwim(w,day,at);},`session:${week}:${day}`);
+  setRecoveryPrompt({week,day});
  };
  const rescheduleSession=(day:Day,date:string,targetWeek=week)=>{
   if(!isValidDate(date)){notify('Choose a valid date.');return;}
@@ -265,7 +331,7 @@ export function useTrainer(){
   const existing=dataRef.current.weeks[targetWeek];
   if(mode==='edit'&&!existing?.done?.[day]){notify('This workout is not completed yet.');return;}
   if(mode==='complete'&&existing?.done?.[day]){notify('This workout is already completed.');return;}
-  if(mode==='complete'&&existing?.timing?.[day]?.startedAt&&!existing.timing[day]?.endedAt){notify('Finish your active timer instead to save the actual workout time.');return;}
+  if(mode==='complete'&&existing?.timing?.[day]?.startedAt&&!existing.timing[day]?.endedAt){notify('Stop or finish your running/paused timer first.');return;}
   setCompletionRequest({week:targetWeek,day,mode});
  };
  const confirmCompletion=(date:string)=>{
@@ -396,6 +462,8 @@ export function useTrainer(){
  };
  const closeRecoveryPrompt=()=>{
   const prompt=recoveryPrompt;setRecoveryPrompt(null);if(!prompt)return;
+  // The session celebration always plays first. A newly earned swim PR follows it.
+  let nextRecord:Celebration=null;
   if(['Thursday','Friday','Saturday'].includes(prompt.day)){
     const records=swimPersonalBests(dataRef.current).filter(e=>e.week===prompt.week&&e.day===prompt.day);
     for(const best of records.slice().reverse()){
@@ -403,27 +471,34 @@ export function useTrainer(){
       let already=false;try{already=!!localStorage.getItem(receipt);}catch{}
       if(already)continue;
       try{localStorage.setItem(receipt,'1');}catch{}
-      setCelebration({kind:'pr',title:`New ${SWIM_ACTIVITY_LABELS[best.stroke]} record!`,
-        body:best.kind==='continuous'?`You swam ${best.meters} metres without stopping!`:`Fastest logged ${best.meters} m: ${best.seconds?.toFixed(1)} seconds. Keep it up!`});
-      return;
+      nextRecord={kind:'pr',title:`New ${SWIM_ACTIVITY_LABELS[best.stroke]} record!`,
+        body:best.kind==='continuous'?`You swam ${best.meters} metres without stopping!`:`Fastest logged ${best.meters} m: ${best.seconds?.toFixed(1)} seconds. Keep it up!`};
+      break;
     }
   }
-  setCelebration({title:'Session complete!',body:`${PLAN[prompt.day].name} is in the books.`,kind:'session'});
+  setQueuedCelebration(nextRecord);
+  setCelebration({title:'Session complete!',body:`${PLAN[prompt.day].kind==='swim'?swimRoutine(dataRef.current,prompt.week,prompt.day as SwimDay).name:PLAN[prompt.day].name} is in the books.`,kind:'session'});
  };
+ const dismissCelebration=()=>{
+  if(queuedCelebration){setCelebration(queuedCelebration);setQueuedCelebration(null);}
+  else setCelebration(null);
+ };
+
  const swimPlanEdit=(day:SwimDay,routine:SwimRoutine)=>{
   if(!routine.name.trim()||routine.name.length>80||routine.activities.length>15){notify('Choose a session name and up to 15 activities.');return;}
   update(d=>{const w=d.weeks[week]??=weekBlank();w.swimRoutineOverrides??={};w.swimRoutineOverrides[day]=structuredClone(routine);},`session:${week}:${day}`);
  };
  const beginSwimRoutine=(day:SwimDay)=>{
   const plan=swimRoutine(dataRef.current,week,day);
-  update(d=>{const w=d.weeks[week]??=weekBlank(),log=w.swim[day]??={};
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.swimRoutineOverrides??={};w.swimRoutineOverrides[day]??=structuredClone(plan);const log=w.swim[day]??={};
    if(log.segments?.length)return;
    log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
    log.segments=plan.activities.map(item=>blankSegment(item.activity,isStroke(item.activity)?d.swimModes[item.activity]||item.mode||SWIM_MODE_DEFAULTS[item.activity]:item.mode||'learning'));
   },`session:${week}:${day}`);
  };
  const addSwimSegment=(day:SwimDay,activity:SwimActivity)=>{
-  update(d=>{const w=d.weeks[week]??=weekBlank(),log=w.swim[day]??={};
+  const plan=swimRoutine(dataRef.current,week,day);
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.swimRoutineOverrides??={};w.swimRoutineOverrides[day]??=structuredClone(plan);const log=w.swim[day]??={};
     log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
     log.segments??=[];if(log.segments.length>=25)return;
     log.segments.push(blankSegment(activity,isStroke(activity)?d.swimModes[activity]||SWIM_MODE_DEFAULTS[activity]:'learning'));
@@ -577,6 +652,6 @@ export function useTrainer(){
  const conflicts=Object.values(data.setConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,finishSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopSwimSession,completeSwimSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

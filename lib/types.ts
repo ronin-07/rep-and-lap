@@ -45,7 +45,7 @@ export interface SwimLog {
   breaststroke?:string;notes?:string;drills?:Record<string,boolean>;intervals?:SwimInterval[];
   segments?:SwimSegment[]; // v5: separate strokes/drills, no changes to old measurements
 }
-export interface SessionTiming {startedAt?:string; endedAt?:string}
+export interface SessionTiming {startedAt?:string; endedAt?:string; pausedAt?:string; pausedDurationMs?:number}
 export interface SessionNotes {fatigue?:string;discomfort?:string;technique?:string;general?:string;soreness?:string;sessionRpe?:number}
 export interface WeekLog {
   done:Partial<Record<Day,boolean>>;
