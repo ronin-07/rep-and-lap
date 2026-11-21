@@ -65,8 +65,12 @@ function validateSwim(value:unknown){
      check(typeof x.id==='string'&&x.id.length<=100,'Invalid interval ID');
      check(typeof x.repeats==='number'&&Number.isInteger(x.repeats)&&x.repeats>=1&&x.repeats<=50,'Invalid repetitions');
      check(typeof x.lengths==='number'&&Number.isInteger(x.lengths)&&x.lengths>=1&&x.lengths<=40,'Invalid lengths');
-     check(typeof x.restSeconds==='number'&&x.restSeconds>=0&&x.restSeconds<=1800,'Invalid rest');
-     if(x.secondsPerRepeat!==undefined)check(saneScalar(x.secondsPerRepeat,10000),'Invalid timed interval');
+     check(typeof x.restSeconds==='number'&&Number.isInteger(x.restSeconds)&&x.restSeconds>=0&&x.restSeconds<=1800,'Invalid rest');
+     if(x.secondsPerRepeat!==undefined){
+      const raw=x.secondsPerRepeat;
+      const seconds=typeof raw==='number'?raw:typeof raw==='string'&&raw.trim()!==''?Number(raw):NaN;
+      check(Number.isFinite(seconds)&&seconds>0&&seconds<=10000,'Invalid timed interval');
+     }
     }
    }
   }
@@ -159,7 +163,7 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
   }
   if(raw.routineTemplates!==undefined){const templates=safeRecord(raw.routineTemplates,'routine templates',3);for(const [day,value] of Object.entries(templates)){check(['Monday','Tuesday','Wednesday'].includes(day),'Invalid routine template day');validateExercises(value);}base.routineTemplates=templates as TrackerData['routineTemplates'];}
   if(raw.swimTemplates!==undefined){const templates=safeRecord(raw.swimTemplates,'swim routines',3);for(const [day,value] of Object.entries(templates)){check(['Thursday','Friday','Saturday'].includes(day),'Invalid swim routine day');validateSwimRoutine(value);}base.swimTemplates=templates as TrackerData['swimTemplates'];}
-  if(raw.swimPoolDefault!==undefined){check(typeof raw.swimPoolDefault==='number'&&raw.swimPoolDefault>=10&&raw.swimPoolDefault<=100,'Invalid default pool length');base.swimPoolDefault=raw.swimPoolDefault;}
+  if(raw.swimPoolDefault!==undefined){check(typeof raw.swimPoolDefault==='number'&&validPool(raw.swimPoolDefault)===raw.swimPoolDefault,'Invalid default pool length');base.swimPoolDefault=raw.swimPoolDefault;}
   if(raw.swimTargets!==undefined){const values=safeRecord(raw.swimTargets,'swim targets',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&typeof value==='number'&&value>=25&&value<=10000,'Invalid swim goal');base.swimTargets=values as TrackerData['swimTargets'];}
   if(raw.swimModes!==undefined){const values=safeRecord(raw.swimModes,'swim modes',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&(value==='learning'||value==='advanced'),'Invalid swim mode');base.swimModes=values as TrackerData['swimModes'];}
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];

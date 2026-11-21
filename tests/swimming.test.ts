@@ -121,6 +121,23 @@ describe('Milestone 6 multi-stroke swimming',()=>{
   data.weeks[WK].swim.Thursday={segments:[makeSegment('a','freestyle',{intervals:[{id:'no',repeats:999999,lengths:1,restSeconds:30}]})]};
   expect(()=>readBackup(JSON.stringify(data),blankData())).toThrow('Invalid repetitions');
  });
+ it('rejects malformed interval times and fractional default pools on restore',()=>{
+  const data=blankData();data.weeks[WK]=weekBlank();
+  const interval={id:'set-1',repeats:4,lengths:1,restSeconds:30,secondsPerRepeat:60};
+  data.weeks[WK].swim.Thursday={poolLength:50,segments:[makeSegment('a','freestyle',{intervals:[interval]})]};
+  const read=()=>readBackup(JSON.stringify(data),blankData());
+  expect(read().backup.weeks[WK].swim.Thursday?.segments?.[0].intervals?.[0].secondsPerRepeat).toBe(60);
+  for(const invalid of [-1,0,'', 'Infinity',10001]){
+   data.weeks[WK].swim.Thursday!.segments![0].intervals![0].secondsPerRepeat=invalid;
+   expect(read).toThrow('Invalid timed interval');
+  }
+  data.weeks[WK].swim.Thursday!.segments![0].intervals![0].secondsPerRepeat=60;
+  data.weeks[WK].swim.Thursday!.segments![0].intervals![0].restSeconds=1.5;
+  expect(read).toThrow('Invalid rest');
+  data.weeks[WK].swim.Thursday!.segments![0].intervals![0].restSeconds=30;
+  data.swimPoolDefault=25.5;
+  expect(read).toThrow('Invalid default pool length');
+ });
  it('does not mutate the default plan when customized',()=>{
   const data=blankData(),one=swimRoutine(data,WK,'Friday');one.name='Changed';
   expect(swimRoutine(data,WK,'Friday').name).not.toBe('Changed');

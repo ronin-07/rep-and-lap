@@ -284,10 +284,12 @@ export function useTrainer(){
   if(entry?.done?.[day]){notify('This swim has already been completed.');return;}
   if(timing?.startedAt&&!timing.endedAt){notify('Stop the swim timer before saving your workout.');return;}
   if(!timing?.startedAt){requestCompletion(week,day);return;} // Manual log: ask for the actual date.
-  if(!timing.endedAt||!stoppedSwimTiming({startedAt:timing.startedAt},timing.endedAt)){
+  const at=new Date().toISOString();
+  // Validate the full saved clock (including any paused duration) before showing
+  // a completion celebration. A malformed clock must not produce a false success.
+  if(!entry||!completeStoppedSwim(structuredClone(entry),day,at)){
    notify('Swim timer timestamps are invalid. The session has not been completed.');return;
   }
-  const at=new Date().toISOString();
   update(d=>{const w=d.weeks[week]??=weekBlank();completeStoppedSwim(w,day,at);},`session:${week}:${day}`);
   setRecoveryPrompt({week,day});
  };
