@@ -26,6 +26,7 @@
     "lib/item-sync.ts",
     "lib/backup.ts",
     "lib/workout-flow.ts",
+    "lib/set-management.ts",
     "lib/training-intelligence.ts",
     "lib/next-set-guidance.ts",
     "lib/swimming.ts",

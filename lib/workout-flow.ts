@@ -1,9 +1,11 @@
 import {exercisesFor} from './routines';
 import {gymStats,setCount,loggedSet} from './metrics';
-import type {GymDay,GymSet,TrackerData} from './types';
+import type {Day,GymDay,GymSet,TrackerData} from './types';
+import {scheduledDate} from './scheduling';
+import {keyOf} from './dates';
 
 export interface NextSetTarget {week:string;day:GymDay;exercise:string;index:number}
-export interface RestState {startedAt:number;endsAt:number;durationSeconds:number;target:NextSetTarget|null}
+export interface RestState {startedAt:number;endsAt:number;durationSeconds:number;target:NextSetTarget|null;from?:NextSetTarget|null}
 export const REST_KEY='replap-rest-v1';
 
 export function nextIncompleteSet(data:TrackerData,week:string,day:GymDay,afterExercise:string,afterIndex:number):NextSetTarget|null {
@@ -27,9 +29,9 @@ export function suggestedNextSet(data:TrackerData,week:string,day:GymDay,exercis
  return previousCompletedSet(data,week,day,exercise,index);
 }
 export function secondsLeft(rest:RestState|null,now:number):number{return rest?Math.max(0,Math.ceil((rest.endsAt-now)/1000)):0;}
-export function makeRest(durationSeconds:number,target:NextSetTarget|null,now=Date.now()):RestState {
+export function makeRest(durationSeconds:number,target:NextSetTarget|null,now=Date.now(),from:NextSetTarget|null=null):RestState {
  const duration=Math.min(600,Math.max(5,Math.round(durationSeconds)));
- return {startedAt:now,endsAt:now+duration*1000,durationSeconds:duration,target};
+ return {startedAt:now,endsAt:now+duration*1000,durationSeconds:duration,target,from};
 }
 export function parseRest(value:string|null,now=Date.now()):RestState|null {
  if(!value)return null;
@@ -40,9 +42,18 @@ export function parseRest(value:string|null,now=Date.now()):RestState|null {
    const t=rest.target;
    if(!/^\d{4}-\d{2}-\d{2}$/.test(t.week)||!['Monday','Tuesday','Wednesday'].includes(t.day)||typeof t.exercise!=='string'||!t.exercise||!Number.isInteger(t.index)||t.index<0||t.index>30)return null;
   }
+  if(rest.from!==undefined&&rest.from!==null){
+   const f=rest.from;
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(f.week)||!['Monday','Tuesday','Wednesday'].includes(f.day)||typeof f.exercise!=='string'||!f.exercise||!Number.isInteger(f.index)||f.index<0||f.index>30)return null;
+  }
   return {...rest,target:rest.target||null};
  }catch{return null;}
 }
 export function formatRest(seconds:number):string{return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;}
 export function validEffort(mode:'rir'|'rpe',value:number):boolean{return mode==='rir'?Number.isInteger(value)&&value>=0&&value<=4:Number.isFinite(value)&&value>=6&&value<=10&&value*2===Math.round(value*2);}
+/** Past-due manual completion should ask for the actual training date, even
+ * when a stopwatch was previously stopped. Running clocks finish today. */
+export function needsManualCompletionDate(data:TrackerData,week:string,day:Day,today=keyOf(new Date())):boolean {
+ return scheduledDate(data,week,day)<today;
+}
 export function hasUnfinishedSets(data:TrackerData,week:string,day:GymDay):boolean {const s=gymStats(data,week,day);return s.logged<s.total;}

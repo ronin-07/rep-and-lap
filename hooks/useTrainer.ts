@@ -10,7 +10,8 @@ import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,w
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
 import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
-import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
+import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,needsManualCompletionDate,type RestState,type NextSetTarget} from '@/lib/workout-flow';
+import {applySetCountChange,hasRemovableValues} from '@/lib/set-management';
 import {stableSetId} from '@/lib/set-sync';
 import {clockItemKey,queueSwimSegment,REST_ITEM_KEY,queueSyncItem,integrateServerItem,acknowledgeItem,flagItemConflict,resolveItemConflict,ItemVersionConflict} from '@/lib/item-sync';
 import {blankSegment,swimRoutine,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
@@ -146,8 +147,8 @@ export function useTrainer(){
    queueSyncItem(copy,REST_ITEM_KEY,'rest',next);persist(copy);scheduleFlush();
   }
  },[saveRest,persist,scheduleFlush,notify]);
- const beginRest=useCallback((seconds:number,target:NextSetTarget|null=null)=>{
-  saveSyncedRest(makeRest(seconds,target));setClock(Date.now());
+ const beginRest=useCallback((seconds:number,target:NextSetTarget|null=null,from:NextSetTarget|null=null)=>{
+  saveSyncedRest(makeRest(seconds,target,Date.now(),from));setClock(Date.now());
  },[saveSyncedRest]);
  useEffect(()=>{
   mountedRef.current=true;setOnline(navigator.onLine);
@@ -341,6 +342,9 @@ export function useTrainer(){
   if(!entry||!completeStoppedSwim(structuredClone(entry),day,at)){
    notify('Swim timer timestamps are invalid. The session has not been completed.');return;
   }
+  // An old, manually finalized session needs the actual training date choice,
+  // not an implicit assumption that the stopwatch stop date is the answer.
+  if(needsManualCompletionDate(dataRef.current,week,day)){requestCompletion(week,day);return;}
   update(d=>{const w=d.weeks[week]??=weekBlank();completeStoppedSwim(w,day,at);},`session:${week}:${day}`);
   showCompletedFeedback(week,day);
  };
@@ -354,6 +358,11 @@ export function useTrainer(){
       const end=w?.timing?.[day]?.endedAt;
       if(!end||elapsedSessionMs(w?.timing?.[day])===null){
         notify('Invalid gym timer. The workout was not completed.');return;
+      }
+      // A manually marked past-due session must offer Scheduled / Today /
+      // Another date, even if a stopwatch was previously stopped.
+      if(needsManualCompletionDate(dataRef.current,week,day)){
+        requestCompletion(week,day);return;
       }
       const at=new Date().toISOString();
       update(d=>{const entry=d.weeks[week]??=weekBlank();entry.done[day]=true;
@@ -456,19 +465,18 @@ export function useTrainer(){
   const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={};const e=ex[exercise]??={sets:[]};e.notes=value;ex[exercise]=e;
  },`session:${week}:${day}`);
  const changeSetCount=(day:GymDay,exercise:string,delta:number)=>{
-  const current=setCount(dataRef.current,week,day,exercise),next=current+delta;if(next<1||next>10)return;
+  if(delta!==1&&delta!==-1)return;
+  const current=setCount(dataRef.current,week,day,exercise),next=current+delta;
+  if(next<1||next>10)return;
   const last=dataRef.current.weeks[week]?.gym?.[day]?.[exercise]?.sets?.[current-1];
-  if(delta<0&&(last?.kg||last?.reps)&&!confirm('Remove the final set and its values?'))return;
-  if(delta<0){
-    const copy=structuredClone(dataRef.current);
-    queueSetChange(copy,`session:${week}:${day}`,exercise,current-1,set=>{set.deleted=true;set.done=false;});
-    copy.setOverrides[`${day}|${exercise}`]=next;
-    const stamp=Math.max(Date.now(),(copy.recordUpdates.preferences||0)+1);
-    copy.recordUpdates.preferences=stamp;copy.pendingSync.preferences=stamp;
-    persist(copy);if(uidRef.current!=='guest')scheduleFlush();
-  }else update(d=>{const w=d.weeks[week]??=weekBlank(),ex=w.gym[day]??={},entry=ex[exercise]??={sets:[]};
-    entry.setCount=next;ex[exercise]=entry;d.setOverrides[`${day}|${exercise}`]=next;
-  },'preferences');
+  if(delta<0&&hasRemovableValues(last)&&!confirm('Remove the final set and its values?'))return;
+  const copy=structuredClone(dataRef.current);
+  const change=applySetCountChange(copy,week,day,exercise,delta,restRef.current);
+  if(!change)return;
+  persist(copy);if(uidRef.current!=='guest')scheduleFlush();
+  // Re-target an ongoing rest countdown if a new set was added to the
+  // exercise just completed. Preserve the countdown's original end time.
+  if(change.rest!==restRef.current)saveSyncedRest(change.rest);
  };
  const changeRoutine=(day:GymDay,kind:'add'|'remove'|'move'|'replace',index:number,payload?:RoutineExercise|number)=>{
   try {
@@ -521,7 +529,7 @@ export function useTrainer(){
    // countdown or show an old session's lifting record as a new notification.
    if(dataRef.current.weeks[week]?.done?.[day]){notify('Corrected set saved to the completed workout.');return;}
    const target=nextIncompleteSet(dataRef.current,week,day,exercise,index);
-   if(target)beginRest(dataRef.current.restSeconds||90,target);
+   if(target)beginRest(dataRef.current.restSeconds||90,target,{week,day,exercise,index});
    else saveSyncedRest(null); // The final set never leaves a pointless rest countdown.
    if(previousBest!==null&&num(current?.kg)>previousBest)setCelebration({title:'New personal record!',body:`${exercise}: ${num(current?.kg)} kg`,kind:'pr'});
    else notify(target?'Set logged · rest timer running':'All planned sets logged. Nice work!');
@@ -541,7 +549,10 @@ export function useTrainer(){
   editSet(day,exercise,index,set=>{delete set[mode==='rir'?'rpe':'rir'];if(raw==='')delete set[mode];else set[mode]=Number(raw);});
  };
  const goToNextSet=()=>{
-  const target=restRef.current?.target;
+  const current=restRef.current;
+  const target=current?.from
+    ?nextIncompleteSet(dataRef.current,current.from.week,current.from.day,current.from.exercise,current.from.index)
+    :current?.target;
   saveSyncedRest(null);
   if(!target)return;
   setWeek(target.week);setGymDay(target.day);setTrackingTab('gym');setView('workout');
