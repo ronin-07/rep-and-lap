@@ -569,8 +569,10 @@ export function useTrainer(){
     break;
    }
   }
-  setQueuedCelebration(nextRecord);
-  setCelebration({title:'Session complete!',body:`${PLAN[day].kind==='swim'?swimRoutine(dataRef.current,targetWeek,day as SwimDay).name:PLAN[day].name} is in the books.`,kind:'session'});
+  // Routine completion already produces a saved-state toast and optional check-in.
+  // Only a genuine swimming personal best warrants a full-screen celebration.
+  setQueuedCelebration(null);
+  setCelebration(nextRecord);
   setRecoveryPrompt({week:targetWeek,day});
   notify('Workout completed and saved. Feedback is optional.');
  };

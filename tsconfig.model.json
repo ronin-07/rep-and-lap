@@ -27,6 +27,7 @@
     "lib/backup.ts",
     "lib/workout-flow.ts",
     "lib/training-intelligence.ts",
+    "lib/next-set-guidance.ts",
     "lib/swimming.ts",
     "lib/insights.ts",
     "lib/activity-notifications.ts"

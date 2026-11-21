@@ -870,3 +870,112 @@ body.keyboard-open .active-timer-dock{display:none}
 /* A second running session must remain reachable above the expanded bar. */
 @media(max-width:900px){.app-layout:has(.workout-control-bar) .active-timer-dock{bottom:calc(242px + env(safe-area-inset-bottom))}.app-layout.rest-open:has(.workout-control-bar) .active-timer-dock{bottom:calc(378px + env(safe-area-inset-bottom))}}
 @media(min-width:901px){.app-layout:has(.workout-control-bar) .active-timer-dock{bottom:128px}.app-layout.rest-open:has(.workout-control-bar) .active-timer-dock{bottom:257px}}
+
+
+/* Milestone 9 Phase A: one non-overlapping gym/swim control region. */
+.workout-control-bar{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:0;padding:11px 15px;max-width:970px;margin-left:auto;margin-right:auto}
+.workout-control-main{display:flex;align-items:center;justify-content:space-between;gap:18px;min-width:0}
+.workout-bar-actions{flex-wrap:wrap;justify-content:flex-end}
+.workout-bar-actions button{min-height:44px}
+.finish-label-short{display:none}
+.workout-timer-options{position:relative;font-size:.75rem;color:var(--muted)}
+.workout-timer-options summary{cursor:pointer;padding:9px 8px;min-height:42px;display:flex;align-items:center}
+.workout-timer-options button{margin-top:6px}
+.workout-control-bar .embedded-rest-dock{position:static;left:auto;right:auto;bottom:auto;z-index:auto;box-shadow:none;width:100%;max-width:none;margin:0;padding:8px 10px 11px;border-radius:12px;animation:none;gap:8px}
+.workout-control-bar .embedded-rest-dock .rest-dock-symbol{height:30px;width:30px}
+.workout-control-bar .embedded-rest-dock .rest-dock-symbol svg{height:16px;width:16px}
+.workout-control-bar .embedded-rest-dock .rest-dock-info strong{font-size:1rem}
+.workout-control-bar .embedded-rest-dock .rest-dock-info small{font-size:.69rem}
+.workout-control-bar .embedded-rest-dock .rest-action,.workout-control-bar .embedded-rest-dock .rest-next{min-height:36px}
+.workout-control-bar .embedded-rest-dock .rest-dock-main{min-width:100px}
+.app-layout .app-main:has(.workout-control-bar){padding-bottom:160px}
+.app-layout .workout-control-bar{bottom:16px}
+.app-layout .inline-active-timer{position:static;left:auto;right:auto;bottom:auto;max-width:100%;width:100%;margin:0;box-shadow:none;background:var(--panel2);border-style:dashed}
+/* Readable historical sessions, with no disabled expansion controls. */
+.completed-session-summary{display:flex;flex-direction:column;gap:15px}
+.completed-session-heading,.completed-summary-actions{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.completed-session-heading .eyebrow{display:inline-flex;align-items:center;gap:6px;color:var(--green)}
+.completed-session-heading h2{margin:5px 0}
+.completed-menu-wrap{position:relative;margin-left:auto}
+.completed-menu{position:absolute;z-index:11;right:0;top:100%;min-width:min(280px,80vw);display:grid;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:13px;box-shadow:0 12px 30px #0004;padding:10px}
+.completed-menu>button{color:var(--text);border:0;background:var(--panel2);border-radius:9px;text-align:left;padding:11px 12px;cursor:pointer}
+.completed-menu details{font-size:.77rem;color:var(--muted)}
+.completed-menu details summary{padding:9px;cursor:pointer}
+.completed-menu details small{display:block;padding:4px 9px;overflow-wrap:anywhere}
+.completed-session-metrics{display:flex;gap:10px;flex-wrap:wrap}
+.completed-session-metrics>div{min-width:150px;flex:1;border-radius:12px;background:var(--panel2);padding:12px 15px;display:grid;gap:4px}
+.completed-session-metrics small{color:var(--muted);font-size:.7rem}
+.completed-session-metrics strong{font-size:1.23rem;font-variant-numeric:tabular-nums}
+.completed-summary-actions button{min-height:44px;display:flex;align-items:center;gap:8px}
+.completed-activity-list{display:grid;gap:9px;margin-top:10px}
+.completed-activity{border:1px solid var(--border);border-radius:12px;background:var(--panel2);overflow:hidden}
+.completed-activity summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;min-height:52px}
+.completed-activity summary::-webkit-details-marker{display:none}
+.completed-activity summary span{display:flex;flex-direction:column;gap:4px}
+.completed-activity summary small{font-size:.75rem;color:var(--muted)}
+.completed-activity[open] summary svg{transform:rotate(180deg)}
+.completed-activity-body{border-top:1px solid var(--border);padding:12px 15px;color:var(--muted);font-size:.82rem;line-height:1.5;display:grid;gap:9px}
+.completed-activity-body p{margin:0;overflow-wrap:anywhere}
+.completed-activity-body ul{margin:5px 0 0;padding-left:19px}
+.completed-set-list{display:grid;gap:5px}
+.completed-set-list>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* Compact optional details retain all editing when the workout is active. */
+.exercise-progression{align-items:flex-start}
+.exercise-progression>span{display:flex;flex-direction:column;gap:3px}
+.exercise-target-weight{font-size:1.02rem;color:var(--text);font-variant-numeric:tabular-nums}
+.compact-exercise-footer{align-items:flex-start;flex-wrap:wrap}
+.exercise-add-set{min-height:44px;display:inline-flex;align-items:center;gap:7px}
+.exercise-extra-details{flex:1;min-width:145px;color:var(--muted)}
+.exercise-extra-details>summary,.secondary-workout-details>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font-weight:700}
+.exercise-extra-details .field{margin:8px 0}
+.secondary-workout-details{min-width:0}
+.set-optional-effort{grid-column:2/-1}
+.set-optional-effort>summary{cursor:pointer;color:var(--muted);font-size:.72rem;padding:5px}
+.set-optional-effort .set-effort{margin-top:7px;max-width:240px}
+/* Strokes all have a compact collapsed summary; session settings live behind details. */
+.swim-session-settings>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:44px}
+.swim-session-settings>summary::-webkit-details-marker{display:none}
+.swim-session-settings>summary span{display:grid;gap:4px}
+.swim-session-settings>summary small{font-size:.72rem;color:var(--muted)}
+.swim-session-settings[open]>summary{margin-bottom:15px}
+.swim-session-settings[open]>summary svg{transform:rotate(180deg)}
+@media(max-width:900px){
+ .app-layout .workout-control-bar{bottom:calc(80px + env(safe-area-inset-bottom));left:12px;right:12px;max-width:640px}
+ .app-layout .app-main:has(.workout-control-bar){padding-bottom:235px}
+ .workout-control-main{gap:9px}
+ .workout-bar-actions{gap:7px}
+ .workout-bar-actions button{padding:10px;font-size:.78rem}
+}
+@media(max-width:670px){
+ .workout-control-bar{max-height:min(44dvh,285px);overflow-y:auto;overscroll-behavior:contain}
+ .workout-control-main{flex-direction:column;align-items:stretch;gap:8px}
+ .workout-bar-actions{display:flex;width:100%;gap:7px}
+ .workout-bar-actions>button{flex:1;min-width:0}
+ .workout-control-bar .quick-save-info{flex-direction:row;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+ .workout-control-bar .quick-save-info strong{max-width:64%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+ .workout-control-bar .quick-save-info small{flex-basis:100%;font-size:.66rem}
+ .workout-bar-clock{font-size:.8rem}
+ .workout-control-bar .workout-bar-actions button{min-height:44px}
+ .finish-label-full{display:none}.finish-label-short{display:inline}
+ .workout-timer-options{flex-basis:100%}
+ .app-layout .app-main:has(.workout-control-bar){padding-bottom:275px}
+ .completed-session-metrics>div{min-width:120px}
+}
+@media(max-width:410px){
+ .workout-bar-actions>button{padding:9px 6px;font-size:.74rem;gap:4px}
+ .workout-control-bar .quick-save-info strong{max-width:55%}
+ .workout-control-bar .embedded-rest-dock .rest-dock-symbol{display:none}
+ .workout-control-bar .embedded-rest-dock .rest-dock-main{min-width:80px}
+ .workout-control-bar .embedded-rest-dock .rest-dock-actions{flex-wrap:wrap}
+ .set-item{gap:6px;padding:9px}
+}
+body.keyboard-open .workout-control-bar{display:none}
+
+.exercise-count-label{padding:9px 13px;min-height:36px}
+.exercise-set-management{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.exercise-remove-set{display:inline-flex;align-items:center;gap:3px;min-height:44px;font-size:.74rem;color:var(--muted)}
+.exercise-remove-set:disabled{opacity:.45;cursor:not-allowed}
+
+/* Match content clearance to the measured bar (including an expanded rest dock). */
+.app-layout .app-main:has(.workout-control-bar){padding-bottom:calc(var(--workout-control-height, 125px) + 55px)}
+@media(max-width:900px){.app-layout .app-main:has(.workout-control-bar){padding-bottom:calc(var(--workout-control-height, 145px) + 106px + env(safe-area-inset-bottom))}}

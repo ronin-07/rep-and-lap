@@ -1,13 +1,12 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Check,CheckCircle2,ChevronDown,ChevronUp,Clock,Plus,Minus,Play,Pause,Square,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
+import {ChevronDown,ChevronUp,Plus,Minus,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {SwimDay,SwimActivity,SwimStroke,SwimSegment,SwimRoutine,SwimMode} from '@/lib/types';
 import {SWIM_DAYS,PLAN} from '@/lib/plan';
 import {weekLog,plannedDate} from '@/lib/metrics';
 import {SWIM_ACTIVITY_LABELS,SWIM_STROKES,SWIM_DRILLS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,SWIM_SKILL_LEVELS,swimRoutine,swimTotals,swimNumber,effectivePool,segmentDistance,segmentContinuous,isStroke} from '@/lib/swimming';
 import {statusFor} from '@/lib/scheduling';
-import {formatSessionClock,sessionClockState} from '@/lib/session-timing';
 import DateInput from '@/components/DateInput';
 import SessionNotes from '@/components/workout/SessionNotes';
 
@@ -19,40 +18,39 @@ export default function SwimLogger({app,editable}:Props){
  const day=app.swimDay,record=weekLog(app.data,app.week),log=record.swim[day];
  const plan=swimRoutine(app.data,app.week,day),pool=effectivePool(log,app.data.swimPoolDefault);
  const currentSchedule=plannedDate(app.data,app.week,day);
- const totals=swimTotals(log,app.data.swimPoolDefault),completed=!!record.done[day],timing=record.timing?.[day];
+ const totals=swimTotals(log,app.data.swimPoolDefault),completed=!!record.done[day];
  const [routineOpen,setRoutineOpen]=useState(false),[activity,setActivity]=useState<SwimActivity>('freestyle');
+ const scope=`${app.week}:${day}`;
+ const segments=log?.segments||[];
+ const ids=segments.map(x=>x.id);
+ const idsKey=ids.join('|');
+ const [accordion,setAccordion]=useState<{scope:string;expanded:string|null;known:string[]}>({scope:'',expanded:null,known:[]});
+ const expanded=accordion.scope===scope?accordion.expanded:(segments[0]?.id??null);
+ useEffect(()=>{
+  setAccordion(prev=>{
+   if(prev.scope!==scope)return {scope,expanded:segments[0]?.id??null,known:ids};
+   if(prev.known.join('|')===idsKey)return prev;
+   // Automatically open locally added strokes, keeping edits in all others intact.
+   const added=segments.find(segment=>!prev.known.includes(segment.id));
+   const expanded=added?.id??(prev.expanded&&ids.includes(prev.expanded)?prev.expanded:segments[0]?.id??null);
+   return {scope,expanded,known:ids};
+  });
+ // Depends on stable segment IDs, not autosaved individual field edits.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[scope,idsKey]);
  const [pickDate,setPickDate]=useState('');
  useEffect(()=>setPickDate(currentSchedule),[app.week,day,currentSchedule]);
  const [defaultPool,setDefaultPool]=useState(String(app.data.swimPoolDefault||50));
  const [currentPool,setCurrentPool]=useState(String(pool));
  useEffect(()=>setCurrentPool(String(pool)),[pool,day,app.week]);
  useEffect(()=>setDefaultPool(String(app.data.swimPoolDefault||50)),[app.data.swimPoolDefault]);
- const status=statusFor(app.data,app.week,day),clockState=sessionClockState(timing);
- const active=clockState==='running',paused=clockState==='paused';
- const stopped=clockState==='stopped'&&!completed;
- const shownClock=(active||paused)&&timing?.startedAt?Math.max(app.clock,Date.parse(timing.startedAt)):undefined;
+ const status=statusFor(app.data,app.week,day);
  return <div className="stack swim-log">
   <div className="day-tabs" role="group" aria-label="Swimming day">{SWIM_DAYS.map(d=><button key={d} className={day===d?'active':''} onClick={()=>app.setSwimDay(d)}><small>{d.slice(0,3)}{record.timing?.[d]?.endedAt&&!record.done[d]?' · Log pending':''}</small><strong>{swimRoutine(app.data,app.week,d).name}</strong></button>)}</div>
   <section className="card pane-pad swim-session-hero"><div><span className="eyebrow">{day.toUpperCase()} · SWIM SESSION</span><h2>{plan.name}</h2><p className="muted">{plan.description}</p></div><span className="icon-wrap aqua"><Waves/></span></section>
-  <section className={`card pane-pad swim-session-controls ${stopped?'swim-ready-to-log':''}`} aria-label="Swimming session timer and completion">
-   <div className="swim-clock-status"><div className="swim-clock-heading"><span className="eyebrow">SESSION CLOCK</span><span className={`clock-indicator ${active?'running':''}`} aria-hidden="true"><Clock size={18}/></span></div>
-    <strong className="swim-session-time" role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,shownClock):'Ready when you are'}</strong>
-    <small className="muted">{paused?'Swim paused · paused time excluded':active?'Swim timer running · pauses excluded':stopped?'Timer stopped · log your laps and notes, or continue swimming':completed?'Swim completed · undo to continue or restart':'Start before swimming, or log a swim without a timer'}</small>
-    {timing?.startedAt&&<small className="muted swim-session-stamps">Started {new Date(timing.startedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}{timing.pausedAt?` · Paused ${new Date(timing.pausedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:timing.endedAt?` · Stopped ${new Date(timing.endedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}</small>}
-   </div>
-   <div className="swim-session-actions">
-    {clockState==='ready'&&!completed&&<button className="button-secondary" onClick={()=>app.startSession(day)}><Play size={16}/> Start timer</button>}
-    {active&&!completed&&<button className="button-secondary" onClick={()=>app.pauseSession(day)}><Pause size={16}/> Pause</button>}
-    {paused&&!completed&&<button className="button-secondary" onClick={()=>app.resumeSession(day)}><Play size={16}/> Resume</button>}
-    {(active||paused)&&!completed&&<button className="button-primary" onClick={()=>app.stopSwimSession(day)}><Square size={16}/> Stop timer</button>}
-    {stopped&&<><button className="button-secondary" onClick={()=>app.resumeSession(day)}><Play size={16}/> Continue swim</button><button className="button-secondary" onClick={()=>app.restartSession(day)}><RotateCcw size={16}/> Restart timer</button></>}
-    {clockState!=='running'&&clockState!=='paused'&&!completed&&<button className="button-primary" onClick={()=>app.completeSwimSession(day)}><Check size={16}/> {stopped?'Save & complete swim':'Mark swim complete'}</button>}
-    {completed&&<button className="button-secondary" onClick={()=>app.toggleDone(day)}><CheckCircle2 size={16}/> Undo completion</button>}
-   </div>
-   {stopped&&<p className="muted tiny swim-clock-note">Continue preserves your earlier active time. Restart resets only the clock; your laps and notes stay saved.</p>}
-  </section>
   {(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped swim'}</strong><p>Restore this session to record a swim.</p><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore session</button></div>}
-  <fieldset className="workout-edit-fieldset" disabled={completed&&!editable}><div className="swim-top-grid">
+  <fieldset className="workout-edit-fieldset" disabled={completed&&!editable}>
+  <details className="card pane-pad swim-session-settings"><summary><span><strong>Session settings</strong><small>{pool} m pool · Scheduled {currentSchedule} · Plan and pool options</small></span><ChevronDown size={18}/></summary><div className="swim-top-grid">
    <section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">SWIM PLAN</span><h3>Edit your schedule</h3></div><button className="button-secondary" onClick={()=>setRoutineOpen(x=>!x)} aria-expanded={routineOpen}>{routineOpen?'Close editor':'Edit swim plan'}</button></div>
     <div className="swim-field-row"><label className="field swim-field-date"><span>Scheduled swim date</span><DateInput value={pickDate||plannedDate(app.data,app.week,day)} onChange={e=>setPickDate(e.target.value)}/></label><button className="button-secondary" disabled={completed||pickDate===plannedDate(app.data,app.week,day)} onClick={()=>app.rescheduleSession(day,pickDate)}>Reschedule</button></div>
     <div className="muted small">Planned activities: {plan.activities.map(x=>`${SWIM_ACTIVITY_LABELS[x.activity]} (${x.plannedMinutes??0} min)`).join(' · ')||'No planned activities'}</div>
@@ -63,11 +61,11 @@ export default function SwimLogger({app,editable}:Props){
     <div className="swim-field-row"><label className="field"><span>Default for new sessions</span><input type="number" min="10" max="100" value={defaultPool} onChange={e=>setDefaultPool(e.target.value)} inputMode="numeric"/></label><button className="button-secondary" disabled={n(defaultPool)===app.data.swimPoolDefault} onClick={()=>{const value=Number(defaultPool);if(Number.isInteger(value)&&value>=10&&value<=100)app.editSwimPreference({swimPoolDefault:value});else app.notify('Pool length must be a whole number between 10 and 100 m.');}}>Save default</button></div>
     <p className="muted tiny">One length means one end-to-end swim. Old workouts keep their original pool size.</p>
    </section>
-  </div>
+  </div></details>
   <div className="swim-summary-grid" aria-label="Session swimming summary"><div><small>Distance</small><strong>{meters(totals.meters)}</strong></div><div><small>Continuous best</small><strong>{meters(totals.bestContinuous)}</strong></div><div><small>Stroke/drill practice</small><strong>{totals.minutes} min</strong></div></div>
   <section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">STROKES & DRILLS</span><h2>Log your swim, your way.</h2></div></div>
    {(!log?.segments?.length)&&<div className="swim-start-empty"><p className="muted">Load this session’s planned strokes, or add a stroke or drill to start logging. Your existing historical entries remain available.</p><button className="button-primary" onClick={()=>app.beginSwimRoutine(day)}><Plus size={17}/> Use scheduled activities</button></div>}
-   {log?.segments?.map(segment=><SwimSegmentEditor key={segment.id} app={app} day={day} segment={segment} pool={pool}/>) }
+   {segments.map(segment=><SwimSegmentEditor key={segment.id} app={app} day={day} segment={segment} pool={pool} open={expanded===segment.id} onToggle={()=>setAccordion({scope,expanded:expanded===segment.id?null:segment.id,known:ids})}/>) }
    <div className="swim-add-activity"><label className="field"><span>Add another stroke or drill</span><select value={activity} onChange={e=>setActivity(e.target.value as SwimActivity)}>{activityChoices.map(choice=><option key={choice} value={choice}>{SWIM_ACTIVITY_LABELS[choice]}</option>)}</select></label><button className="button-secondary" onClick={()=>app.addSwimSegment(day,activity)}><Plus size={17}/> Add activity</button></div>
    <p className="muted tiny">General lengths and interval sets are added together. Timed records refer to one of the lengths already logged and never add distance again.</p>
   </section>
@@ -89,9 +87,9 @@ function SwimRoutineEditor({app,day,plan}:{app:Trainer;day:SwimDay;plan:SwimRout
  <div className="swim-add-activity"><select aria-label="Select planned swim activity" value={candidate} onChange={e=>setCandidate(e.target.value as SwimActivity)}>{activityChoices.map(x=><option key={x} value={x}>{SWIM_ACTIVITY_LABELS[x]}</option>)}</select><button className="button-secondary" onClick={()=>save({...plan,activities:[...plan.activities,{activity:candidate,plannedMinutes:10}]})} disabled={plan.activities.length>=15}><Plus size={16}/> Add to plan</button></div>
  <div className="row-actions"><button className="button-primary" onClick={()=>app.saveSwimDefault(day)}><Save size={16}/> Save as default</button><button className="button-secondary" onClick={()=>app.restoreSwimDefault(day)} disabled={!app.data.swimTemplates[day]}><RotateCcw size={16}/> Restore built-in default</button></div><p className="muted tiny">Editing the plan does not delete or alter logged swim segments. Saving as default asks for confirmation and changes future sessions only.</p></div>;
 }
-function SwimSegmentEditor({app,day,segment,pool}:{app:Trainer;day:SwimDay;segment:SwimSegment;pool:number}){
+function SwimSegmentEditor({app,day,segment,pool,open,onToggle}:{app:Trainer;day:SwimDay;segment:SwimSegment;pool:number;open:boolean;onToggle:()=>void}){
  const stroke=isStroke(segment.activity),label=SWIM_ACTIVITY_LABELS[segment.activity];
- const [open,setOpen]=useState(true),[advancedOpen,setAdvancedOpen]=useState(false);
+ const [advancedOpen,setAdvancedOpen]=useState(false);
  const [repeats,setRepeats]=useState('4'),[intervalLengths,setIntervalLengths]=useState('1'),[rest,setRest]=useState('30'),[seconds,setSeconds]=useState('');
  const distance=segmentDistance(segment,pool),continuous=segmentContinuous(segment,pool);
  const update=(patch:Partial<SwimSegment>)=>app.updateSwimSegment(day,segment.id,patch);
@@ -99,8 +97,8 @@ function SwimSegmentEditor({app,day,segment,pool}:{app:Trainer;day:SwimDay;segme
  const trackedTechniques=Object.values(segment.technique||{}).filter(Boolean).length;
  const detailed=[segment.intervals?.length?`${segment.intervals.length} interval sets`:null,n(segment.longestContinuous)>0?'continuous effort':null,n(segment.timedMeters)>0?'timed effort':null,trackedTechniques?`${trackedTechniques} technique steps`:null,segment.notes?.trim()?'notes':null].filter(Boolean).join(' · ');
  return <article className="swim-segment card">
-  <header className="swim-segment-head"><button type="button" className="swim-segment-title" onClick={()=>setOpen(o=>!o)} aria-expanded={open}><Waves size={20}/><span><strong>{label}</strong><small>{distance} m logged · {stroke?(mode==='advanced'?'Advanced mode':'Learning mode'):'Technique drill'}</small></span>{open?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</button><button type="button" className="icon-btn" title={`Remove ${label}`} aria-label={`Remove ${label}`} onClick={()=>app.removeSwimSegment(day,segment.id)}><Trash2 size={16}/></button></header>
-  {open&&<div className="swim-segment-body stack">
+  <header className="swim-segment-head"><button type="button" className="swim-segment-title" onClick={onToggle} aria-expanded={open} aria-controls={`swim-activity-${segment.id}`}><Waves size={20}/><span><strong>{label}</strong><small>{distance} m · {segment.minutes||0} min{segment.difficulty?` · ${segment.difficulty}`:''} · {stroke?(mode==='advanced'?'Advanced':'Learning'):'Drill'}</small></span>{open?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</button><button type="button" className="icon-btn" title={`Remove ${label}`} aria-label={`Remove ${label}`} onClick={()=>app.removeSwimSegment(day,segment.id)}><Trash2 size={16}/></button></header>
+  {open&&<div id={`swim-activity-${segment.id}`} className="swim-segment-body stack">
    <div className="swim-length-group"><div><span className="muted small">Lengths completed outside intervals</span><div className="swim-length-value"><strong>{totalLengths}</strong><small>{totalLengths*pool} m</small></div></div><div className="swim-length-actions"><button type="button" className="icon-btn large" aria-label={`Subtract one ${label} length`} onClick={()=>update({lengths:Math.max(0,totalLengths-1)})}><Minus/></button><input aria-label={`${label} lengths completed`} type="number" min="0" max="1000" inputMode="numeric" value={segment.lengths??0} onChange={e=>update({lengths:e.target.value})}/><button type="button" className="icon-btn large" aria-label={`Add one ${label} length`} onClick={()=>update({lengths:totalLengths+1})}><Plus/></button></div></div>
    <div className="swim-field-row"><label className="field"><span>Practice minutes (optional)</span><input type="number" inputMode="numeric" min="0" max="240" value={segment.minutes??''} onChange={e=>update({minutes:e.target.value})} placeholder="e.g. 15"/></label><label className="field"><span>Difficulty (optional)</span><select value={segment.difficulty??''} onChange={e=>update({difficulty:e.target.value as SwimSegment['difficulty']})}><option value="">Not rated</option><option>Easy</option><option>Moderate</option><option>Difficult</option></select></label></div>
    <button type="button" className="swim-more-toggle" aria-expanded={advancedOpen} aria-controls={`advanced-${segment.id}`} onClick={()=>setAdvancedOpen(v=>!v)}><span>{advancedOpen?'Hide advanced logging':'Advanced logging'}{!advancedOpen&&detailed?<small>{detailed}</small>:null}</span>{advancedOpen?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</button>
