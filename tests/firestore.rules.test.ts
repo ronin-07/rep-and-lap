@@ -78,6 +78,15 @@ describe('Milestone 7 individually versioned training items',()=>{
   await assertFails(getDoc(doc(env.authenticatedContext('bob').firestore(),'users/alice/syncItems',clock)));
   await assertFails(deleteDoc(ref));
  });
+ it('permits a completed two-hour safety stop but rejects forged auto-stop flags',async()=>{
+  const ref=doc(env.authenticatedContext('alice').firestore(),'users/alice/syncItems',clock);
+  const start='2026-11-19T17:00:00.000Z',end='2026-11-19T19:00:00.000Z';
+  await assertSucceeds(setDoc(ref,make(clock,'clock',{startedAt:start})));
+  await assertSucceeds(updateDoc(ref,{revision:2,value:{startedAt:start,endedAt:end,autoStopped:true}}));
+  await assertFails(updateDoc(ref,{revision:3,value:{startedAt:start,autoStopped:true}}));
+  await assertFails(updateDoc(ref,{revision:3,value:{startedAt:start,endedAt:end,autoStopped:false}}));
+  await assertFails(updateDoc(ref,{revision:3,value:{startedAt:start,endedAt:end,pausedAt:end,autoStopped:true}}));
+ });
  it('allows swimming segment tombstones but denies forged IDs and changes to kind',async()=>{
   const ref=doc(env.authenticatedContext('alice').firestore(),'users/alice/syncItems',swim);
   const data={id:'swim-12345678',activity:'freestyle',mode:'advanced',lengths:4};

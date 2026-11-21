@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RepLap — Timer recovery</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#080e1c;color:#f3f6ff}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:flex;justify-content:center;padding:32px 16px}main{width:min(100%,660px)}h1{font-size:1.65rem;margin:0 0 12px}h2{font-size:1.1rem;margin:0 0 8px}p{line-height:1.55;color:#bbc7dc}section{border:1px solid #35435d;background:#19243b;border-radius:16px;padding:18px;margin:16px 0}.timer{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:12px 0}.timer small{display:block;margin:4px 0;color:#afbed4}button,a.action{padding:11px 14px;border-radius:10px;border:1px solid #53617e;background:#2c3b57;color:white;text-decoration:none;font-weight:600;cursor:pointer}button.primary{background:#7860e3;border-color:#7860e3}button:focus-visible,a:focus-visible{outline:3px solid #a79cff;outline-offset:2px}button:disabled{opacity:.5;cursor:default}.actions{display:flex;flex-wrap:wrap;gap:8px}#message{font-weight:600;color:#81e1c4}.subtle{font-size:.83rem}code{overflow-wrap:anywhere}
+</style></head><body><main>
+<h1>RepLap timer recovery</h1>
+<p>This independent page works when the regular workout screen fails to render. It can stop a timer saved in <strong>this browser's local cache</strong> without completing a workout or deleting any sets or swimming lengths.</p>
+<section><h2>Locally cached timers</h2><div id="timers" role="list"><p>Checking this browser…</p></div><p id="message" role="status"></p></section>
+<div class="actions"><button id="backup" type="button">Download local backup</button><a class="action" href="/">Return to RepLap</a><button id="refresh" type="button">Check again</button></div>
+<p class="subtle">Changes made here are saved locally and queued for Firebase synchronization the next time RepLap can load. They do <strong>not</strong> immediately update other devices. If no timers appear, this browser may have no cached workout data; do not clear site storage as a troubleshooting step.</p>
+<script>
+(()=>{'use strict';
+const STORAGE='rep-and-lap-firebase-v1';
+const LAST='rep-and-lap-firebase-last-account';
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const CAP=120*60000;
+const list=document.getElementById('timers');
+const msg=document.getElementById('message');
+let key='',data=null;
+const ms=x=>{const t=Date.parse(x||'');return Number.isFinite(t)?t:null;};
+function state(t){return !t||!t.startedAt?'ready':t.endedAt?'stopped':t.pausedAt?'paused':'running';}
+function getLocal(){
+  const last=JSON.parse(localStorage.getItem(LAST)||'null');
+  const uid=last&&typeof last.id==='string'?last.id:'guest';
+  key=`${STORAGE}:${uid}`;
+  const raw=localStorage.getItem(key);
+  data=raw?JSON.parse(raw):null;
+  if(!data||!data.weeks||typeof data.weeks!=='object'||Array.isArray(data.weeks))data=null;
+}
+function stop(t,at){
+  const start=ms(t.startedAt),pause=t.pausedAt?ms(t.pausedAt):null;
+  const oldPause=t.pausedDurationMs===undefined?0:t.pausedDurationMs;
+  if(start===null||!Number.isSafeInteger(oldPause)||oldPause<0||at<start)return null;
+  if(state(t)==='paused'&&(pause===null||pause<start||pause>at))return null;
+  if(state(t)!=='running'&&state(t)!=='paused')return null;
+  const activeEnd=pause===null?at:pause;
+  const active=activeEnd-start-oldPause;
+  if(active<0)return null;
+  let end=at,totalPause=oldPause,auto=false;
+  if(active>=CAP){end=start+oldPause+CAP;auto=true;}
+  else if(pause!==null)totalPause+=at-pause;
+  if(end<start||totalPause>end-start)return null;
+  const result={startedAt:t.startedAt,endedAt:new Date(end).toISOString()};
+  if(totalPause||t.pausedDurationMs!==undefined)result.pausedDurationMs=totalPause;
+  if(auto)result.autoStopped=true;
+  return result;
+}
+function show(){
+  msg.textContent='';list.replaceChildren();
+  try{getLocal();}catch(err){list.textContent='Browser storage cannot be read. Check site permissions.';return;}
+  if(!data){list.textContent='No local workout cache found for the last signed-in account.';return;}
+  let found=0;
+  for(const [week,record] of Object.entries(data.weeks)){
+    for(const day of DAYS){
+      const t=record&&record.timing&&record.timing[day];
+      if((state(t)!=='running'&&state(t)!=='paused')||record.done&&record.done[day])continue;
+      found++;
+      const item=document.createElement('div');item.className='timer';item.setAttribute('role','listitem');
+      const info=document.createElement('div');const strong=document.createElement('strong');strong.textContent=`${day} · ${week}`;
+      const small=document.createElement('small');small.textContent=`${state(t)==='paused'?'Paused':'Running'} · Started ${new Date(t.startedAt).toLocaleString()}`;
+      info.append(strong,small);
+      const btn=document.createElement('button');btn.className='primary';btn.type='button';btn.textContent='Stop timer locally';
+      const itemKey=`session:${week}:${day}~clock`;
+      if(data.itemConflicts&&data.itemConflicts[itemKey]){btn.disabled=true;small.textContent+=' · Resolve cloud conflict inside RepLap';}
+      btn.addEventListener('click',()=>{
+        if(!confirm(`Stop the ${day} timer locally? Your workout will remain incomplete. This change syncs only after RepLap loads again.`))return;
+        try{
+          getLocal();
+          const rec=data&&data.weeks&&data.weeks[week],previous=rec&&rec.timing&&rec.timing[day];
+          if(!previous||data.itemConflicts&&data.itemConflicts[itemKey]){msg.textContent='Timer changed or has a conflict. Please reload.';return;}
+          const stopped=stop(previous,Date.now());
+          if(!stopped){msg.textContent='Timer timestamps are invalid; no records changed.';return;}
+          rec.timing[day]=stopped;
+          data.recordUpdates||={};data.pendingSync||={};data.pendingItems||={};data.syncItems||={};
+          const sessionKey=`session:${week}:${day}`;
+          const stamp=Math.max(Date.now(),(data.recordUpdates[sessionKey]||0)+1);
+          data.recordUpdates[sessionKey]=stamp;data.pendingSync[sessionKey]=stamp;
+          const prior=data.pendingItems[itemKey];
+          data.pendingItems[itemKey]={key:itemKey,kind:'clock',value:stopped,baseRevision:prior?prior.baseRevision:data.syncItems[itemKey]?.revision||0,updatedMs:Math.max(stamp,(prior?.updatedMs||0)+1)};
+          localStorage.setItem(key,JSON.stringify(data));
+          show();msg.textContent=`${day} timer stopped locally. Your sets and laps are preserved; open RepLap to synchronize.`;
+        }catch(err){msg.textContent='Unable to save timer change. Local workout data was not intentionally cleared.';}
+      });
+      item.append(info,btn);list.append(item);
+    }
+  }
+  if(!found)list.textContent='No running or paused local workout timers found.';
+}
+document.getElementById('refresh').addEventListener('click',show);
+document.getElementById('backup').addEventListener('click',()=>{
+ try{getLocal();const raw=localStorage.getItem(key);if(!raw){msg.textContent='No local data to export.';return;}
+  const url=URL.createObjectURL(new Blob([raw],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download=`replap-emergency-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+ }catch{msg.textContent='Backup could not be downloaded.';}
+});
+show();
+})();
+</script></main></body></html>

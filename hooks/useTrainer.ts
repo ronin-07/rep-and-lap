@@ -16,7 +16,7 @@ import {stableSetId} from '@/lib/set-sync';
 import {clockItemKey,queueSwimSegment,REST_ITEM_KEY,queueSyncItem,integrateServerItem,acknowledgeItem,flagItemConflict,resolveItemConflict,ItemVersionConflict} from '@/lib/item-sync';
 import {blankSegment,swimRoutine,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
 import {stoppedSwimTiming,completeStoppedSwim} from '@/lib/swim-session';
-import {elapsedSessionMs,sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming} from '@/lib/session-timing';
+import {elapsedSessionMs,sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming,autoStopSessionTiming} from '@/lib/session-timing';
 
 export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
 export function useTrainer(){
@@ -152,11 +152,11 @@ export function useTrainer(){
  },[saveSyncedRest]);
  useEffect(()=>{
   mountedRef.current=true;setOnline(navigator.onLine);
-  const last=localStorage.getItem(LAST_ACCOUNT_KEY);
+  let last:string|null=null;try{last=localStorage.getItem(LAST_ACCOUNT_KEY);}catch{}
   try {const user=last?JSON.parse(last) as {id?:string}:null;uidRef.current=user?.id||'guest';}catch{uidRef.current='guest';}
   const stored=loadData(uidRef.current);dataRef.current=stored;setData(stored);
-  saveRest(parseRest(localStorage.getItem(`${REST_KEY}:${uidRef.current}`)));
-  const oldTheme=localStorage.getItem(THEME_KEY);if(oldTheme==='dark'||oldTheme==='light')setTheme(oldTheme);
+  try{saveRest(parseRest(localStorage.getItem(`${REST_KEY}:${uidRef.current}`)));}catch{saveRest(null);}
+  try{const oldTheme=localStorage.getItem(THEME_KEY);if(oldTheme==='dark'||oldTheme==='light')setTheme(oldTheme);}catch{}
   setHydrated(true);
   if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
     void navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{});
@@ -168,7 +168,7 @@ export function useTrainer(){
  useEffect(()=>{
   document.documentElement.dataset.theme=theme;
   const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',theme==='dark'?'#080e1c':'#f6f7fc');
-  if(hydrated)localStorage.setItem(THEME_KEY,theme);
+  if(hydrated)try{localStorage.setItem(THEME_KEY,theme);}catch{}
  },[theme,hydrated]);
  useEffect(()=>{
   if(!hydrated)return;
@@ -179,11 +179,11 @@ export function useTrainer(){
       const previous=dataRef.current;try{saveData(uidRef.current,previous);}catch{}
       uidRef.current=newId;inFlight.current.clear();readyRef.current=false;serverRef.current=false;
       const fresh=loadData(newId);dataRef.current=fresh;setData(fresh);
-      restRef.current=parseRest(localStorage.getItem(`${REST_KEY}:${newId}`));setRestState(restRef.current);
+      try{restRef.current=parseRest(localStorage.getItem(`${REST_KEY}:${newId}`));}catch{restRef.current=null;}setRestState(restRef.current);
     }
     setUser(nextUser);
-    if(nextUser)localStorage.setItem(LAST_ACCOUNT_KEY,JSON.stringify({id:nextUser.uid,email:nextUser.email}));
-    else localStorage.removeItem(LAST_ACCOUNT_KEY);
+    try{if(nextUser)localStorage.setItem(LAST_ACCOUNT_KEY,JSON.stringify({id:nextUser.uid,email:nextUser.email}));
+    else localStorage.removeItem(LAST_ACCOUNT_KEY);}catch{}
     setSyncMode(nextUser?'checking':'saved-local');
   },err=>{setFirebaseError(err.message);setSyncMode('needs-attention');});
   return ()=>unsub();
@@ -228,6 +228,32 @@ export function useTrainer(){
   const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length||Object.keys(dataRef.current.pendingItems).length))void flush();},30000);
   return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);document.removeEventListener('visibilitychange',handleVisibility);clearInterval(interval);};
  },[hydrated,flush]);
+ // Enforce the free client-side two-hour cap. This runs on every ticking second,
+ // initial local hydration, focus/visibility restoration, and cloud snapshots.
+ // A closed browser cannot write to Firestore, but the exact two-hour cutoff
+ // is reconstructed and synchronized once any signed-in client comes online.
+ useEffect(()=>{
+  if(!hydrated)return;
+  const now=Date.now();
+  const expired:{week:string;day:Day}[]=[];
+  for(const [wk,record] of Object.entries(data.weeks)){
+   for(const day of DAYS){
+    if(record.done?.[day])continue;
+    if(autoStopSessionTiming(record.timing?.[day],now))expired.push({week:wk,day});
+   }
+  }
+  if(!expired.length)return;
+  update(copy=>{
+   for(const item of expired){
+    const timer=copy.weeks[item.week]?.timing?.[item.day];
+    const stopped=autoStopSessionTiming(timer,now);
+    if(!stopped)continue;
+    const record=copy.weeks[item.week];record.timing??={};record.timing[item.day]=stopped;
+    queueSyncItem(copy,clockItemKey(item.week,item.day),'clock',stopped);
+   }
+  },expired.map(x=>`session:${x.week}:${x.day}`));
+  notify(expired.length===1?'Timer automatically stopped at 2 hours. Review your workout before finishing.':`${expired.length} forgotten timers automatically stopped at 2 hours. Review them in Log.`);
+ },[hydrated,data,clock,update,notify]);
  // Keep global active-clock shortcut ticking even when the user opens
  // Calendar/Progress or switches to a different workout tab.
  const liveClock=Object.values(data.weeks).some(w=>Object.values(w.timing||{}).some(t=>sessionClockState(t)==='running'));
@@ -274,6 +300,7 @@ export function useTrainer(){
   if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week],at=new Date().toISOString();
   if(entry?.done?.[day]){notify('Undo completion before changing the clock.');return;}
+  if(autoStopSessionTiming(entry?.timing?.[day],Date.parse(at))){notify('The 2-hour limit was reached; the timer will stop automatically.');return;}
   const next=pauseSessionTiming(entry?.timing?.[day],at);
   if(!next){notify('Start a running session before pausing.');return;}
   setClock(Date.parse(at));
@@ -286,6 +313,7 @@ export function useTrainer(){
   const entry=dataRef.current.weeks[week];
   if(entry?.done?.[day]){notify('Undo completion before continuing this session.');return;}
   if(statusFor(dataRef.current,week,day)!=='scheduled'){notify('Restore this session on the calendar before continuing.');return;}
+  if(entry?.timing?.[day]?.autoStopped){notify('This timer reached the 2-hour safety limit. Restart its clock from the timer menu or finish the workout; your logs are safe.');return;}
   const at=new Date().toISOString(),next=resumeSessionTiming(entry?.timing?.[day],at);
   if(!next){notify('Only a paused or stopped session can be resumed.');return;}
   setClock(Date.parse(at));
@@ -310,6 +338,7 @@ export function useTrainer(){
   if(PLAN[day].kind==='swim'){notify('Stop your swim timer, log the swim, then save it.');return;}
   const entry=dataRef.current.weeks[week],at=new Date().toISOString();
   if(entry?.done?.[day]){notify('Undo completion before changing the session.');return;}
+  if(autoStopSessionTiming(entry?.timing?.[day],Date.parse(at))){notify('The 2-hour cutoff has been reached. Review the automatically stopped timer before finishing.');return;}
   const stopped=stopSessionTiming(entry?.timing?.[day],at);
   if(!stopped){notify('Start or resume the session clock before finishing.');return;}
   setClock(Date.parse(at));
@@ -319,17 +348,20 @@ export function useTrainer(){
   if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveSyncedRest(null);
   showCompletedFeedback(week,day);
  };
- // Swimming is finalized separately so the user can enter laps after leaving the pool.
- const stopSwimSession=(day:SwimDay)=>{
+ // Stop either timer without completing the workout; useful if a session is
+ // abandoned, or the athlete wants to finish entering sets/laps later.
+ const stopWorkoutTimer=(day:Day)=>{
   if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
-  if(dataRef.current.weeks[week]?.done?.[day]){notify('Undo completion before changing this swim.');return;}
+  if(dataRef.current.weeks[week]?.done?.[day]){notify('Reopen this workout before changing its timer.');return;}
   const at=new Date().toISOString();
-  const stopped=stoppedSwimTiming(dataRef.current.weeks[week]?.timing?.[day],at);
-  if(!stopped){notify('No running or paused swim timer to stop.');return;}
+  const current=dataRef.current.weeks[week]?.timing?.[day];
+  const stopped=autoStopSessionTiming(current,Date.parse(at))??stopSessionTiming(current,at);
+  if(!stopped){notify('No running or paused timer to stop.');return;}
   setClock(Date.parse(at));
   update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;queueSyncItem(d,clockItemKey(week,day),'clock',stopped);},`session:${week}:${day}`);
-  notify('Swim time saved. Enter your laps and notes, then save the session.');
+  notify(stopped.autoStopped?'Timer capped at 2 hours. Your logged entries remain saved and the workout is still incomplete.':PLAN[day].kind==='swim'?'Swim timer stopped. Add laps or notes, then finish when ready.':'Gym timer stopped. Your sets are saved; finish when ready.');
  };
+ const stopSwimSession=(day:SwimDay)=>stopWorkoutTimer(day);
  const completeSwimSession=(day:SwimDay)=>{
   if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week],timing=entry?.timing?.[day];
@@ -350,6 +382,7 @@ export function useTrainer(){
  };
  const saveWorkout=(day:Day)=>{
   const w=dataRef.current.weeks[week],state=sessionClockState(w?.timing?.[day]);
+  if(autoStopSessionTiming(w?.timing?.[day],Date.now())){notify('The two-hour limit has been reached. Your timer is being stopped; try Finish again after it updates.');return;}
   if(w?.done?.[day]){notify('This workout is already saved as completed.');return;}
   if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before saving.');setView('conflicts');return;}
   if(PLAN[day].kind==='gym'){
@@ -791,6 +824,6 @@ export function useTrainer(){
   if(choice==='mine')scheduleFlush();
  };
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||itemConflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveSyncedRest(null),extendRest:()=>saveSyncedRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,saveRecoveryFeedback,setEffort,installPrompt,firebaseError,pending,conflicts,itemConflicts,resolveConflict,resolveTrainingItemConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopSwimSession,completeSwimSession,saveWorkout,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,setSwimTechniqueMastered,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveSyncedRest(null),extendRest:()=>saveSyncedRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,saveRecoveryFeedback,setEffort,installPrompt,firebaseError,pending,conflicts,itemConflicts,resolveConflict,resolveTrainingItemConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopWorkoutTimer,stopSwimSession,completeSwimSession,saveWorkout,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,setSwimTechniqueMastered,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

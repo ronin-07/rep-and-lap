@@ -5,6 +5,10 @@ import type {SessionTiming} from './types';
 
 export type SessionClockState = 'ready'|'running'|'paused'|'stopped';
 
+/** Client-only protection: no scheduled jobs or paid Firebase services. */
+export const TIMER_WARNING_MS=110*60_000;
+export const TIMER_AUTO_STOP_MS=120*60_000;
+
 function ms(timestamp: string|undefined):number|null {
  if(!timestamp)return null;
  const value=Date.parse(timestamp);
@@ -53,12 +57,12 @@ export function pauseSessionTiming(timing:SessionTiming|null|undefined,at:string
 export function resumeSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(!timing)return null;
  const state=sessionClockState(timing);
- if(state!=='paused'&&state!=='stopped')return null;
+ if((state!=='paused'&&state!=='stopped')||timing.autoStopped)return null;
  const when=ms(at),from=ms(state==='paused'?timing.pausedAt:timing.endedAt),oldTotal=pauseTotal(timing);
  if(when===null||from===null||oldTotal===null||when<from||elapsedSessionMs(timing,from)===null)return null;
  const nextPause=oldTotal+(when-from);
  if(!Number.isSafeInteger(nextPause))return null;
- const {pausedAt:_pausedAt,endedAt:_endedAt,...rest}=timing;
+ const {pausedAt:_pausedAt,endedAt:_endedAt,autoStopped:_autoStopped,...rest}=timing;
  return {...rest,pausedDurationMs:nextPause};
 }
 
@@ -82,4 +86,26 @@ export function stopSessionTiming(timing:SessionTiming|null|undefined,at:string)
 export function restartSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(sessionClockState(timing)!=='stopped'||ms(at)===null||elapsedSessionMs(timing)===null)return null;
  return {startedAt:at};
+}
+
+/** Record the exact 2-hour active-time cutoff, even when the tab was closed.
+ * It can be reconciled from locally cached or cloud-synced clocks on reopening.
+ * The workout's completed flag and logged entries are intentionally untouched. */
+export function autoStopSessionTiming(timing:SessionTiming|null|undefined,now:number):SessionTiming|null {
+ if(!timing||sessionClockState(timing)!=='running'||!Number.isFinite(now))return null;
+ const elapsed=elapsedSessionMs(timing,now);
+ if(elapsed===null||elapsed<TIMER_AUTO_STOP_MS)return null;
+ const start=ms(timing.startedAt);
+ const paused=pauseTotal(timing);
+ if(start===null||paused===null)return null;
+ const cutoff=start+paused+TIMER_AUTO_STOP_MS;
+ if(!Number.isFinite(cutoff)||cutoff>now)return null;
+ const stopped=stopSessionTiming(timing,new Date(cutoff).toISOString());
+ return stopped?{...stopped,autoStopped:true}:null;
+}
+
+export function timerWarningRemainingMs(timing:SessionTiming|null|undefined,now:number):number|null {
+ if(sessionClockState(timing)!=='running')return null;
+ const elapsed=elapsedSessionMs(timing,now);
+ return elapsed!==null&&elapsed>=TIMER_WARNING_MS&&elapsed<TIMER_AUTO_STOP_MS?TIMER_AUTO_STOP_MS-elapsed:null;
 }

@@ -13,7 +13,7 @@ import SessionNotes from './SessionNotes';
 import RoutineEditor from './RoutineEditor';
 import {exercisesFor} from '@/lib/routines';
 import {statusFor} from '@/lib/scheduling';
-import {elapsedSessionMs,formatSessionClock,sessionClockState} from '@/lib/session-timing';
+import {elapsedSessionMs,formatSessionClock,sessionClockState,timerWarningRemainingMs} from '@/lib/session-timing';
 import {LineChart,MiniBars} from '@/components/Charts';
 import DateInput from '@/components/DateInput';
 import SwimLogger from '@/components/swimming/SwimLogger';
@@ -92,21 +92,24 @@ function WorkoutControlBar({app}:{app:Trainer}){
  const conflict=Object.keys(app.data.itemConflicts).some(key=>key.startsWith(`${sessionKey}~`));
  const isSwim=app.trackingTab==='swim';
  const workoutName=isSwim?swimRoutine(app.data,app.week,day as SwimDay).name:PLAN[day].name;
- const timerLabel=state==='ready'?'Start timer':state==='running'?'Pause':state==='paused'?'Resume':'Continue';
- const toggleTimer=state==='ready'?()=>app.startSession(day):state==='running'?()=>app.pauseSession(day):()=>app.resumeSession(day);
+ const timerLabel=state==='ready'?'Start timer':state==='running'?'Pause':state==='paused'?'Resume':timing?.autoStopped?'Restart timer':'Continue';
+ const toggleTimer=state==='ready'?()=>app.startSession(day):state==='running'?()=>app.pauseSession(day):timing?.autoStopped?()=>app.restartSession(day):()=>app.resumeSession(day);
+ const warningRemaining=timerWarningRemainingMs(timing,app.clock);
  return <section ref={barRef} className="quick-save-bar workout-control-bar" role="region" aria-label={`${isSwim?'Swimming':'Gym'} workout controls`}>
   <div className="workout-control-main">
    <div className="quick-save-info"><strong>{workoutName} · {day}</strong>
-    <span className="workout-bar-clock"><Clock size={15}/><span role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,now):'00:00'}</span><span className={`workout-bar-status ${state}`}>{state==='ready'?'Ready':state==='stopped'?'Stopped':state==='paused'?'Paused':'Running'}</span></span>
+    <span className="workout-bar-clock"><Clock size={15}/><span role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,now):'00:00'}</span><span className={`workout-bar-status ${state}`}>{state==='ready'?'Ready':state==='stopped'?(timing?.autoStopped?'Auto-stopped':'Stopped'):state==='paused'?'Paused':'Running'}</span></span>
     <small>{conflict?'Sync conflict · resolve to continue':pending?'Saved locally · cloud sync pending':app.user?'Autosaved · cloud available':'Autosaved on this device'}</small>
    </div>
    <div className="workout-bar-actions">
     <button type="button" className="button-secondary workout-bar-timer-action" disabled={conflict} onClick={toggleTimer}>{state==='running'?<Pause size={17}/>:<Play size={17}/>}<span>{timerLabel}</span></button>
-    {isSwim&&(state==='running'||state==='paused')&&<button type="button" className="button-secondary workout-bar-stop-action" disabled={conflict} onClick={()=>app.stopSwimSession(day as SwimDay)}><Square size={16}/><span>Stop timer</span></button>}
+    {(state==='running'||state==='paused')&&<button type="button" className="button-secondary workout-bar-stop-action" disabled={conflict} onClick={()=>app.stopWorkoutTimer(day)}><Square size={16}/><span>Stop timer</span></button>}
     <button type="button" className="button-primary workout-bar-finish-action" disabled={conflict} onClick={()=>app.saveWorkout(day)}><Check size={17}/><span className="finish-label-full">Finish workout</span><span className="finish-label-short">Finish</span></button>
     {state==='stopped'&&<details className="workout-timer-menu"><summary aria-label="More timer actions" title="More timer actions"><MoreHorizontal size={20}/></summary><div className="workout-timer-popover"><button type="button" disabled={conflict} onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');app.restartSession(day);}}><RotateCcw size={16}/> Restart timer</button></div></details>}
    </div>
   </div>
+  {warningRemaining!==null&&<p className="workout-timer-warning" role="alert">Timer will stop automatically in {Math.ceil(warningRemaining/60_000)} min. Your workout log stays saved.</p>}
+  {timing?.autoStopped&&<p className="workout-timer-warning" role="status">Timer stopped automatically at 2 hours. Review the duration before finishing; logged sets and laps are unchanged.</p>}
   {!isSwim&&<RestDock app={app} embedded/>}
  </section>;
 }

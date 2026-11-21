@@ -52,11 +52,12 @@ service cloud.firestore {
         )
         && (d.value == null || d.value is map)
         && (d.kind != 'clock' || d.value == null || (
-          d.value.keys().hasOnly(['startedAt','endedAt','pausedAt','pausedDurationMs'])
+          d.value.keys().hasOnly(['startedAt','endedAt','pausedAt','pausedDurationMs','autoStopped'])
           && d.value.get('startedAt','') is string
           && (!d.value.keys().hasAny(['endedAt']) || d.value.endedAt is string)
           && (!d.value.keys().hasAny(['pausedAt']) || d.value.pausedAt is string)
           && (!d.value.keys().hasAny(['pausedDurationMs']) || (d.value.pausedDurationMs is int && d.value.pausedDurationMs >= 0))
+          && (!d.value.keys().hasAny(['autoStopped']) || (d.value.autoStopped == true && d.value.keys().hasAny(['endedAt']) && !d.value.keys().hasAny(['pausedAt'])))
         ))
         && (d.kind != 'swim-segment' || d.value == null || (
           d.value.get('id','') is string

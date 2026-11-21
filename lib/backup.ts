@@ -108,10 +108,11 @@ function validateWeek(week:unknown){
       if(section==='swim')validateSwim(value);
       if(section==='sessionNotes')check(object(value),'Invalid session details');
       if(section==='timing'){
-        const clock=safeRecord(value,'session clock',4);
+        const clock=safeRecord(value,'session clock',5);
         const isStamp=(input:unknown)=>typeof input==='string'&&Number.isFinite(Date.parse(input));
         for(const field of ['startedAt','endedAt','pausedAt'])if(clock[field]!==undefined)check(isStamp(clock[field]),`Invalid ${field} timestamp`);
         if(clock.pausedDurationMs!==undefined)check(typeof clock.pausedDurationMs==='number'&&Number.isSafeInteger(clock.pausedDurationMs)&&clock.pausedDurationMs>=0,'Invalid paused duration');
+        if(clock.autoStopped!==undefined)check(clock.autoStopped===true&&clock.endedAt!==undefined&&clock.pausedAt===undefined,'Invalid automatic stop flag');
         if(clock.pausedAt!==undefined){
           check(isStamp(clock.startedAt)&&clock.endedAt===undefined,'A paused clock must be running');
           check(Date.parse(clock.pausedAt as string)>=Date.parse(clock.startedAt as string),'Pause precedes session start');
