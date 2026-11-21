@@ -8,7 +8,7 @@ import {summary,weeklyChart,hydrationChart,weightTrend,history,bestSwim,weightEn
 import {LineChart,MiniBars} from '@/components/Charts';
 import {weeklyTrainingTime,trainingTimeWeeks,swimmingInsights,paceLabel,progressionAdvice} from '@/lib/training-intelligence';
 import {weeklyAdherence} from '@/lib/scheduling';
-import {strokeInsights,SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,swimTotals} from '@/lib/swimming';
+import {strokeInsights,SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,swimTotals,swimTechniqueEvidence,swimTechniqueStage} from '@/lib/swimming';
 import type {SwimStroke} from '@/lib/types';
 import Insights from './Insights';
 import {exercisesFor} from '@/lib/routines';
@@ -67,12 +67,11 @@ function SwimmingProgress({app}:{app:Trainer}){
  const [targetDraft,setTargetDraft]=React.useState(String(target));
  React.useEffect(()=>setTargetDraft(String(target)),[target,selected]);
  const bestTimes=Object.entries(stroke.bestTimes).sort(([a],[b])=>Number(a)-Number(b));
- const recentSegments=Object.entries(app.data.weeks).flatMap(([week,w])=>SWIM_DAYS.flatMap(day=>{
-  const segments=w.swim?.[day]?.segments||[];
-  return segments.filter(segment=>segment.activity===selected).map(segment=>({week,day,segment}));
- })).sort((a,b)=>b.week.localeCompare(a.week));
- const practiced=new Set(recentSegments.flatMap(({segment})=>Object.keys(segment.technique||{}).filter(key=>segment.technique?.[key])));
  const technique=SWIM_CHECKLIST[selected];
+ const evidence=swimTechniqueEvidence(app.data,selected);
+ const practiced=technique.filter(step=>(evidence.byStep[step]||0)>=1).length;
+ const mastered=technique.filter(step=>swimTechniqueStage(evidence.byStep[step]||0,!!app.data.swimTechniqueMastery?.[selected]?.[step])==='mastered').length;
+ const completedRatings=Object.entries(app.data.weeks).flatMap(([week,record])=>SWIM_DAYS.flatMap(day=>record.done?.[day]?(record.swim?.[day]?.segments||[]).filter(segment=>segment.activity===selected&&segment.skillLevel).map(segment=>({at:record.completedAt?.[day]||week,skill:segment.skillLevel!})):[])).sort((a,b)=>b.at.localeCompare(a.at));
  const progress=Math.min(100,Math.round(stroke.bestContinuous/Math.max(1,target)*100));
  return <div className="stack">
  <section className="card pane-pad stack"><span className="eyebrow">SWIMMING BY STROKE</span><h2>Every stroke has its own journey.</h2>
@@ -86,9 +85,16 @@ function SwimmingProgress({app}:{app:Trainer}){
  <div className="swim-field-row"><label className="field swim-goal-input"><span>Change your continuous-distance target (m)</span><input type="number" inputMode="numeric" min="25" max="10000" step="25" value={targetDraft} onChange={e=>setTargetDraft(e.target.value)}/></label><button className="button-secondary" disabled={Number(targetDraft)===target} onClick={()=>{const value=Number(targetDraft);if(Number.isInteger(value)&&value>=25&&value<=10000)app.editSwimPreference({swimTargets:{...app.data.swimTargets,[selected]:value}});else app.notify('Select a goal between 25 and 10,000 metres.');}}>Save goal</button></div>
  <p className="muted small">Total distance from interval sets counts toward volume, but does not automatically count as a continuous-swimming record.</p></section>
  <section className="card pane-pad stack"><span className="eyebrow">STROKE TECHNIQUE</span><h2>Practice the fundamentals.</h2>
- <div className="swim-goal-summary"><span>{practiced.size} of {technique.length} technique steps practiced</span><strong>{recentSegments.length} recorded segments</strong></div><div className="swim-learning-level">Current learning level: <strong>{stroke.latestSkillLevel||'Not recorded'}</strong></div>
- <div className="checklist">{technique.map(step=><div className="check-row swim-progress-step" key={step}><span aria-hidden="true">{practiced.has(step)?'✓':'○'}</span><span>{step}</span></div>)}</div>
- <p className="muted tiny">Completed steps reflect checklists in saved swim logs. They are not a formal swimming proficiency certification.</p></section>
+ <div className="swim-goal-summary"><span>{practiced} of {technique.length} techniques practiced in completed sessions</span><strong>{mastered} mastered</strong></div>
+ <div className="swim-learning-level">Completed stroke sessions: <strong>{evidence.sessions}</strong> · Self-rated level: <strong>{completedRatings[0]?.skill||'Not recorded'}</strong></div>
+ <div className="swim-technique-evidence-list">{technique.map(step=>{
+  const count=evidence.byStep[step]||0,stage=swimTechniqueStage(count,!!app.data.swimTechniqueMastery?.[selected]?.[step]);
+  return <div className="swim-technique-evidence-row" key={step}>
+   <div className="swim-technique-evidence-text"><strong>{step}</strong><small>{stage==='not-practiced'?'Not practiced':stage==='practicing'?`Practicing · ${count}/3 sessions`:stage==='improving'?`Improving · ${count} completed sessions`:`Mastered · ${count} completed sessions`}</small></div>
+   {count>=3?<button type="button" className={stage==='mastered'?'button-secondary':'button-primary'} onClick={()=>{if(stage==='mastered')app.setSwimTechniqueMastered(selected,step,false);else if(confirm(`Confirm you can consistently perform "${step}"? You have practiced it in ${count} completed sessions.`))app.setSwimTechniqueMastered(selected,step,true);}}>{stage==='mastered'?'Undo mastery':'Mark mastered'}</button>:<span className="muted tiny">{count?`${3-count} more sessions`:'Not started'}</span>}
+  </div>;
+ })}</div>
+ <p className="muted tiny">Only completed sessions count; checking a step twice in one workout counts once. Mastery needs three completed sessions and your explicit confirmation. Self-ratings are separate from demonstrated proficiency.</p></section>
  <section className="card pane-pad stack"><span className="eyebrow">CONTINUOUS DISTANCE PROGRESSION</span><h2>Going the distance.</h2>
  {stroke.sessions.length?<LineChart points={stroke.sessions.map(x=>({date:x.date.slice(5),value:x.continuous}))} unit="m" stroke="#50d7bf"/>:<p className="muted small">Log your first {SWIM_ACTIVITY_LABELS[selected].toLowerCase()} swim to see a progression chart.</p>}
  <p className="muted tiny">The chart uses manually logged uninterrupted distance, not summed interval repetitions.</p></section>

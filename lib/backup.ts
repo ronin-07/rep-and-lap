@@ -2,7 +2,7 @@ import {DAYS,type Day,type GymDay,type SwimDay,type TrackerData,type WeekLog} fr
 import {blankData,weekBlank} from './storage';
 import {normalizeSets} from './set-sync';
 import {clockItemKey,queueSwimSegment,queueSyncItem} from './item-sync';
-import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,validPool,validSwimSegmentPatch} from './swimming';
+import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,validPool,validSwimSegmentPatch} from './swimming';
 
 export interface BackupCounts {sessions:number;sets:number;weighIns:number;drinks:number}
 export interface BackupPreview {backup:TrackerData;counts:BackupCounts;duplicates:number;newRecords:number;version:number;exportedAt?:string}
@@ -167,6 +167,15 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
   if(raw.swimPoolDefault!==undefined){check(typeof raw.swimPoolDefault==='number'&&validPool(raw.swimPoolDefault)===raw.swimPoolDefault,'Invalid default pool length');base.swimPoolDefault=raw.swimPoolDefault;}
   if(raw.swimTargets!==undefined){const values=safeRecord(raw.swimTargets,'swim targets',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&typeof value==='number'&&value>=25&&value<=10000,'Invalid swim goal');base.swimTargets=values as TrackerData['swimTargets'];}
   if(raw.swimModes!==undefined){const values=safeRecord(raw.swimModes,'swim modes',4);for(const [key,value] of Object.entries(values))check((SWIM_STROKES as readonly string[]).includes(key)&&(value==='learning'||value==='advanced'),'Invalid swim mode');base.swimModes=values as TrackerData['swimModes'];}
+  if(raw.swimTechniqueMastery!==undefined){
+   const strokes=safeRecord(raw.swimTechniqueMastery,'technique mastery',4);
+   for(const [stroke,flags] of Object.entries(strokes)){
+    check((SWIM_STROKES as readonly string[]).includes(stroke),'Invalid mastery stroke');
+    const steps=safeRecord(flags,'technique mastery steps',10);
+    for(const [step,mastered] of Object.entries(steps))check(SWIM_CHECKLIST[stroke as typeof SWIM_STROKES[number]].includes(step)&&typeof mastered==='boolean','Invalid technique mastery confirmation');
+   }
+   base.swimTechniqueMastery=strokes as TrackerData['swimTechniqueMastery'];
+  }
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];
   if(typeof raw.restSeconds==='number'&&raw.restSeconds>=15&&raw.restSeconds<=600)base.restSeconds=raw.restSeconds;
   if(raw.effortMode==='off'||raw.effortMode==='rir'||raw.effortMode==='rpe')base.effortMode=raw.effortMode;
@@ -205,6 +214,11 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
   for(const day of ['Thursday','Friday','Saturday'] as const)if(!data.swimTemplates[day]&&source.swimTemplates[day]){data.swimTemplates[day]=structuredClone(source.swimTemplates[day]);addedTemplate=true;}
   // Merge conservatively: existing training preferences always win.
   for(const stroke of SWIM_STROKES){if(!data.swimTargets[stroke]&&source.swimTargets[stroke]){data.swimTargets[stroke]=source.swimTargets[stroke];addedTemplate=true;}}
+  // Confirmations are imported only for unconfirmed steps, never removing existing choices.
+  for(const stroke of SWIM_STROKES){
+   const existing=data.swimTechniqueMastery[stroke]??={};
+   for(const [step,confirmed] of Object.entries(source.swimTechniqueMastery?.[stroke]||{}))if(confirmed&&!existing[step]){existing[step]=true;addedTemplate=true;}
+  }
   if(addedTemplate)changedKeys.push('preferences');
   return {data:normalizeSets(data),changedKeys,duplicates,newRecords};
 }

@@ -831,3 +831,42 @@ body.keyboard-open .active-timer-dock{display:none}
 .app-layout:has(.quick-save-bar) .active-timer-dock{bottom:101px}
 .app-layout.rest-open:has(.quick-save-bar) .active-timer-dock{bottom:218px}
 @media(max-width:900px){.app-layout:has(.quick-save-bar) .active-timer-dock{bottom:calc(162px + env(safe-area-inset-bottom))}.app-layout.rest-open:has(.quick-save-bar) .active-timer-dock{bottom:calc(295px + env(safe-area-inset-bottom))}}
+
+/* Milestone 8: responsive timer + completion bar; previously this was Save-only. */
+.workout-control-bar{gap:20px;min-height:95px}
+.workout-bar-clock{display:flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums;color:var(--text);font-size:.87rem;font-weight:750;white-space:nowrap}
+.workout-bar-clock>svg{color:var(--violet,#a995ff)}
+.workout-bar-status{border-radius:20px;padding:3px 9px;font-size:.69rem;color:var(--muted);background:var(--panel2);font-weight:650}
+.workout-bar-status.running{color:var(--green)}
+.workout-bar-status.paused{color:var(--orange,#f9b76d)}
+.workout-bar-actions{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.workout-bar-actions button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.completed-readonly-hint,.completed-edit-hint{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:12px;padding:12px 15px;font-size:.83rem;line-height:1.5;background:var(--panel2);color:var(--muted)}
+.completed-readonly-hint svg,.completed-edit-hint svg{flex-shrink:0;color:var(--green)}
+.completed-edit-hint svg{color:var(--violet,#a995ff)}
+.workout-edit-fieldset{margin:0;padding:0;min-width:0;border:none;display:flex;flex-direction:column;gap:20px}
+.workout-edit-fieldset:disabled{opacity:.75}
+.workout-edit-fieldset:disabled button,.workout-edit-fieldset:disabled input,.workout-edit-fieldset:disabled textarea,.workout-edit-fieldset:disabled select{cursor:not-allowed}
+@media(max-width:900px){.workout-control-bar{min-height:118px;align-items:stretch}.workout-bar-actions{justify-content:flex-end}.workout-control-bar .quick-save-info strong{max-width:40vw}}
+@media(max-width:670px){.workout-control-bar{flex-direction:column;gap:9px;padding:11px 13px}.workout-control-bar .quick-save-info{gap:3px}.workout-control-bar .quick-save-info strong{max-width:100%;font-size:.8rem}.workout-control-bar .quick-save-info small{font-size:.67rem}.workout-bar-clock{font-size:.78rem}.workout-bar-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}.workout-bar-actions:has(>button:only-child){grid-template-columns:1fr}.workout-bar-actions button{width:100%;font-size:.8rem;min-height:42px;padding:9px}.app-main:has(.workout-control-bar){padding-bottom:260px}.app-layout.rest-open .app-main:has(.workout-control-bar){padding-bottom:370px}}
+/* Milestone 8 compact swimming: quick lengths and practice fields first. */
+.swim-segment-body{gap:14px}
+.swim-more-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);font-weight:750;text-align:left;cursor:pointer}
+.swim-more-toggle>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.swim-more-toggle small{font-size:.72rem;font-weight:450;color:var(--muted);overflow-wrap:anywhere}
+.swim-more-toggle svg{color:var(--violet,#a995ff);flex-shrink:0}
+.swim-detail-body{border-top:1px solid var(--border);padding-top:12px}
+@media(max-width:570px){.swim-length-group{gap:10px}.swim-more-toggle{min-height:44px}}
+
+/* Completed-session technique evidence and voluntary mastery. */
+.swim-technique-evidence-list{display:grid;gap:9px}
+.swim-technique-evidence-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:12px}
+.swim-technique-evidence-text{display:flex;flex-direction:column;gap:5px;min-width:0}
+.swim-technique-evidence-text strong{font-size:.81rem;line-height:1.4}
+.swim-technique-evidence-text small{font-size:.73rem;color:var(--muted)}
+.swim-technique-evidence-row button{min-height:37px;padding:8px 11px;font-size:.74rem;white-space:nowrap;flex-shrink:0}
+@media(max-width:460px){.swim-technique-evidence-row{align-items:flex-start;flex-direction:column}.swim-technique-evidence-row button{width:100%}}
+
+/* A second running session must remain reachable above the expanded bar. */
+@media(max-width:900px){.app-layout:has(.workout-control-bar) .active-timer-dock{bottom:calc(242px + env(safe-area-inset-bottom))}.app-layout.rest-open:has(.workout-control-bar) .active-timer-dock{bottom:calc(378px + env(safe-area-inset-bottom))}}
+@media(min-width:901px){.app-layout:has(.workout-control-bar) .active-timer-dock{bottom:128px}.app-layout.rest-open:has(.workout-control-bar) .active-timer-dock{bottom:257px}}

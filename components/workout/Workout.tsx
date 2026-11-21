@@ -1,7 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {progressionAdvice} from '@/lib/training-intelligence';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Save,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Pencil,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {GymDay,SwimDay,Day,SwimInterval,SwimLog} from '@/lib/types';
 import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
@@ -22,25 +22,44 @@ function WeekChooser({app}:{app:Trainer}){return <div className="week-chooser"><
 function Segmented<T extends string>({values,value,onChange}:{values:readonly T[];value:T;onChange:(value:T)=>void}){return <div className="segmented">{values.map(x=><button key={x} className={value===x?'selected':''} onClick={()=>onChange(x)}>{x}</button>)}</div>}
 function SelectDay({days,value,onChange}:{days:Day[];value:Day;onChange:(value:Day)=>void}){return <div className="day-tabs">{days.map(d=><button key={d} className={value===d?'active':''} onClick={()=>onChange(d)}><small>{d.slice(0,3)}</small><strong>{PLAN[d].name}</strong></button>)}</div>}
 export default function Workout({app}:{app:Trainer}){
+ const [editingCompleted,setEditingCompleted]=useState<string|null>(null);
+ const day=app.trackingTab==='gym'?app.gymDay:app.swimDay;
+ const key=`${app.week}:${day}`;
+ const completed=!!weekLog(app.data,app.week).done?.[day];
+ const editing=completed&&editingCompleted===key;
  return <div className="stack-xl"><div className="page-header"><div><span className="eyebrow">YOUR TRAINING LOG</span><h1>Keep moving.</h1><p>Choose a workout, log a drink or record your body weight.</p></div><WeekChooser app={app}/></div>
  <div className="tracking-tabs">{(['gym','swim','water','weight'] as const).map(tab=><button key={tab} className={app.trackingTab===tab?'active':''} onClick={()=>app.setTrackingTab(tab)}>{tab==='gym'?<Dumbbell size={18}/>:tab==='swim'?<Swim size={18}/>:tab==='water'?<Droplets size={18}/>:<Weight size={18}/>}<span>{tab==='gym'?'Gym':tab==='swim'?'Swimming':tab==='water'?'Water':'Body weight'}</span></button>)}</div>
- {app.trackingTab==='gym'?<Gym app={app}/>:app.trackingTab==='swim'?<Swimming app={app}/>:app.trackingTab==='water'?<Water app={app}/>:<BodyWeight app={app}/>}
- {(app.trackingTab==='gym'||app.trackingTab==='swim')&&<WorkoutSaveBar app={app}/>}
- </div>
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&completed&&!editing&&<div className="completed-readonly-hint" role="status"><CheckCircle2 size={18}/><span>Completed workout · read-only until you choose <strong>Edit completed workout</strong> below. Your original date and duration are preserved.</span></div>}
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&editing&&<div className="completed-edit-hint" role="status"><Pencil size={18}/><span>Editing completed workout · changes save automatically. Your completion date, status and duration stay unchanged.</span></div>}
+ {app.trackingTab==='gym'?<Gym app={app} editable={editing}/>:app.trackingTab==='swim'?<Swimming app={app} editable={editing}/>:app.trackingTab==='water'?<Water app={app}/>:<BodyWeight app={app}/>}
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&<WorkoutControlBar app={app} editing={editing} onEdit={()=>setEditingCompleted(key)} onDoneEditing={()=>setEditingCompleted(null)}/>}
+ </div>;
 }
-/** Persistent completion action, distinct from automatic progress saving.
- * Stays above mobile navigation and the rest dock; no scrolling required. */
-function WorkoutSaveBar({app}:{app:Trainer}){
+/** One consistent persistent workout action area on phone and desktop. Progress
+ * is autosaved separately; Finish is a deliberate completion action. */
+function WorkoutControlBar({app,editing,onEdit,onDoneEditing}:{app:Trainer;editing:boolean;onEdit:()=>void;onDoneEditing:()=>void}){
  const day=app.trackingTab==='gym'?app.gymDay:app.swimDay;
  const record=weekLog(app.data,app.week),complete=!!record.done[day];
- const clock=sessionClockState(record.timing?.[day]);
+ const timing=record.timing?.[day],state=sessionClockState(timing);
+ const now=state==='running'||state==='paused'?Math.max(app.clock,Date.parse(timing!.startedAt!)):undefined;
  const sessionKey=`session:${app.week}:${day}`;
  const pending=!!app.data.pendingSync[sessionKey]||Object.keys(app.data.pendingItems).some(key=>key.startsWith(`${sessionKey}~`));
  const conflict=Object.keys(app.data.itemConflicts).some(key=>key.startsWith(`${sessionKey}~`));
- return <div className="quick-save-bar" role="region" aria-label={`${app.trackingTab==='gym'?'Gym':'Swimming'} workout save controls`}>
-  <div className="quick-save-info"><strong>{complete?'Workout completed':`${PLAN[day].name} · ${day}`}</strong><small>{conflict?'Sync conflict · review before completing':pending?'Saved on device · syncing to cloud':app.user?'Progress saved automatically · cloud sync available':'Progress saved on this device'}</small></div>
-  {complete?<span className="quick-save-finished"><CheckCircle2 size={19}/> Completed</span>:<button className="button-primary quick-save-button" type="button" disabled={conflict} onClick={()=>app.saveWorkout(day)}><Save size={18}/> Save workout</button>}
- </div>;
+ const toggleTimer=state==='ready'?()=>app.startSession(day):state==='running'?()=>app.pauseSession(day):()=>app.resumeSession(day);
+ const timerLabel=state==='ready'?'Start timer':state==='running'?'Pause':'Resume';
+ return <section className="quick-save-bar workout-control-bar" role="region" aria-label={`${app.trackingTab==='gym'?'Gym':'Swimming'} workout and timer controls`}>
+  <div className="quick-save-info">
+   <strong>{PLAN[day].name} · {day}</strong>
+   <span className="workout-bar-clock"><Clock size={15}/><span role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,now):'00:00:00'}</span><span className={`workout-bar-status ${state}`}>{complete?'Completed':state==='ready'?'Ready':state==='stopped'?'Stopped':state==='paused'?'Paused':'Running'}</span></span>
+   <small>{conflict?'Sync conflict · review before changing':pending?'Saved locally · cloud sync pending':app.user?'Autosaved · cloud sync available':'Autosaved on this device'}</small>
+  </div>
+  <div className="workout-bar-actions">
+   {complete?editing?<button type="button" className="button-primary" onClick={onDoneEditing}><Check size={17}/> Done editing</button>:<button type="button" className="button-secondary" onClick={onEdit}><Pencil size={17}/> Edit completed workout</button>:<>
+    <button type="button" className="button-secondary workout-bar-timer-action" disabled={conflict} onClick={toggleTimer}>{state==='running'?<Pause size={17}/>:<Play size={17}/>}<span>{timerLabel}</span></button>
+    <button type="button" className="button-primary workout-bar-finish-action" disabled={conflict} onClick={()=>app.saveWorkout(day)}><Check size={17}/> Finish workout</button>
+   </>}
+  </div>
+ </section>;
 }
 function SessionClock({app,day}:{app:Trainer;day:Day}){
  const record=weekLog(app.data,app.week),timing=record.timing?.[day],state=sessionClockState(timing),done=!!record.done[day];
@@ -61,13 +80,13 @@ function SessionClock({app,day}:{app:Trainer;day:Day}){
  {state==='stopped'&&!done&&<p className="muted tiny">Continue keeps previously tracked active time. Restart resets only the timer, not your logged sets.</p>}
  </div>;
 }
-function Gym({app}:{app:Trainer}){
+function Gym({app,editable}:{app:Trainer;editable:boolean}){
  const day=app.gymDay,plan=PLAN[day];if(plan.kind!=='gym')return null;
  const stats=gymStats(app.data,app.week,day),w=weekLog(app.data,app.week),done=!!w.done?.[day],status=statusFor(app.data,app.week,day);
  const activeExercises=exercisesFor(app.data,app.week,day);
  return <div className="stack"><SelectDay days={GYM_DAYS} value={day} onChange={v=>app.setGymDay(v as GymDay)}/>
  <div className="workout-banner card"><div><span className="eyebrow">{day.toUpperCase()} · STRENGTH</span><h2>{plan.name}</h2><p>{plan.subtitle}</p></div><div className="workout-banner-pill">{stats.logged} / {stats.total} sets</div></div>
- <RoutineEditor app={app} day={day}/>{(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped workout'}</strong><span>This session is {status}. It does not count as completed training.</span><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore workout</button></div>}
+ <fieldset className="workout-edit-fieldset" disabled={done&&!editable}><RoutineEditor app={app} day={day}/>{(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped workout'}</strong><span>This session is {status}. It does not count as completed training.</span><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore workout</button></div>}
  <div className="workout-columns"><div className="stack">{activeExercises.map(ex=>{
  const count=setCount(app.data,app.week,day,ex.name),entry=w.gym?.[day]?.[ex.name];
  const volume=(entry?.sets||[]).slice(0,count).filter(loggedSet).reduce((s,x)=>s+num(x.kg)*num(x.reps),0);
@@ -80,7 +99,7 @@ function Gym({app}:{app:Trainer}){
  <div className="stack"><section className="card pane-pad session-progress-card"><div className="section-title"><div><span className="eyebrow">SESSION PROGRESS</span><h2>Your sets, at a glance.</h2></div></div><div className="set-progress-total"><strong>{stats.logged}</strong><div><span>of {stats.total} sets logged</span><small>{stats.total?Math.round(stats.logged/stats.total*100):0}% complete</small></div></div><div className="progress-track tall"><span style={{width:`${stats.total?stats.logged/stats.total*100:0}%`}}/></div><p className="muted small progress-help">Log set marks a finished set. Your weights and reps save automatically.</p><SessionClock app={app} day={day}/>{!(w.timing?.[day]?.startedAt&&!w.timing?.[day]?.endedAt)&&<button className={`button-primary full ${done?'completed-btn':''}`} onClick={()=>app.toggleDone(day)}>{done?<><CheckCircle2 size={18}/> Undo completion</>:<><Check size={18}/> Mark workout complete</>}</button>}</section>
  <section className="card pane-pad"><span className="eyebrow">REST SETTINGS</span><div className="muted small rest-help">Logging a set starts a rest timer, displayed at the bottom of the workout screen. It counts elapsed time even when your phone is locked.</div><div className="rest-choices">{[60,90,120,180].map(v=><button key={v} className={app.data.restSeconds===v?'selected':''} onClick={()=>app.updatePreferences({restSeconds:v})}>{v===90?'1.5':v/60} min</button>)}</div><div className="row-actions"><button className="button-secondary" onClick={()=>app.startRest()}><Timer size={16}/> Start</button><button className="button-secondary" onClick={()=>app.extendRest()}>+30s</button><button className="button-secondary" onClick={app.stopRest}>Stop</button></div></section>
  <div className="tip-card"><strong>Double progression</strong><p>Build reps with good form. When every set reaches the top of its target range, increase weight slightly.</p></div></div></div>
- </div>;
+ </fieldset></div>;
 }
 function DeleteLoggedSetButton({app,day,exercise,index,kg,reps}:{app:Trainer;day:GymDay;exercise:string;index:number;kg:string;reps:string}){
  const [confirmOpen,setConfirmOpen]=useState(false);
@@ -88,7 +107,7 @@ function DeleteLoggedSetButton({app,day,exercise,index,kg,reps}:{app:Trainer;day
  {confirmOpen&&<div className="overlay" role="presentation" onClick={()=>setConfirmOpen(false)}><div className="card confirm-delete" role="alertdialog" aria-modal="true" aria-labelledby="confirm-set-heading" aria-describedby="confirm-set-detail" onClick={e=>e.stopPropagation()}><h2 id="confirm-set-heading">Delete logged set?</h2><p id="confirm-set-detail">Remove set {index+1} of {exercise} ({kg} kg × {reps} reps)? The recorded set will be deleted from this workout. The empty set slot remains available.</p><div className="row-actions"><button className="button-secondary" autoFocus onClick={()=>setConfirmOpen(false)}>Cancel</button><button className="button-danger" onClick={()=>{app.deleteLoggedSet(day,exercise,index);setConfirmOpen(false);}}>Delete logged set</button></div></div></div>}
  </>;
 }
-function Swimming({app}:{app:Trainer}){return <SwimLogger app={app}/>;}
+function Swimming({app,editable}:{app:Trainer;editable:boolean}){return <SwimLogger app={app} editable={editable}/>;}
 function Water({app}:{app:Trainer}){
  const [date,setDate]=useState(keyOf(new Date())),[custom,setCustom]=useState('330');
  const total=waterTotal(app.data,date),goal=waterGoal(date),items=waterEntries(app.data,date);

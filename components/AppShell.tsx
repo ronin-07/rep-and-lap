@@ -55,7 +55,7 @@ export default function AppShell(){
  <RecoveryCheckIn app={app}/>
  <CompletionDateDialog app={app}/>
  {totalConflicts>0&&conflictNotice&&app.view!=='conflicts'&&<div className="conflict-notice" role="alert"><ShieldAlert size={23}/><div><strong>Sync conflict detected</strong><small>{totalConflicts} {totalConflicts===1?'item needs':'items need'} your decision</small></div><button className="button-primary" onClick={()=>{setConflictNotice(false);app.goto('conflicts');}}>Review</button><button className="icon-btn" aria-label="Dismiss conflict notification" onClick={()=>setConflictNotice(false)}><X size={17}/></button></div>}
- {app.celebration&&<div className="overlay" role="presentation" onClick={()=>app.setCelebration(null)}>
+ {app.celebration&&!app.recoveryPrompt&&<div className="overlay" role="presentation" onClick={()=>app.setCelebration(null)}>
   <div className={`celebration card ${app.celebration.kind==='hydration'?'celebration-water':''}`} role="dialog" aria-modal="true" aria-label={app.celebration.title} onClick={e=>e.stopPropagation()}>
    {app.celebration.kind==='hydration'?<div className="water-celebration-art" aria-hidden="true"><span className="water-ripple ripple-one"/><span className="water-ripple ripple-two"/><span className="water-drop-core"><Droplets size={46}/></span><span className="water-spark spark-a"/><span className="water-spark spark-b"/><span className="water-spark spark-c"/><span className="water-spark spark-d"/></div>:<span className="celebration-trophy"><Trophy size={42}/></span>}
    <div className="eyebrow">{app.celebration.kind==='hydration'?'DAILY WATER GOAL COMPLETE':'A MOMENT TO CELEBRATE'}</div>

@@ -6,7 +6,7 @@ function typedGymDay(day:Day):day is 'Monday'|'Tuesday'|'Wednesday'{return day==
 export const STORAGE_KEY='rep-and-lap-firebase-v1'; // Reuse existing Firebase edition cache, no data reset.
 export const LAST_ACCOUNT_KEY='rep-and-lap-firebase-last-account';
 export const THEME_KEY='rep-and-lap-theme';
-export function blankData():TrackerData {return {version:5,swimTemplates:{},swimPoolDefault:50,swimTargets:{...SWIM_TARGET_DEFAULTS},swimModes:{...SWIM_MODE_DEFAULTS},routineTemplates:{},setRecords:{},pendingSets:{},setConflicts:{},syncItems:{},pendingItems:{},itemConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,effortMode:'off',recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
+export function blankData():TrackerData {return {version:5,swimTemplates:{},swimPoolDefault:50,swimTargets:{...SWIM_TARGET_DEFAULTS},swimModes:{...SWIM_MODE_DEFAULTS},swimTechniqueMastery:{},routineTemplates:{},setRecords:{},pendingSets:{},setConflicts:{},syncItems:{},pendingItems:{},itemConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,effortMode:'off',recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
 export function weekBlank():WeekLog{return {done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{},completedOn:{},scheduleStatus:{},routineOverrides:{},swimRoutineOverrides:{}};}
 export function loadData(uid:string):TrackerData {
   if(typeof window==='undefined')return blankData();
@@ -14,7 +14,7 @@ export function loadData(uid:string):TrackerData {
     const value=JSON.parse(localStorage.getItem(`${STORAGE_KEY}:${uid}`)||'null');
     if(!value||typeof value.weeks!=='object'||Array.isArray(value.weeks))return blankData();
     const result:TrackerData={...blankData(),...value,version:5};
-    if(!['off','rir','rpe'].includes(result.effortMode))result.effortMode='off';result.weights||={};result.waterLogs||={};result.recordUpdates||={};result.pendingSync||={};result.setOverrides||={};result.routineTemplates||={};result.swimTemplates||={};result.swimPoolDefault||=50;result.swimTargets||={...SWIM_TARGET_DEFAULTS};result.swimModes||={...SWIM_MODE_DEFAULTS};
+    if(!['off','rir','rpe'].includes(result.effortMode))result.effortMode='off';result.weights||={};result.waterLogs||={};result.recordUpdates||={};result.pendingSync||={};result.setOverrides||={};result.routineTemplates||={};result.swimTemplates||={};result.swimPoolDefault||=50;result.swimTargets||={...SWIM_TARGET_DEFAULTS};result.swimModes||={...SWIM_MODE_DEFAULTS};result.swimTechniqueMastery||={};
     if(!Object.keys(result.recordUpdates).length) {
       const t=Date.now()-60_000;
       for(const [w,entry] of Object.entries(result.weeks))for(const day of DAYS)
@@ -28,7 +28,7 @@ export function loadData(uid:string):TrackerData {
 }
 export function saveData(uid:string,data:TrackerData) {localStorage.setItem(`${STORAGE_KEY}:${uid}`,JSON.stringify(data));}
 export function recordPayload(data:TrackerData,key:string):unknown {
-  if(key==='preferences')return {setOverrides:data.setOverrides,targetWeight:data.targetWeight,restSeconds:data.restSeconds,effortMode:data.effortMode,reminders:data.reminders,routineTemplates:data.routineTemplates,swimTemplates:data.swimTemplates,swimPoolDefault:data.swimPoolDefault,swimTargets:data.swimTargets,swimModes:data.swimModes};
+  if(key==='preferences')return {setOverrides:data.setOverrides,targetWeight:data.targetWeight,restSeconds:data.restSeconds,effortMode:data.effortMode,reminders:data.reminders,routineTemplates:data.routineTemplates,swimTemplates:data.swimTemplates,swimPoolDefault:data.swimPoolDefault,swimTargets:data.swimTargets,swimModes:data.swimModes,swimTechniqueMastery:data.swimTechniqueMastery};
   if(key.startsWith('weight:'))return data.weights[key.slice(7)]??{deleted:true};
   if(key.startsWith('water:'))return data.waterLogs[key.slice(6)]??{deleted:true};
   if(key.startsWith('session:')){
@@ -41,7 +41,7 @@ export function applyRecord(data:TrackerData,key:string,value:unknown):TrackerDa
   const next:TrackerData=structuredClone(data);
   if(key==='preferences'){
     const p=(value||{}) as Partial<TrackerData>;
-    next.setOverrides=p.setOverrides||{};next.routineTemplates=p.routineTemplates||{};next.swimTemplates=p.swimTemplates||{};next.swimPoolDefault=Number(p.swimPoolDefault)||50;next.swimTargets=p.swimTargets||{...SWIM_TARGET_DEFAULTS};next.swimModes=p.swimModes||{...SWIM_MODE_DEFAULTS};next.targetWeight=p.targetWeight??'';next.restSeconds=p.restSeconds||90;next.effortMode=['off','rir','rpe'].includes(p.effortMode||'')?p.effortMode!:'off';next.reminders=p.reminders||{enabled:false,time:'18:00'};
+    next.setOverrides=p.setOverrides||{};next.routineTemplates=p.routineTemplates||{};next.swimTemplates=p.swimTemplates||{};next.swimPoolDefault=Number(p.swimPoolDefault)||50;next.swimTargets=p.swimTargets||{...SWIM_TARGET_DEFAULTS};next.swimModes=p.swimModes||{...SWIM_MODE_DEFAULTS};next.swimTechniqueMastery=p.swimTechniqueMastery||{};next.targetWeight=p.targetWeight??'';next.restSeconds=p.restSeconds||90;next.effortMode=['off','rir','rpe'].includes(p.effortMode||'')?p.effortMode!:'off';next.reminders=p.reminders||{enabled:false,time:'18:00'};
   }else if(key.startsWith('weight:'))next.weights[key.slice(7)]=(value||{deleted:true}) as TrackerData['weights'][string];
   else if(key.startsWith('water:'))next.waterLogs[key.slice(6)]=(value||{deleted:true}) as TrackerData['waterLogs'][string];
   else if(key.startsWith('session:')){

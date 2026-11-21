@@ -51,7 +51,7 @@ function cryptoId():string {return typeof crypto!=='undefined'&&typeof crypto.ra
 export function initialSwimRoutines():Record<SwimDay,SwimRoutine> {
  return {
   Thursday:{name:'Freestyle technique',description:'Relaxed practice, breathing and technique',activities:[{activity:'freestyle',mode:'advanced',plannedMinutes:30},{activity:'breathing',mode:'learning',plannedMinutes:10}]},
-  Friday:{name:'New strokes + sculling',description:'Learn breaststroke and improve water confidence',activities:[{activity:'breaststroke',mode:'learning',plannedMinutes:25},{activity:'sculling',mode:'learning',plannedMinutes:10}]},
+  Friday:{name:'Freestyle + new strokes',description:'Freestyle practice, breaststroke and water confidence',activities:[{activity:'freestyle',mode:'advanced',plannedMinutes:15},{activity:'breaststroke',mode:'learning',plannedMinutes:20},{activity:'sculling',mode:'learning',plannedMinutes:10}]},
   Saturday:{name:'Freestyle endurance',description:'Build comfortable continuous distance',activities:[{activity:'freestyle',mode:'advanced',plannedMinutes:40}]},
  };
 }
@@ -202,6 +202,26 @@ export function strokeFromLabel(label:string):SwimActivity|undefined{
  const value=label.toLowerCase().trim();return (Object.keys(SWIM_ACTIVITY_LABELS) as SwimActivity[]).find(k=>SWIM_ACTIVITY_LABELS[k].toLowerCase()===value);
 }
 
+/** A technique is practiced at most once per completed workout, regardless of
+ * how many segments of the same stroke were logged that day. Unfinished sessions
+ * do not provide mastery evidence. Existing checkboxes are never rewritten. */
+export function swimTechniqueEvidence(data:TrackerData,stroke:SwimStroke):{sessions:number;segments:number;byStep:Record<string,number>} {
+ const byStep:Record<string,number>={};let sessions=0,segments=0;
+ for(const record of Object.values(data.weeks))for(const day of SWIM_DAYS){
+  if(!record.done?.[day])continue;
+  const entries=(record.swim?.[day]?.segments||[]).filter(segment=>segment.activity===stroke);
+  if(!entries.length)continue;
+  sessions++;segments+=entries.length;
+  const checked=new Set(entries.flatMap(item=>Object.keys(item.technique||{}).filter(step=>item.technique?.[step])));
+  for(const step of checked)if(SWIM_CHECKLIST[stroke].includes(step))byStep[step]=(byStep[step]||0)+1;
+ }
+ return {sessions,segments,byStep};
+}
+export function swimTechniqueStage(practiceSessions:number,confirmed:boolean):'not-practiced'|'practicing'|'improving'|'mastered'{
+ if(practiceSessions<1)return 'not-practiced';
+ if(practiceSessions<3)return 'practicing';
+ return confirmed?'mastered':'improving';
+}
 /** Reuse customized swim-plan names wherever session summaries are shown. */
 export function sessionDisplayName(data:TrackerData,week:string,day:import('./types').Day):string {
  if((SWIM_DAYS as readonly string[]).includes(day))return swimRoutine(data,week,day as SwimDay).name;

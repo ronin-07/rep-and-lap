@@ -141,6 +141,6 @@ describe('Milestone 6 multi-stroke swimming',()=>{
  it('does not mutate the default plan when customized',()=>{
   const data=blankData(),one=swimRoutine(data,WK,'Friday');one.name='Changed';
   expect(swimRoutine(data,WK,'Friday').name).not.toBe('Changed');
-  expect(initialSwimRoutines().Friday.activities).toHaveLength(2);
+  expect(initialSwimRoutines().Friday.activities).toHaveLength(3); // Freestyle is now a built-in Friday default.
  });
 });
