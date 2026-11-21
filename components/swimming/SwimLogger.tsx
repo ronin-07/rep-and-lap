@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import {ChevronDown,ChevronUp,Plus,Minus,Save,RotateCcw,Trash2,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {SwimDay,SwimActivity,SwimStroke,SwimSegment,SwimRoutine,SwimMode} from '@/lib/types';
-import {SWIM_DAYS,PLAN} from '@/lib/plan';
+import {PLAN} from '@/lib/plan';
 import {weekLog,plannedDate} from '@/lib/metrics';
 import {SWIM_ACTIVITY_LABELS,SWIM_STROKES,SWIM_DRILLS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,SWIM_SKILL_LEVELS,swimRoutine,swimTotals,swimNumber,effectivePool,segmentDistance,segmentContinuous,isStroke} from '@/lib/swimming';
 import {statusFor} from '@/lib/scheduling';
@@ -46,7 +46,6 @@ export default function SwimLogger({app,editable}:Props){
  useEffect(()=>setDefaultPool(String(app.data.swimPoolDefault||50)),[app.data.swimPoolDefault]);
  const status=statusFor(app.data,app.week,day);
  return <div className="stack swim-log">
-  <div className="day-tabs" role="group" aria-label="Swimming day">{SWIM_DAYS.map(d=><button key={d} className={day===d?'active':''} onClick={()=>app.setSwimDay(d)}><small>{d.slice(0,3)}{record.timing?.[d]?.endedAt&&!record.done[d]?' · Log pending':''}</small><strong>{swimRoutine(app.data,app.week,d).name}</strong></button>)}</div>
   <section className="card pane-pad swim-session-hero"><div><span className="eyebrow">{day.toUpperCase()} · SWIM SESSION</span><h2>{plan.name}</h2><p className="muted">{plan.description}</p></div><span className="icon-wrap aqua"><Waves/></span></section>
   {(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped swim'}</strong><p>Restore this session to record a swim.</p><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore session</button></div>}
   <fieldset className="workout-edit-fieldset" disabled={completed&&!editable}>

@@ -878,9 +878,6 @@ body.keyboard-open .active-timer-dock{display:none}
 .workout-bar-actions{flex-wrap:wrap;justify-content:flex-end}
 .workout-bar-actions button{min-height:44px}
 .finish-label-short{display:none}
-.workout-timer-options{position:relative;font-size:.75rem;color:var(--muted)}
-.workout-timer-options summary{cursor:pointer;padding:9px 8px;min-height:42px;display:flex;align-items:center}
-.workout-timer-options button{margin-top:6px}
 .workout-control-bar .embedded-rest-dock{position:static;left:auto;right:auto;bottom:auto;z-index:auto;box-shadow:none;width:100%;max-width:none;margin:0;padding:8px 10px 11px;border-radius:12px;animation:none;gap:8px}
 .workout-control-bar .embedded-rest-dock .rest-dock-symbol{height:30px;width:30px}
 .workout-control-bar .embedded-rest-dock .rest-dock-symbol svg{height:16px;width:16px}
@@ -957,7 +954,6 @@ body.keyboard-open .active-timer-dock{display:none}
  .workout-bar-clock{font-size:.8rem}
  .workout-control-bar .workout-bar-actions button{min-height:44px}
  .finish-label-full{display:none}.finish-label-short{display:inline}
- .workout-timer-options{flex-basis:100%}
  .app-layout .app-main:has(.workout-control-bar){padding-bottom:275px}
  .completed-session-metrics>div{min-width:120px}
 }
@@ -979,3 +975,21 @@ body.keyboard-open .workout-control-bar{display:none}
 /* Match content clearance to the measured bar (including an expanded rest dock). */
 .app-layout .app-main:has(.workout-control-bar){padding-bottom:calc(var(--workout-control-height, 125px) + 55px)}
 @media(max-width:900px){.app-layout .app-main:has(.workout-control-bar){padding-bottom:calc(var(--workout-control-height, 145px) + 106px + env(safe-area-inset-bottom))}}
+
+/* Phase A refinement: stable selector order and matching gym/swim timer controls. */
+.workout-bar-actions{flex-wrap:nowrap;align-items:center}
+.workout-timer-menu{position:relative;flex:0 0 44px;align-self:center;z-index:3}
+.workout-timer-menu>summary{list-style:none;display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);color:var(--text);cursor:pointer}
+.workout-timer-menu>summary::-webkit-details-marker{display:none}
+.workout-timer-menu>summary:hover,.workout-timer-menu[open]>summary{border-color:var(--purple)}
+.workout-timer-menu>summary:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+.workout-timer-popover{position:absolute;right:0;bottom:calc(100% + 9px);min-width:180px;padding:7px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 14px 35px #0005}
+.workout-timer-popover button{width:100%;display:flex;justify-content:flex-start;gap:9px;min-height:42px;padding:9px 11px;border:0;border-radius:9px;background:var(--panel2);color:var(--text);font-size:.78rem;font-weight:750;cursor:pointer}
+.workout-timer-popover button:hover{background:var(--border)}
+.workout-timer-popover button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:670px){
+ .workout-control-bar{max-height:none;overflow:visible}
+ .workout-bar-actions{flex-wrap:nowrap;align-items:center}
+ .workout-timer-menu{flex:0 0 44px}
+ .workout-bar-actions>button{flex:1 1 auto;min-width:0}
+}

@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {nextSetGuidance} from '@/lib/next-set-guidance';
-import {Check,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Pencil,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Target,Dumbbell} from 'lucide-react';
+import {Check,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,MoreHorizontal,Square,Pencil,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Target,Dumbbell} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {GymDay,SwimDay,Day,SwimInterval,SwimLog} from '@/lib/types';
 import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
@@ -24,6 +24,18 @@ import {swimTotals,swimRoutine,effectivePool,segmentDistance,SWIM_ACTIVITY_LABEL
 function WeekChooser({app}:{app:Trainer}){return <div className="week-chooser"><button className="icon-btn" aria-label="Previous week" onClick={()=>app.setWeek(shiftWeek(app.week,-1))}><ChevronLeft size={19}/></button><strong>{labelWeek(app.week)}</strong><button className="icon-btn" aria-label="Next week" onClick={()=>app.setWeek(shiftWeek(app.week,1))}><ChevronRight size={19}/></button></div>}
 function Segmented<T extends string>({values,value,onChange}:{values:readonly T[];value:T;onChange:(value:T)=>void}){return <div className="segmented">{values.map(x=><button key={x} className={value===x?'selected':''} onClick={()=>onChange(x)}>{x}</button>)}</div>}
 function SelectDay({days,value,onChange}:{days:Day[];value:Day;onChange:(value:Day)=>void}){return <div className="day-tabs">{days.map(d=><button key={d} className={value===d?'active':''} onClick={()=>onChange(d)}><small>{d.slice(0,3)}</small><strong>{PLAN[d].name}</strong></button>)}</div>}
+/** Keep the day selector in the same position for planned, active, and completed
+ * workouts. Rendering it inside the editors made the whole layout jump when a
+ * workout was completed. */
+function WorkoutDayTabs({app}:{app:Trainer}){
+ if(app.trackingTab==='gym')return <SelectDay days={GYM_DAYS} value={app.gymDay} onChange={v=>app.setGymDay(v as GymDay)}/>;
+ if(app.trackingTab==='swim'){
+  const record=weekLog(app.data,app.week);
+  return <div className="day-tabs" role="group" aria-label="Choose swimming day">{SWIM_DAYS.map(day=><button type="button" key={day} className={app.swimDay===day?'active':''} onClick={()=>app.setSwimDay(day)}><small>{day.slice(0,3)}{record.timing?.[day]?.endedAt&&!record.done?.[day]?' · Log pending':''}</small><strong>{swimRoutine(app.data,app.week,day).name}</strong></button>)}</div>;
+ }
+ return null;
+}
+
 export default function Workout({app}:{app:Trainer}){
  const [editingCompleted,setEditingCompleted]=useState<string|null>(null);
  const day=app.trackingTab==='gym'?app.gymDay:app.swimDay;
@@ -32,11 +44,11 @@ export default function Workout({app}:{app:Trainer}){
  const editing=completed&&editingCompleted===key;
  return <div className="stack-xl"><div className="page-header"><div><span className="eyebrow">YOUR TRAINING LOG</span><h1>Keep moving.</h1><p>Choose a workout, log a drink or record your body weight.</p></div><WeekChooser app={app}/></div>
  <div className="tracking-tabs">{(['gym','swim','water','weight'] as const).map(tab=><button key={tab} className={app.trackingTab===tab?'active':''} onClick={()=>app.setTrackingTab(tab)}>{tab==='gym'?<Dumbbell size={18}/>:tab==='swim'?<Swim size={18}/>:tab==='water'?<Droplets size={18}/>:<Weight size={18}/>}<span>{tab==='gym'?'Gym':tab==='swim'?'Swimming':tab==='water'?'Water':'Body weight'}</span></button>)}</div>
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&<WorkoutDayTabs app={app}/>}
  {(app.trackingTab==='gym'||app.trackingTab==='swim')&&completed&&<CompletedSessionSummary key={key} app={app} day={day} editing={editing} onEdit={()=>setEditingCompleted(key)} onDoneEditing={()=>setEditingCompleted(null)}/>}
  <ActiveTimerDock app={app} inline/>
- {(app.trackingTab==='gym'||app.trackingTab==='swim')&&completed&&!editing&&<div className="completed-day-navigation">{app.trackingTab==='gym'?<SelectDay days={GYM_DAYS} value={app.gymDay} onChange={v=>app.setGymDay(v as GymDay)}/>:<div className="day-tabs" role="group" aria-label="Choose swimming day">{SWIM_DAYS.map(d=><button type="button" key={d} className={app.swimDay===d?'active':''} onClick={()=>app.setSwimDay(d)}><small>{d.slice(0,3)}</small><strong>{swimRoutine(app.data,app.week,d).name}</strong></button>)}</div>}</div>}
  {(app.trackingTab==='gym'||app.trackingTab==='swim')&&completed&&!editing?<CompletedWorkoutDetails app={app} day={day}/>:app.trackingTab==='gym'?<Gym app={app} editable={editing}/>:app.trackingTab==='swim'?<Swimming app={app} editable={editing}/>:app.trackingTab==='water'?<Water app={app}/>:<BodyWeight app={app}/>}
- {(app.trackingTab==='gym'||app.trackingTab==='swim')&&!completed&&<WorkoutControlBar app={app}/>}
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&!completed&&<WorkoutControlBar key={key} app={app}/>}
  </div>;
 }
 /** Completed workouts are summaries, not interactive stopwatches. Historical
@@ -46,9 +58,10 @@ function CompletedSessionSummary({app,day,editing,onEdit,onDoneEditing}:{app:Tra
  const duration=elapsedSessionMs(timing),isSwim=PLAN[day].kind==='swim';
  const gym=gymStats(app.data,app.week,day as GymDay);
  const swim=swimTotals(record.swim?.[day as SwimDay],app.data.swimPoolDefault);
+ const workoutName=isSwim?swimRoutine(app.data,app.week,day as SwimDay).name:PLAN[day].name;
  const [menuOpen,setMenuOpen]=useState(false),[reopenOpen,setReopenOpen]=useState(false);
  return <section className="card pane-pad completed-session-summary" aria-label="Completed workout summary">
-  <div className="completed-session-heading"><div><span className="eyebrow"><CheckCircle2 size={15}/> WORKOUT COMPLETED</span><h2>{PLAN[day].name}</h2><small className="muted">Trained {record.completedOn?.[day]||'on a saved date'} · {day}</small></div>
+  <div className="completed-session-heading"><div><span className="eyebrow"><CheckCircle2 size={15}/> WORKOUT COMPLETED</span><h2>{workoutName}</h2><small className="muted">Trained {record.completedOn?.[day]||'on a saved date'} · {day}</small></div>
    <div className="completed-menu-wrap"><button type="button" className="icon-btn" aria-label="More completed workout options" aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)}>•••</button>
     {menuOpen&&<div className="completed-menu"><button type="button" onClick={()=>setReopenOpen(true)}>Reopen workout…</button><details><summary>Recorded timestamps</summary><small>Started: {timing?.startedAt?new Date(timing.startedAt).toLocaleString():'Not tracked'}</small><small>Stopped: {timing?.endedAt?new Date(timing.endedAt).toLocaleString():'Not tracked'}</small><small>Completed: {record.completedAt?.[day]?new Date(record.completedAt[day]).toLocaleString():'Not recorded'}</small></details></div>}
    </div></div>
@@ -78,11 +91,12 @@ function WorkoutControlBar({app}:{app:Trainer}){
  const pending=!!app.data.pendingSync[sessionKey]||Object.keys(app.data.pendingItems).some(key=>key.startsWith(`${sessionKey}~`));
  const conflict=Object.keys(app.data.itemConflicts).some(key=>key.startsWith(`${sessionKey}~`));
  const isSwim=app.trackingTab==='swim';
+ const workoutName=isSwim?swimRoutine(app.data,app.week,day as SwimDay).name:PLAN[day].name;
  const timerLabel=state==='ready'?'Start timer':state==='running'?'Pause':state==='paused'?'Resume':'Continue';
  const toggleTimer=state==='ready'?()=>app.startSession(day):state==='running'?()=>app.pauseSession(day):()=>app.resumeSession(day);
  return <section ref={barRef} className="quick-save-bar workout-control-bar" role="region" aria-label={`${isSwim?'Swimming':'Gym'} workout controls`}>
   <div className="workout-control-main">
-   <div className="quick-save-info"><strong>{PLAN[day].name} · {day}</strong>
+   <div className="quick-save-info"><strong>{workoutName} · {day}</strong>
     <span className="workout-bar-clock"><Clock size={15}/><span role="timer" aria-live="off">{timing?.startedAt?formatSessionClock(timing,now):'00:00'}</span><span className={`workout-bar-status ${state}`}>{state==='ready'?'Ready':state==='stopped'?'Stopped':state==='paused'?'Paused':'Running'}</span></span>
     <small>{conflict?'Sync conflict · resolve to continue':pending?'Saved locally · cloud sync pending':app.user?'Autosaved · cloud available':'Autosaved on this device'}</small>
    </div>
@@ -90,7 +104,7 @@ function WorkoutControlBar({app}:{app:Trainer}){
     <button type="button" className="button-secondary workout-bar-timer-action" disabled={conflict} onClick={toggleTimer}>{state==='running'?<Pause size={17}/>:<Play size={17}/>}<span>{timerLabel}</span></button>
     {isSwim&&(state==='running'||state==='paused')&&<button type="button" className="button-secondary workout-bar-stop-action" disabled={conflict} onClick={()=>app.stopSwimSession(day as SwimDay)}><Square size={16}/><span>Stop timer</span></button>}
     <button type="button" className="button-primary workout-bar-finish-action" disabled={conflict} onClick={()=>app.saveWorkout(day)}><Check size={17}/><span className="finish-label-full">Finish workout</span><span className="finish-label-short">Finish</span></button>
-    {state==='stopped'&&<details className="workout-timer-options"><summary>Timer options</summary><button type="button" className="button-secondary" disabled={conflict} onClick={()=>app.restartSession(day)}><RotateCcw size={16}/> Restart timer</button></details>}
+    {state==='stopped'&&<details className="workout-timer-menu"><summary aria-label="More timer actions" title="More timer actions"><MoreHorizontal size={20}/></summary><div className="workout-timer-popover"><button type="button" disabled={conflict} onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');app.restartSession(day);}}><RotateCcw size={16}/> Restart timer</button></div></details>}
    </div>
   </div>
   {!isSwim&&<RestDock app={app} embedded/>}
@@ -155,8 +169,7 @@ function Gym({app,editable}:{app:Trainer;editable:boolean}){
  const day=app.gymDay,plan=PLAN[day];if(plan.kind!=='gym')return null;
  const stats=gymStats(app.data,app.week,day),w=weekLog(app.data,app.week),done=!!w.done?.[day],status=statusFor(app.data,app.week,day);
  const activeExercises=exercisesFor(app.data,app.week,day);
- return <div className="stack"><SelectDay days={GYM_DAYS} value={day} onChange={v=>app.setGymDay(v as GymDay)}/>
- <div className="workout-banner card"><div><span className="eyebrow">{day.toUpperCase()} · STRENGTH</span><h2>{plan.name}</h2><p>{plan.subtitle}</p></div><div className="workout-banner-pill">{stats.logged} / {stats.total} sets</div></div>
+ return <div className="stack"><div className="workout-banner card"><div><span className="eyebrow">{day.toUpperCase()} · STRENGTH</span><h2>{plan.name}</h2><p>{plan.subtitle}</p></div><div className="workout-banner-pill">{stats.logged} / {stats.total} sets</div></div>
  <fieldset className="workout-edit-fieldset" disabled={done&&!editable}><RoutineEditor app={app} day={day}/>{(status==='rest'||status==='skipped')&&<div className="schedule-notice card"><strong>{status==='rest'?'Recovery day':'Skipped workout'}</strong><span>This session is {status}. It does not count as completed training.</span><button className="button-secondary" onClick={()=>app.setScheduleStatus(day,null)}>Restore workout</button></div>}
  <div className="workout-columns"><div className="stack">{activeExercises.map(ex=>{
  const count=setCount(app.data,app.week,day,ex.name),entry=w.gym?.[day]?.[ex.name];
