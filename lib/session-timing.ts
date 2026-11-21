@@ -15,7 +15,7 @@ function pauseTotal(timing:SessionTiming):number|null {
  return Number.isSafeInteger(value)&&value>=0?value:null;
 }
 
-export function sessionClockState(timing?:SessionTiming):SessionClockState {
+export function sessionClockState(timing?:SessionTiming|null):SessionClockState {
  if(!timing?.startedAt)return 'ready';
  if(timing.endedAt)return 'stopped';
  return timing.pausedAt?'paused':'running';
@@ -23,7 +23,7 @@ export function sessionClockState(timing?:SessionTiming):SessionClockState {
 
 /** Null means missing/invalid timing. A running clock requires an explicit `now`.
  * This keeps unfinished sessions out of historical aggregate time calculations. */
-export function elapsedSessionMs(timing?:SessionTiming,now?:number):number|null {
+export function elapsedSessionMs(timing?:SessionTiming|null,now?:number):number|null {
  if(!timing||(!timing.endedAt&&now===undefined))return null;
  const start=ms(timing.startedAt),paused=timing.pausedAt?ms(timing.pausedAt):null;
  const end=timing.endedAt?ms(timing.endedAt):paused??now;
@@ -36,21 +36,21 @@ export function elapsedSessionMs(timing?:SessionTiming,now?:number):number|null 
 }
 
 /** Format an actual ticking stopwatch; unlike minute totals it shows seconds. */
-export function formatSessionClock(timing:SessionTiming|undefined,now?:number):string {
+export function formatSessionClock(timing:SessionTiming|null|undefined,now?:number):string {
  const elapsed=elapsedSessionMs(timing,now);
  if(elapsed===null)return 'Not tracked';
  const seconds=Math.floor(elapsed/1000),h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),s=seconds%60;
  return h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-export function pauseSessionTiming(timing:SessionTiming|undefined,at:string):SessionTiming|null {
+export function pauseSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(sessionClockState(timing)!=='running'||!timing)return null;
  const when=ms(at),start=ms(timing.startedAt);
  if(when===null||start===null||when<start||elapsedSessionMs(timing,when)===null)return null;
  return {...timing,pausedAt:at};
 }
 
-export function resumeSessionTiming(timing:SessionTiming|undefined,at:string):SessionTiming|null {
+export function resumeSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(!timing)return null;
  const state=sessionClockState(timing);
  if(state!=='paused'&&state!=='stopped')return null;
@@ -64,7 +64,7 @@ export function resumeSessionTiming(timing:SessionTiming|undefined,at:string):Se
 
 /** Finalizing while paused excludes the remaining pause (including time
  * spent away from the phone), rather than silently counting that break. */
-export function stopSessionTiming(timing:SessionTiming|undefined,at:string):SessionTiming|null {
+export function stopSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(!timing)return null;
  const state=sessionClockState(timing),when=ms(at),start=ms(timing.startedAt);
  if((state!=='running'&&state!=='paused')||when===null||start===null||when<start)return null;
@@ -79,7 +79,7 @@ export function stopSessionTiming(timing:SessionTiming|undefined,at:string):Sess
 }
 
 /** Reset only clock fields; exercise sets, stroke segments and notes are separate. */
-export function restartSessionTiming(timing:SessionTiming|undefined,at:string):SessionTiming|null {
+export function restartSessionTiming(timing:SessionTiming|null|undefined,at:string):SessionTiming|null {
  if(sessionClockState(timing)!=='stopped'||ms(at)===null||elapsedSessionMs(timing)===null)return null;
  return {startedAt:at};
 }
