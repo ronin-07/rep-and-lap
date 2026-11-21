@@ -64,3 +64,33 @@ describe('Milestone 3 schedule and routine fields',()=>{
     await assertFails(setDoc(doc(env.authenticatedContext('bob').firestore(),'users/alice/gymSessions','session:2026-11-16:Monday'),session));
   });
 });
+
+describe('Milestone 7 individually versioned training items',()=>{
+ const clock='session:2026-11-16:Monday~clock';
+ const swim='session:2026-11-16:Thursday~swim-12345678';
+ const make=(key:string,kind:'clock'|'rest'|'swim-segment',value:unknown,revision=1,uid='alice')=>({key,kind,value,revision,updatedMs:1763630000000,updatedBy:uid});
+ it('permits only the owner to read or update valid clock transitions',async()=>{
+  const ref=doc(env.authenticatedContext('alice').firestore(),'users/alice/syncItems',clock);
+  await assertSucceeds(setDoc(ref,make(clock,'clock',{startedAt:'2026-11-19T17:00:00.000Z'})));
+  await assertSucceeds(updateDoc(ref,{revision:2,value:{startedAt:'2026-11-19T17:00:00.000Z',pausedAt:'2026-11-19T17:05:00.000Z'}}));
+  await assertFails(updateDoc(ref,{revision:2}));
+  await assertFails(updateDoc(ref,{revision:4}));
+  await assertFails(getDoc(doc(env.authenticatedContext('bob').firestore(),'users/alice/syncItems',clock)));
+  await assertFails(deleteDoc(ref));
+ });
+ it('allows swimming segment tombstones but denies forged IDs and changes to kind',async()=>{
+  const ref=doc(env.authenticatedContext('alice').firestore(),'users/alice/syncItems',swim);
+  const data={id:'swim-12345678',activity:'freestyle',mode:'advanced',lengths:4};
+  await assertSucceeds(setDoc(ref,make(swim,'swim-segment',data)));
+  await assertSucceeds(updateDoc(ref,{revision:2,value:null}));
+  await assertFails(updateDoc(ref,{revision:3,kind:'clock'}));
+  await assertFails(updateDoc(ref,{revision:3,value:{...data,id:'forged'}}));
+  await assertFails(setDoc(doc(env.authenticatedContext('bob').firestore(),'users/alice/syncItems',swim),make(swim,'swim-segment',data,1,'bob')));
+ });
+ it('validates the shared rest timer and forbids invalid countdowns',async()=>{
+  const ref=doc(env.authenticatedContext('alice').firestore(),'users/alice/syncItems','rest');
+  await assertSucceeds(setDoc(ref,make('rest','rest',{startedAt:1763630000000,endsAt:1763630090000,durationSeconds:90,target:null})));
+  await assertFails(updateDoc(ref,{revision:2,value:{startedAt:1,endsAt:2,durationSeconds:-1,target:null}}));
+  await assertSucceeds(updateDoc(ref,{revision:2,value:null}));
+ });
+});

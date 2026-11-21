@@ -6,12 +6,13 @@ import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory,re
 import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
-import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet} from '@/lib/firebase';
+import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet,writeSyncItem} from '@/lib/firebase';
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
 import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {stableSetId} from '@/lib/set-sync';
+import {clockItemKey,queueSwimSegment,REST_ITEM_KEY,queueSyncItem,integrateServerItem,acknowledgeItem,flagItemConflict,resolveItemConflict,ItemVersionConflict} from '@/lib/item-sync';
 import {blankSegment,swimRoutine,swimPersonalBests,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
 import {stoppedSwimTiming,completeStoppedSwim} from '@/lib/swim-session';
 import {sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming} from '@/lib/session-timing';
@@ -54,7 +55,6 @@ export function useTrainer(){
   restRef.current=next;setRestState(next);
   try {const key=`${REST_KEY}:${uidRef.current}`;if(next)localStorage.setItem(key,JSON.stringify(next));else localStorage.removeItem(key);}catch{}
  },[]);
- const beginRest=useCallback((seconds:number,target:NextSetTarget|null=null)=>{saveRest(makeRest(seconds,target));setClock(Date.now());},[saveRest]);
  const notify=useCallback((message:string)=>{setToast(message);if(toastTimeout.current)clearTimeout(toastTimeout.current);toastTimeout.current=setTimeout(()=>setToast(''),3000);},[]);
  const persist=useCallback((next:TrackerData)=>{
   dataRef.current=next;setData(next);
@@ -77,7 +77,7 @@ export function useTrainer(){
         delete next.pendingSync[key];
         persist(next);
       }
-      if(!Object.keys(dataRef.current.pendingSync).length&&serverRef.current)setSyncMode('synced');
+      if(!Object.keys(dataRef.current.pendingSync).length&&!Object.keys(dataRef.current.pendingSets).length&&!Object.keys(dataRef.current.pendingItems).length&&serverRef.current)setSyncMode('synced');
     }).catch((err:unknown)=>{
       if(uidRef.current!==uid)return;
       setFirebaseError(err instanceof Error?err.message:'Cloud write failed');
@@ -92,7 +92,7 @@ export function useTrainer(){
       setFirebaseError('');
       const next=structuredClone(dataRef.current);acknowledgeSet(next,record,op.updatedMs);persist(next);
       if(next.pendingSets[key])setTimeout(()=>void flush(),250); // User edited again during the write.
-      if(!Object.keys(next.pendingSync).length&&!Object.keys(next.pendingSets).length&&serverRef.current)setSyncMode('synced');
+      if(!Object.keys(next.pendingSync).length&&!Object.keys(next.pendingSets).length&&!Object.keys(next.pendingItems).length&&serverRef.current)setSyncMode('synced');
     }).catch((error:unknown)=>{
       if(uidRef.current!==uid)return;
       if(error instanceof SetVersionConflict){
@@ -101,7 +101,28 @@ export function useTrainer(){
       }else {setFirebaseError(error instanceof Error?error.message:'Set sync failed');setSyncMode('needs-attention');}
     }).finally(()=>{inFlight.current.delete(inflightKey);});
   }
- },[persist,notify]);
+  for(const [key,op] of Object.entries(dataRef.current.pendingItems||{})){
+    const busy=`item|${key}`;
+    if(inFlight.current.has(busy)||dataRef.current.itemConflicts[key])continue;
+    inFlight.current.add(busy);setSyncMode('syncing');
+    void writeSyncItem(uid,op).then(record=>{
+      if(uidRef.current!==uid)return;
+      setFirebaseError('');
+      const next=structuredClone(dataRef.current);acknowledgeItem(next,record,op.updatedMs);persist(next);
+      // An edit made during the previous transaction must be sent after that
+      // transaction releases the in-flight lock, not left in the local queue.
+      if(next.pendingItems[key])setTimeout(()=>void flush(),250);
+      if(op.kind==='rest'&&!next.pendingItems[key])saveRest(record.value?parseRest(JSON.stringify(record.value)):null);
+      if(!Object.keys(next.pendingSync).length&&!Object.keys(next.pendingSets).length&&!Object.keys(next.pendingItems).length&&serverRef.current)setSyncMode('synced');
+    }).catch((error:unknown)=>{
+      if(uidRef.current!==uid)return;
+      if(error instanceof ItemVersionConflict){
+        const next=structuredClone(dataRef.current);flagItemConflict(next,key,error.remote);persist(next);
+        setSyncMode('needs-attention');notify('A timer or swim activity needs conflict review.');
+      }else {setFirebaseError(error instanceof Error?error.message:'Training item sync failed');setSyncMode('needs-attention');}
+    }).finally(()=>{inFlight.current.delete(busy);});
+  }
+ },[persist,notify,saveRest]);
  const scheduleFlush=useCallback(()=>{if(flushTimeout.current)clearTimeout(flushTimeout.current);flushTimeout.current=setTimeout(()=>void flush(),700);},[flush]);
  // Every mutation writes to the existing Firebase-era localStorage shape, preserving logged history.
  const update=useCallback((mutate:(copy:TrackerData)=>void,keys:string|string[]|null)=>{
@@ -113,6 +134,21 @@ export function useTrainer(){
    persist(next);
    if(keys&&uidRef.current!=='guest')scheduleFlush();
  },[persist,scheduleFlush]);
+ // Rest countdown uses absolute timestamps, so it resumes at the same remaining
+ // time on another device. Guest timers remain local-only.
+ const saveSyncedRest=useCallback((next:RestState|null)=>{
+  if(dataRef.current.itemConflicts[REST_ITEM_KEY]){notify('Review the rest timer conflict before changing it.');setView('conflicts');return;}
+  if(next===null&&restRef.current===null)return;
+  if(next!==null&&JSON.stringify(next)===JSON.stringify(restRef.current))return;
+  saveRest(next);
+  if(uidRef.current!=='guest'){
+   const copy=structuredClone(dataRef.current);
+   queueSyncItem(copy,REST_ITEM_KEY,'rest',next);persist(copy);scheduleFlush();
+  }
+ },[saveRest,persist,scheduleFlush,notify]);
+ const beginRest=useCallback((seconds:number,target:NextSetTarget|null=null)=>{
+  saveSyncedRest(makeRest(seconds,target));setClock(Date.now());
+ },[saveSyncedRest]);
  useEffect(()=>{
   mountedRef.current=true;setOnline(navigator.onLine);
   const last=localStorage.getItem(LAST_ACCOUNT_KEY);
@@ -165,15 +201,22 @@ export function useTrainer(){
     if(id!==uidRef.current||hasPending)return;
     const next=structuredClone(dataRef.current);
     integrateServerSet(next,record);persist(next);
+  },(item,hasPending,fromCache)=>{
+    if(id!==uidRef.current||hasPending)return;
+    const next=structuredClone(dataRef.current);
+    integrateServerItem(next,item);persist(next);
+    if(item.kind==='rest'&&!next.pendingItems[REST_ITEM_KEY]){
+      saveRest(item.value?parseRest(JSON.stringify(item.value)):null);
+    }
   },(ready,hasPending)=>{
     serverRef.current=ready;readyRef.current=ready;
-    if(Object.keys(dataRef.current.setConflicts).length)setSyncMode('needs-attention');
-    else if(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length||hasPending)setSyncMode('syncing');
+    if(Object.keys(dataRef.current.setConflicts).length||Object.keys(dataRef.current.itemConflicts).length)setSyncMode('needs-attention');
+    else if(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length||Object.keys(dataRef.current.pendingItems).length||hasPending)setSyncMode('syncing');
     else setSyncMode(ready?'synced':'checking');
   },err=>{setFirebaseError(err.message);setSyncMode('needs-attention');});
   void flush();
   return ()=>stop();
- },[user?.uid,flush,persist]);
+ },[user?.uid,flush,persist,saveRest]);
  useEffect(()=>{if(!hydrated)return;
   const handleOnline=()=>{setOnline(true);void flush();};
   const handleOffline=()=>{setOnline(false);setSyncMode('saved-local');};
@@ -181,11 +224,12 @@ export function useTrainer(){
   const handleVisibility=()=>{if(document.visibilityState==='visible'){setClock(Date.now());if(navigator.onLine)void flush();}};
   window.addEventListener('online',handleOnline);window.addEventListener('offline',handleOffline);
   window.addEventListener('focus',handleFocus);document.addEventListener('visibilitychange',handleVisibility);
-  const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length))void flush();},30000);
+  const interval=setInterval(()=>{if(navigator.onLine&&uidRef.current!=='guest'&&(Object.keys(dataRef.current.pendingSync).length||Object.keys(dataRef.current.pendingSets).length||Object.keys(dataRef.current.pendingItems).length))void flush();},30000);
   return ()=>{window.removeEventListener('online',handleOnline);window.removeEventListener('offline',handleOffline);window.removeEventListener('focus',handleFocus);document.removeEventListener('visibilitychange',handleVisibility);clearInterval(interval);};
  },[hydrated,flush]);
- const visibleTiming=data.weeks[week]?.timing?.[trackingTab==='swim'?swimDay:gymDay];
- const liveClock=view==='workout'&&(trackingTab==='gym'||trackingTab==='swim')&&sessionClockState(visibleTiming)==='running';
+ // Keep global active-clock shortcut ticking even when the user opens
+ // Calendar/Progress or switches to a different workout tab.
+ const liveClock=Object.values(data.weeks).some(w=>Object.values(w.timing||{}).some(t=>sessionClockState(t)==='running'));
  useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),liveClock?1000:15000);return ()=>clearInterval(interval);},[hydrated,liveClock]);
  useEffect(()=>{
    if(!restEnd)return;
@@ -211,12 +255,13 @@ export function useTrainer(){
   if(tab)setTrackingTab(tab);setView(next);window.scrollTo({top:0,behavior:'instant'});
  },[]);
  const startSession=(day:Day)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const session=dataRef.current.weeks[week]?.timing?.[day];
   if(sessionClockState(session)!=='ready'){notify('Use Pause, Resume or Restart timer for this session.');return;}
   if(dataRef.current.weeks[week]?.done?.[day]){notify('Undo completion before starting another timer.');return;}
   if(statusFor(dataRef.current,week,day)!=='scheduled'&&!confirm('This was marked as a rest or skipped day. Restore the workout and start?'))return;
   const startedMs=Date.now();const at=new Date(startedMs).toISOString();setClock(startedMs);
-  update(d=>{const w=d.weeks[week]??=weekBlank();if(w.scheduleStatus)delete w.scheduleStatus[day];w.timing??={};w.timing[day]={startedAt:at};
+  update(d=>{const w=d.weeks[week]??=weekBlank();if(w.scheduleStatus)delete w.scheduleStatus[day];w.timing??={};w.timing[day]={startedAt:at};queueSyncItem(d,clockItemKey(week,day),'clock',w.timing[day]);
     if(PLAN[day].kind==='gym'){w.routineOverrides??={};w.routineOverrides[day as GymDay]??=cloneExercises(exercisesFor(d,week,day as GymDay));}
     else {w.swimRoutineOverrides??={};w.swimRoutineOverrides[day as SwimDay]??=swimRoutine(d,week,day as SwimDay);}
   },`session:${week}:${day}`);
@@ -225,26 +270,29 @@ export function useTrainer(){
  // Pauses and subsequent resumes are persisted in the same session record as
  // the start/end timestamps. Old sessions have an implicit zero paused duration.
  const pauseSession=(day:Day)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week],at=new Date().toISOString();
   if(entry?.done?.[day]){notify('Undo completion before changing the clock.');return;}
   const next=pauseSessionTiming(entry?.timing?.[day],at);
   if(!next){notify('Start a running session before pausing.');return;}
   setClock(Date.parse(at));
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
-  if(PLAN[day].kind==='gym'&&restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;queueSyncItem(d,clockItemKey(week,day),'clock',next);},`session:${week}:${day}`);
+  if(PLAN[day].kind==='gym'&&restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveSyncedRest(null);
   notify('Workout paused. Paused time will not count toward the session duration.');
  };
  const resumeSession=(day:Day)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week];
   if(entry?.done?.[day]){notify('Undo completion before continuing this session.');return;}
   if(statusFor(dataRef.current,week,day)!=='scheduled'){notify('Restore this session on the calendar before continuing.');return;}
   const at=new Date().toISOString(),next=resumeSessionTiming(entry?.timing?.[day],at);
   if(!next){notify('Only a paused or stopped session can be resumed.');return;}
   setClock(Date.parse(at));
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;queueSyncItem(d,clockItemKey(week,day),'clock',next);},`session:${week}:${day}`);
   notify('Session resumed. Earlier active time and your logged data are preserved.');
  };
  const restartSession=(day:Day)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week];
   if(entry?.done?.[day]){notify('Undo completion before restarting the timer.');return;}
   if(statusFor(dataRef.current,week,day)!=='scheduled'){notify('Restore this session on the calendar before restarting.');return;}
@@ -253,33 +301,36 @@ export function useTrainer(){
   const at=new Date().toISOString(),next=restartSessionTiming(entry?.timing?.[day],at);
   if(!next){notify('Could not restart this timer.');return;}
   setClock(Date.parse(at));
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;},`session:${week}:${day}`);
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=next;queueSyncItem(d,clockItemKey(week,day),'clock',next);},`session:${week}:${day}`);
   notify('Timer restarted from zero. Your workout log is unchanged.');
  };
  const finishSession=(day:Day)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   if(PLAN[day].kind==='swim'){notify('Stop your swim timer, log the swim, then save it.');return;}
   const entry=dataRef.current.weeks[week],at=new Date().toISOString();
   if(entry?.done?.[day]){notify('Undo completion before changing the session.');return;}
   const stopped=stopSessionTiming(entry?.timing?.[day],at);
   if(!stopped){notify('Start or resume the session clock before finishing.');return;}
   setClock(Date.parse(at));
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;queueSyncItem(d,clockItemKey(week,day),'clock',stopped);
    w.done[day]=true;if(w.scheduleStatus)delete w.scheduleStatus[day];w.completedAt??={};w.completedAt[day]=at;w.completedOn??={};w.completedOn[day]=keyOf(new Date(at));
   },`session:${week}:${day}`);
-  if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);
+  if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveSyncedRest(null);
   setRecoveryPrompt({week,day});
  };
  // Swimming is finalized separately so the user can enter laps after leaving the pool.
  const stopSwimSession=(day:SwimDay)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   if(dataRef.current.weeks[week]?.done?.[day]){notify('Undo completion before changing this swim.');return;}
   const at=new Date().toISOString();
   const stopped=stoppedSwimTiming(dataRef.current.weeks[week]?.timing?.[day],at);
   if(!stopped){notify('No running or paused swim timer to stop.');return;}
   setClock(Date.parse(at));
-  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;},`session:${week}:${day}`);
+  update(d=>{const w=d.weeks[week]??=weekBlank();w.timing??={};w.timing[day]=stopped;queueSyncItem(d,clockItemKey(week,day),'clock',stopped);},`session:${week}:${day}`);
   notify('Swim time saved. Enter your laps and notes, then save the session.');
  };
  const completeSwimSession=(day:SwimDay)=>{
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before changing it.');setView('conflicts');return;}
   const entry=dataRef.current.weeks[week],timing=entry?.timing?.[day];
   if(entry?.done?.[day]){notify('This swim has already been completed.');return;}
   if(timing?.startedAt&&!timing.endedAt){notify('Stop the swim timer before saving your workout.');return;}
@@ -292,6 +343,27 @@ export function useTrainer(){
   }
   update(d=>{const w=d.weeks[week]??=weekBlank();completeStoppedSwim(w,day,at);},`session:${week}:${day}`);
   setRecoveryPrompt({week,day});
+ };
+ const saveWorkout=(day:Day)=>{
+  const w=dataRef.current.weeks[week],state=sessionClockState(w?.timing?.[day]);
+  if(w?.done?.[day]){notify('This workout is already saved as completed.');return;}
+  if(dataRef.current.itemConflicts[clockItemKey(week,day)]){notify('Resolve the timer conflict before saving.');setView('conflicts');return;}
+  if(PLAN[day].kind==='gym'){
+    if(state==='running'||state==='paused')finishSession(day);
+    else requestCompletion(week,day);
+    return;
+  }
+  if(state==='running'||state==='paused'){
+    const at=new Date().toISOString(),stopped=stoppedSwimTiming(w?.timing?.[day],at);
+    if(!stopped){notify('Invalid swim timer. Nothing was completed.');return;}
+    const check=structuredClone(w??weekBlank());check.timing??={};check.timing[day]=stopped;
+    if(!completeStoppedSwim(check,day as SwimDay,at)){notify('Unable to validate the stopped swim timer.');return;}
+    update(d=>{const entry=d.weeks[week]??=weekBlank();entry.timing??={};entry.timing[day]=stopped;
+      queueSyncItem(d,clockItemKey(week,day),'clock',stopped);completeStoppedSwim(entry,day as SwimDay,at);
+    },`session:${week}:${day}`);
+    setClock(Date.parse(at));setRecoveryPrompt({week,day});return;
+  }
+  completeSwimSession(day as SwimDay);
  };
  const rescheduleSession=(day:Day,date:string,targetWeek=week)=>{
   if(!isValidDate(date)){notify('Choose a valid date.');return;}
@@ -346,7 +418,7 @@ export function useTrainer(){
    if(mode==='complete'){item.done[day]=true;item.completedAt??={};item.completedAt[day]=new Date().toISOString();if(item.scheduleStatus)delete item.scheduleStatus[day];}
   },`session:${targetWeek}:${day}`);
   setCompletionRequest(null);
-  if(mode==='complete'){if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveRest(null);setRecoveryPrompt({week:targetWeek,day});}
+  if(mode==='complete'){if(restRef.current&&(!restRef.current.target||restRef.current.target.day===day))saveSyncedRest(null);setRecoveryPrompt({week:targetWeek,day});}
   else notify('Actual training date updated. Original schedule unchanged.');
  };
  const toggleDone=(day:Day)=>{
@@ -391,7 +463,7 @@ export function useTrainer(){
     if(archived?.sets?.some(s=>s.done&&!s.deleted)&&!confirm('This exercise has logged sets. Hide it from the current routine? Its recorded sets will remain in history.'))return;
    }
    const changed=editRoutine(existing,kind,index,payload);
-   if((kind==='remove'||kind==='replace')&&restRef.current?.target?.week===week&&restRef.current?.target?.day===day&&restRef.current?.target?.exercise===existing[index]?.name)saveRest(null);
+   if((kind==='remove'||kind==='replace')&&restRef.current?.target?.week===week&&restRef.current?.target?.day===day&&restRef.current?.target?.exercise===existing[index]?.name)saveSyncedRest(null);
    update(d=>{const w=d.weeks[week]??=weekBlank();w.routineOverrides??={};w.routineOverrides[day]=changed;},`session:${week}:${day}`);
    notify('This session’s routine updated.');
   }catch(error){notify(error instanceof Error?error.message:'Routine change failed.');}
@@ -418,7 +490,7 @@ export function useTrainer(){
   if(!record||record.deleted||!record.done)return;
   // A tombstone allows offline edits to propagate instead of resurrecting a deleted set.
   editSet(day,exercise,index,set=>{set.kg='';set.reps='';set.done=false;set.deleted=true;delete set.rir;delete set.rpe;});
-  if(restRef.current?.target?.exercise===exercise&&restRef.current?.target?.day===day)saveRest(null);
+  if(restRef.current?.target?.exercise===exercise&&restRef.current?.target?.day===day)saveSyncedRest(null);
   notify('Logged set deleted. Set slot is ready to reuse.');
  };
  const logSet=(day:GymDay,exercise:string,index:number)=>{
@@ -432,10 +504,10 @@ export function useTrainer(){
   if(!was){
    const target=nextIncompleteSet(dataRef.current,week,day,exercise,index);
    if(target)beginRest(dataRef.current.restSeconds||90,target);
-   else saveRest(null); // The final set never leaves a pointless rest countdown.
+   else saveSyncedRest(null); // The final set never leaves a pointless rest countdown.
    if(previousBest!==null&&num(current?.kg)>previousBest)setCelebration({title:'New personal record!',body:`${exercise}: ${num(current?.kg)} kg`,kind:'pr'});
    else notify(target?'Set logged · rest timer running':'All planned sets logged. Nice work!');
-  }else if(restRef.current)saveRest(null);
+  }else if(restRef.current)saveSyncedRest(null);
  };
  const usePrevious=(day:GymDay,exercise:string,index:number,onlyBlank=false)=>{
   const old=previousCompletedSet(dataRef.current,week,day,exercise,index);
@@ -451,7 +523,7 @@ export function useTrainer(){
  };
  const goToNextSet=()=>{
   const target=restRef.current?.target;
-  saveRest(null);
+  saveSyncedRest(null);
   if(!target)return;
   setWeek(target.week);setGymDay(target.day);setTrackingTab('gym');setView('workout');
   const entry=dataRef.current.weeks[target.week]?.gym?.[target.day]?.[target.exercise]?.sets[target.index];
@@ -496,6 +568,7 @@ export function useTrainer(){
    if(log.segments?.length)return;
    log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
    log.segments=plan.activities.map(item=>blankSegment(item.activity,isStroke(item.activity)?d.swimModes[item.activity]||item.mode||SWIM_MODE_DEFAULTS[item.activity]:item.mode||'learning'));
+   for(const item of log.segments)queueSwimSegment(d,week,day,item.id,item);
   },`session:${week}:${day}`);
  };
  const addSwimSegment=(day:SwimDay,activity:SwimActivity)=>{
@@ -503,34 +576,34 @@ export function useTrainer(){
   update(d=>{const w=d.weeks[week]??=weekBlank();w.swimRoutineOverrides??={};w.swimRoutineOverrides[day]??=structuredClone(plan);const log=w.swim[day]??={};
     log.poolLength=log.poolLength??validPool(d.swimPoolDefault);
     log.segments??=[];if(log.segments.length>=25)return;
-    log.segments.push(blankSegment(activity,isStroke(activity)?d.swimModes[activity]||SWIM_MODE_DEFAULTS[activity]:'learning'));
+    const item=blankSegment(activity,isStroke(activity)?d.swimModes[activity]||SWIM_MODE_DEFAULTS[activity]:'learning');log.segments.push(item);queueSwimSegment(d,week,day,item.id,item);
   },`session:${week}:${day}`);
  };
  const updateSwimSegment=(day:SwimDay,id:string,patch:Partial<SwimSegment>)=>{
   if(!validSwimSegmentPatch(patch))return;
   update(d=>{
   const s=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!s)return;
-  Object.assign(s,patch);
+  Object.assign(s,patch);queueSwimSegment(d,week,day,id,s);
  },`session:${week}:${day}`);
  };
  const removeSwimSegment=(day:SwimDay,id:string)=>{
   const log=dataRef.current.weeks[week]?.swim?.[day];const segment=log?.segments?.find(x=>x.id===id);if(!segment)return;
   if(!confirm(`Remove this ${segment.activity} entry? The lengths, intervals and notes recorded in this segment will be deleted.`))return;
-  update(d=>{const log=d.weeks[week]?.swim?.[day];if(log)log.segments=log.segments?.filter(x=>x.id!==id);},`session:${week}:${day}`);
+  update(d=>{const log=d.weeks[week]?.swim?.[day];if(log){log.segments=log.segments?.filter(x=>x.id!==id);queueSwimSegment(d,week,day,id,null);}},`session:${week}:${day}`);
  };
  const toggleSwimTechnique=(day:SwimDay,id:string,step:string,done:boolean)=>update(d=>{
   const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!item)return;
-  item.technique??={};item.technique[step]=done;
+  item.technique??={};item.technique[step]=done;queueSwimSegment(d,week,day,id,item);
  },`session:${week}:${day}`);
  const addSwimInterval=(day:SwimDay,id:string,interval:Omit<SwimIntervalSet,'id'>)=>{
   if(!Number.isInteger(interval.repeats)||interval.repeats<1||interval.repeats>50||!Number.isInteger(interval.lengths)||interval.lengths<1||interval.lengths>40||!Number.isInteger(interval.restSeconds)||interval.restSeconds<0||interval.restSeconds>1800||
      (interval.secondsPerRepeat!==undefined&&(!Number.isFinite(Number(interval.secondsPerRepeat))||Number(interval.secondsPerRepeat)<=0||Number(interval.secondsPerRepeat)>10000))){notify('Check interval repetitions, lengths, rest and timed repeat values.');return;}
   update(d=>{const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(!item)return;
-   item.intervals??=[];if(item.intervals.length>=60){notify('A swimming segment can contain up to 60 interval sets.');return;}item.intervals.push({...interval,id:crypto.randomUUID()});
+   item.intervals??=[];if(item.intervals.length>=60){notify('A swimming segment can contain up to 60 interval sets.');return;}item.intervals.push({...interval,id:crypto.randomUUID()});queueSwimSegment(d,week,day,id,item);
   },`session:${week}:${day}`);
  };
  const removeSwimInterval=(day:SwimDay,id:string,intervalId:string)=>update(d=>{
-  const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(item)item.intervals=item.intervals?.filter(x=>x.id!==intervalId);
+  const item=d.weeks[week]?.swim?.[day]?.segments?.find(x=>x.id===id);if(item){item.intervals=item.intervals?.filter(x=>x.id!==intervalId);queueSwimSegment(d,week,day,id,item);}
  },`session:${week}:${day}`);
  const editSwimPreference=(patch:Partial<Pick<TrackerData,'swimPoolDefault'|'swimTargets'|'swimModes'>>)=>{
   if(patch.swimPoolDefault!==undefined&&validPool(patch.swimPoolDefault)!==patch.swimPoolDefault)return;
@@ -650,10 +723,27 @@ export function useTrainer(){
  };
  const signin=async()=>{try{setFirebaseError('');await googleSignIn();}catch(e){const msg=e instanceof Error?e.message:'Sign-in unavailable';setFirebaseError(msg);notify('Google sign-in failed. Check your browser settings.');}};
  const signout=async()=>{try{await googleSignOut();}catch{notify('Unable to sign out.');}};
- const pending=Object.keys(data.pendingSync||{}).length+Object.keys(data.pendingSets||{}).length;
+ const pending=Object.keys(data.pendingSync||{}).length+Object.keys(data.pendingSets||{}).length+Object.keys(data.pendingItems||{}).length;
  const conflicts=Object.values(data.setConflicts||{});
+ const itemConflicts=Object.values(data.itemConflicts||{});
  const resolveConflict=(key:string,choice:'mine'|'cloud')=>{const next=structuredClone(dataRef.current);resolveSetConflict(next,key,choice);persist(next);if(choice==='mine')scheduleFlush();};
- const displaySync:SyncMode=!online?'saved-local':conflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveRest(null),extendRest:()=>saveRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,resolveConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopSwimSession,completeSwimSession,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ const resolveTrainingItemConflict=(key:string,choice:'mine'|'cloud')=>{
+  const next=structuredClone(dataRef.current),conflict=next.itemConflicts[key];
+  resolveItemConflict(next,key,choice);persist(next);
+  if(choice==='cloud'&&conflict?.local.kind==='rest')saveRest(conflict.remote?.value?parseRest(JSON.stringify(conflict.remote.value)):null);
+  if(choice==='cloud'&&conflict?.local.kind==='clock'){
+   const m=/^session:(\d{4}-\d{2}-\d{2}):(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)~clock$/.exec(key);
+   if(m){const [,w,day]=m,entry=next.weeks[w];
+    if(entry?.done?.[day as Day]&&sessionClockState(entry.timing?.[day as Day])!=='stopped'){
+     delete entry.done[day as Day];delete entry.completedAt?.[day as Day];delete entry.completedOn?.[day as Day];
+     const session=`session:${w}:${day}`,stamp=Math.max(Date.now(),(next.recordUpdates[session]||0)+1);
+     next.recordUpdates[session]=stamp;next.pendingSync[session]=stamp;persist(next);scheduleFlush();
+    }
+   }
+  }
+  if(choice==='mine')scheduleFlush();
+ };
+ const displaySync:SyncMode=!online?'saved-local':conflicts.length||itemConflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
+ return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveSyncedRest(null),extendRest:()=>saveSyncedRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,setEffort,installPrompt,firebaseError,pending,conflicts,itemConflicts,resolveConflict,resolveTrainingItemConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopSwimSession,completeSwimSession,saveWorkout,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

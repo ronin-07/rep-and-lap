@@ -1,6 +1,7 @@
 import {DAYS,type Day,type GymDay,type SwimDay,type TrackerData,type WeekLog} from './types';
 import {blankData,weekBlank} from './storage';
 import {normalizeSets} from './set-sync';
+import {clockItemKey,queueSwimSegment,queueSyncItem} from './item-sync';
 import {SWIM_STROKES,SWIM_ACTIVITY_LABELS,validPool,validSwimSegmentPatch} from './swimming';
 
 export interface BackupCounts {sessions:number;sets:number;weighIns:number;drinks:number}
@@ -208,7 +209,22 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
   return {data:normalizeSets(data),changedKeys,duplicates,newRecords};
 }
 export function markRestoredWrites(data:TrackerData,keys:string[],stamp=Date.now()):void {
-  keys.forEach((key,i)=>{const t=Math.max(stamp+i,(data.recordUpdates[key]||0)+1);data.recordUpdates[key]=t;data.pendingSync[key]=t;});
+  keys.forEach((key,i)=>{
+    const t=Math.max(stamp+i,(data.recordUpdates[key]||0)+1);data.recordUpdates[key]=t;data.pendingSync[key]=t;
+    // Backups predate independent records. Imported sessions must publish their
+    // clocks and individual swimming activities as well as their legacy payload.
+    const match=/^session:(\d{4}-\d{2}-\d{2}):(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/.exec(key);
+    if(!match)return;
+    const [,week,day]=match,entry=data.weeks[week];if(!entry)return;
+    const clock=entry.timing?.[day as Day];
+    if(clock)queueSyncItem(data,clockItemKey(week,day as Day),'clock',clock,t);
+    if(['Thursday','Friday','Saturday'].includes(day))for(const segment of entry.swim?.[day as SwimDay]?.segments||[]){
+      // Older backups permitted arbitrary IDs up to 100 characters. Preserve
+      // those records in the legacy session without queuing an invalid cloud
+      // document; app-generated activity IDs fit the independent-sync schema.
+      queueSwimSegment(data,week,day as SwimDay,segment.id,segment,t);
+    }
+  });
 }
 export function replaceLocalBackup(source:TrackerData):TrackerData {return normalizeSets(structuredClone(source));}
 

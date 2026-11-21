@@ -4,6 +4,7 @@ import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,setPersistence,browse
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,memoryLocalCache,collection,onSnapshot,doc,setDoc,runTransaction,type Firestore,type Unsubscribe} from 'firebase/firestore';
 import type {UserInfo,SetDocument,PendingSetWrite} from './types';
 import {acceptSetRevision,SetVersionConflict} from './set-sync';
+import {acceptItemRevision,ItemVersionConflict,type SyncItemDocument,type PendingSyncItem} from './item-sync';
 
 export const firebaseConfig={
  apiKey:process.env.NEXT_PUBLIC_FIREBASE_API_KEY||'',
@@ -31,15 +32,17 @@ export function observeAuth(callback:(user:UserInfo|null)=>void,onError:(e:Error
 export function toUserInfo(u:User):UserInfo{return {uid:u.uid,name:u.displayName||'Member',email:u.email||'',photoURL:u.photoURL};}
 export async function googleSignIn(){if(!init())throw new Error('Set Firebase NEXT_PUBLIC environment variables first');const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});return signInWithPopup(auth!,provider);}
 export async function googleSignOut(){if(auth)await signOut(auth);}
-const COLLECTIONS=['gymSessions','swimSessions','weighIns','waterEntries','settings','gymSets'] as const;
+const COLLECTIONS=['gymSessions','swimSessions','weighIns','waterEntries','settings','gymSets','syncItems'] as const;
 function colFor(key:string){if(key==='preferences')return 'settings';if(key.startsWith('weight:'))return 'weighIns';if(key.startsWith('water:'))return 'waterEntries';if(key.startsWith('session:'))return ['Monday','Tuesday','Wednesday'].includes(key.split(':')[2])?'gymSessions':'swimSessions';throw new Error('Unexpected record key');}
-export function watchRecords(uid:string,onRecord:(key:string,payload:unknown,stamp:number,localWrite:boolean,fromCache:boolean)=>void,onSet:(record:SetDocument,localWrite:boolean,fromCache:boolean)=>void,onStatus:(allServerReady:boolean,pending:boolean)=>void,onError:(e:Error)=>void):Unsubscribe {
+export function watchRecords(uid:string,onRecord:(key:string,payload:unknown,stamp:number,localWrite:boolean,fromCache:boolean)=>void,onSet:(record:SetDocument,localWrite:boolean,fromCache:boolean)=>void,onItem:(record:SyncItemDocument,localWrite:boolean,fromCache:boolean)=>void,onStatus:(allServerReady:boolean,pending:boolean)=>void,onError:(e:Error)=>void):Unsubscribe {
  if(!db)return ()=>{};
  const synced=new Set<string>();const activeWrites=new Map<string,boolean>();
  const subscriptions=COLLECTIONS.map(name=>onSnapshot(collection(db!,'users',uid,name),{includeMetadataChanges:true},s=>{
   for(const change of s.docChanges())if(change.type!=='removed'){
    const value=change.doc.data();
-   if(name==='gymSets'){
+   if(name==='syncItems'){
+     if(typeof value.key==='string'&&value.key===change.doc.id)onItem(value as SyncItemDocument,change.doc.metadata.hasPendingWrites,s.metadata.fromCache);
+   }else if(name==='gymSets'){
      if(typeof value.key==='string'&&value.key===change.doc.id)onSet(value as SetDocument,change.doc.metadata.hasPendingWrites,s.metadata.fromCache);
    }else if(typeof value.recordKey==='string')onRecord(value.recordKey,value.payload,Number(value.updatedMs)||0,change.doc.metadata.hasPendingWrites,s.metadata.fromCache);
   }
@@ -70,5 +73,21 @@ export async function writeSet(uid:string,op:PendingSetWrite):Promise<SetDocumen
     updatedMs:op.updatedMs,updatedBy:uid};
   transaction.set(ref,next);
   return next;
+ });
+}
+
+// Version-checked writes are distinct from legacy whole-session documents.
+// Transactions cannot commit while offline, so the caller retains the pending op.
+export async function writeSyncItem(uid:string,op:PendingSyncItem):Promise<SyncItemDocument> {
+ if(!db)throw new Error('Firebase unavailable');
+ const ref=doc(db,'users',uid,'syncItems',op.key);
+ return runTransaction(db,async transaction=>{
+  const snapshot=await transaction.get(ref);
+  const remote=snapshot.exists()?snapshot.data() as SyncItemDocument:null;
+  const decision=acceptItemRevision(remote,op);
+  if(decision==='conflict')throw new ItemVersionConflict(remote);
+  if(decision==='already-saved')return remote!;
+  const next:SyncItemDocument={key:op.key,kind:op.kind,value:op.value,revision:(remote?.revision??0)+1,updatedMs:op.updatedMs,updatedBy:uid};
+  transaction.set(ref,next);return next;
  });
 }

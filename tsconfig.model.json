@@ -23,6 +23,7 @@
     "lib/swim-session.ts",
     "lib/storage.ts",
     "lib/set-sync.ts",
+    "lib/item-sync.ts",
     "lib/backup.ts",
     "lib/workout-flow.ts",
     "lib/training-intelligence.ts",

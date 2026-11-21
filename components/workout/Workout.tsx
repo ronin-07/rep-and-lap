@@ -1,7 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {progressionAdvice} from '@/lib/training-intelligence';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronLeft,ChevronRight,Clock,Play,Pause,RotateCcw,Square,Save,Droplets,Minus,Plus,Timer,Scale as Weight,Waves as Swim,Flame,Target,RefreshCw,Dumbbell} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {GymDay,SwimDay,Day,SwimInterval,SwimLog} from '@/lib/types';
 import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
@@ -25,7 +25,22 @@ export default function Workout({app}:{app:Trainer}){
  return <div className="stack-xl"><div className="page-header"><div><span className="eyebrow">YOUR TRAINING LOG</span><h1>Keep moving.</h1><p>Choose a workout, log a drink or record your body weight.</p></div><WeekChooser app={app}/></div>
  <div className="tracking-tabs">{(['gym','swim','water','weight'] as const).map(tab=><button key={tab} className={app.trackingTab===tab?'active':''} onClick={()=>app.setTrackingTab(tab)}>{tab==='gym'?<Dumbbell size={18}/>:tab==='swim'?<Swim size={18}/>:tab==='water'?<Droplets size={18}/>:<Weight size={18}/>}<span>{tab==='gym'?'Gym':tab==='swim'?'Swimming':tab==='water'?'Water':'Body weight'}</span></button>)}</div>
  {app.trackingTab==='gym'?<Gym app={app}/>:app.trackingTab==='swim'?<Swimming app={app}/>:app.trackingTab==='water'?<Water app={app}/>:<BodyWeight app={app}/>}
+ {(app.trackingTab==='gym'||app.trackingTab==='swim')&&<WorkoutSaveBar app={app}/>}
  </div>
+}
+/** Persistent completion action, distinct from automatic progress saving.
+ * Stays above mobile navigation and the rest dock; no scrolling required. */
+function WorkoutSaveBar({app}:{app:Trainer}){
+ const day=app.trackingTab==='gym'?app.gymDay:app.swimDay;
+ const record=weekLog(app.data,app.week),complete=!!record.done[day];
+ const clock=sessionClockState(record.timing?.[day]);
+ const sessionKey=`session:${app.week}:${day}`;
+ const pending=!!app.data.pendingSync[sessionKey]||Object.keys(app.data.pendingItems).some(key=>key.startsWith(`${sessionKey}~`));
+ const conflict=Object.keys(app.data.itemConflicts).some(key=>key.startsWith(`${sessionKey}~`));
+ return <div className="quick-save-bar" role="region" aria-label={`${app.trackingTab==='gym'?'Gym':'Swimming'} workout save controls`}>
+  <div className="quick-save-info"><strong>{complete?'Workout completed':`${PLAN[day].name} · ${day}`}</strong><small>{conflict?'Sync conflict · review before completing':pending?'Saved on device · syncing to cloud':app.user?'Progress saved automatically · cloud sync available':'Progress saved on this device'}</small></div>
+  {complete?<span className="quick-save-finished"><CheckCircle2 size={19}/> Completed</span>:<button className="button-primary quick-save-button" type="button" disabled={conflict} onClick={()=>app.saveWorkout(day)}><Save size={18}/> Save workout</button>}
+ </div>;
 }
 function SessionClock({app,day}:{app:Trainer;day:Day}){
  const record=weekLog(app.data,app.week),timing=record.timing?.[day],state=sessionClockState(timing),done=!!record.done[day];

@@ -1,11 +1,12 @@
 import {normalizeSets,overlaySets} from './set-sync';
+import {overlaySyncItems} from './item-sync';
 import {DAYS, type TrackerData, type WeekLog, type Day} from './types';
 import {SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS} from './swimming';
 function typedGymDay(day:Day):day is 'Monday'|'Tuesday'|'Wednesday'{return day==='Monday'||day==='Tuesday'||day==='Wednesday';}
 export const STORAGE_KEY='rep-and-lap-firebase-v1'; // Reuse existing Firebase edition cache, no data reset.
 export const LAST_ACCOUNT_KEY='rep-and-lap-firebase-last-account';
 export const THEME_KEY='rep-and-lap-theme';
-export function blankData():TrackerData {return {version:5,swimTemplates:{},swimPoolDefault:50,swimTargets:{...SWIM_TARGET_DEFAULTS},swimModes:{...SWIM_MODE_DEFAULTS},routineTemplates:{},setRecords:{},pendingSets:{},setConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,effortMode:'off',recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
+export function blankData():TrackerData {return {version:5,swimTemplates:{},swimPoolDefault:50,swimTargets:{...SWIM_TARGET_DEFAULTS},swimModes:{...SWIM_MODE_DEFAULTS},routineTemplates:{},setRecords:{},pendingSets:{},setConflicts:{},syncItems:{},pendingItems:{},itemConflicts:{},weeks:{},weights:{},waterLogs:{},targetWeight:'',setOverrides:{},restSeconds:90,effortMode:'off',recordUpdates:{},pendingSync:{},reminders:{enabled:false,time:'18:00'}};}
 export function weekBlank():WeekLog{return {done:{},gym:{},swim:{},sessionNotes:{},timing:{},schedule:{},completedAt:{},completedOn:{},scheduleStatus:{},routineOverrides:{},swimRoutineOverrides:{}};}
 export function loadData(uid:string):TrackerData {
   if(typeof window==='undefined')return blankData();
@@ -21,7 +22,8 @@ export function loadData(uid:string):TrackerData {
       for(const k of Object.keys(result.weights))result.recordUpdates[`weight:${k}`]=t;
       for(const k of Object.keys(result.waterLogs))result.recordUpdates[`water:${k}`]=t;
     }
-    return normalizeSets(result);
+    result.syncItems||={};result.pendingItems||={};result.itemConflicts||={};
+    normalizeSets(result);overlaySyncItems(result);return result;
   } catch{return blankData();}
 }
 export function saveData(uid:string,data:TrackerData) {localStorage.setItem(`${STORAGE_KEY}:${uid}`,JSON.stringify(data));}
@@ -69,7 +71,7 @@ export function applyRecord(data:TrackerData,key:string,value:unknown):TrackerDa
     if(!typedGymDay(d)&&record.swimRoutineOverride && typeof record.swimRoutineOverride==='object'){w.swimRoutineOverrides??={};w.swimRoutineOverrides[d as 'Thursday']=record.swimRoutineOverride as NonNullable<WeekLog['swimRoutineOverrides']>['Thursday'];}
     else if(!typedGymDay(d)&&record.swimRoutineOverride===null)delete w.swimRoutineOverrides?.[d as 'Thursday'];
   }
-  overlaySets(next);
+  overlaySets(next);overlaySyncItems(next);
   return next;
 }
 export function downloadFile(name:string,content:string,mime='application/json') {

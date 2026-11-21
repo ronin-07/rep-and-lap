@@ -64,9 +64,11 @@ export interface WeekLog {
 export interface WeighIn {kg?:InputNumber;note?:string;deleted?:boolean}
 export interface WaterEntry {date:string;ml:number;at:string;deleted?:boolean}
 export interface Preferences {swimTemplates:Partial<Record<SwimDay,SwimRoutine>>;swimPoolDefault:number;swimTargets:Partial<Record<SwimStroke,number>>;swimModes:Partial<Record<SwimStroke,SwimMode>>;routineTemplates:Partial<Record<GymDay,RoutineExercise[]>>;setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
+import type {SyncItemDocument,PendingSyncItem,SyncItemConflict} from './item-sync';
 export interface TrackerData extends Preferences {
   version:number;weeks:Record<string,WeekLog>;weights:Record<string,WeighIn>;
   waterLogs:Record<string,WaterEntry>;recordUpdates:Record<string,number>;pendingSync:Record<string,number>;
   setRecords:Record<string,SetDocument>;pendingSets:Record<string,PendingSetWrite>;setConflicts:Record<string,SetConflict>;
+  syncItems:Record<string,SyncItemDocument>;pendingItems:Record<string,PendingSyncItem>;itemConflicts:Record<string,SyncItemConflict>;
 }
 export interface UserInfo {uid:string;name:string;email:string;photoURL:string|null}
