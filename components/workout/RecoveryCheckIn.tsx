@@ -13,11 +13,12 @@ function RecoveryCheckInSheet({app,prompt}:{app:Trainer;prompt:NonNullable<Train
   const saved=app.data.weeks[prompt.week]?.sessionNotes?.[prompt.day];
   return {sessionRpe:saved?.sessionRpe,soreness:saved?.soreness||'',general:saved?.general||''};
  });
+ const closeRecoveryPrompt=app.closeRecoveryPrompt;
  useEffect(()=>{
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')app.closeRecoveryPrompt();};
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')closeRecoveryPrompt();};
   document.addEventListener('keydown',escape);
   return ()=>document.removeEventListener('keydown',escape);
- },[app.closeRecoveryPrompt]);
+ },[closeRecoveryPrompt]);
  return <div className="overlay" role="presentation" onClick={app.closeRecoveryPrompt}>
   <section className="card recovery-sheet" role="dialog" aria-modal="true" aria-labelledby="recovery-heading" onClick={e=>e.stopPropagation()}>
    <button type="button" className="icon-btn recovery-close" aria-label="Skip optional feedback" onClick={app.closeRecoveryPrompt}><X size={19}/></button>

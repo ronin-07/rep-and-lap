@@ -17,7 +17,8 @@ function CompletionDateModal({app,request}:{app:Trainer;request:NonNullable<Trai
  const existing=completedDate(app.data,request.week,request.day);
  const [choice,setChoice]=useState<'scheduled'|'today'|'other'>(request.mode==='edit'?'other':scheduled<=today?'scheduled':'today');
  const [otherDate,setOtherDate]=useState(request.mode==='edit'?existing:scheduled<=today?scheduled:today);
- useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')app.cancelCompletion();};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[app.cancelCompletion]);
+ const cancelCompletion=app.cancelCompletion;
+ useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')cancelCompletion();};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[cancelCompletion]);
  const actual=choice==='scheduled'?scheduled:choice==='today'?today:otherDate;
  const valid=/^\d{4}-\d{2}-\d{2}$/.test(actual)&&actual<=today;
  const isEditing=request.mode==='edit';

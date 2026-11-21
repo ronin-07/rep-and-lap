@@ -22,7 +22,6 @@ import RestDock from './RestDock';
 import {swimTotals,swimRoutine,effectivePool,segmentDistance,SWIM_ACTIVITY_LABELS} from '@/lib/swimming';
 
 function WeekChooser({app}:{app:Trainer}){return <div className="week-chooser"><button className="icon-btn" aria-label="Previous week" onClick={()=>app.setWeek(shiftWeek(app.week,-1))}><ChevronLeft size={19}/></button><strong>{labelWeek(app.week)}</strong><button className="icon-btn" aria-label="Next week" onClick={()=>app.setWeek(shiftWeek(app.week,1))}><ChevronRight size={19}/></button></div>}
-function Segmented<T extends string>({values,value,onChange}:{values:readonly T[];value:T;onChange:(value:T)=>void}){return <div className="segmented">{values.map(x=><button key={x} className={value===x?'selected':''} onClick={()=>onChange(x)}>{x}</button>)}</div>}
 function SelectDay({days,value,onChange}:{days:Day[];value:Day;onChange:(value:Day)=>void}){return <div className="day-tabs">{days.map(d=><button key={d} className={value===d?'active':''} onClick={()=>onChange(d)}><small>{d.slice(0,3)}</small><strong>{PLAN[d].name}</strong></button>)}</div>}
 /** Keep the day selector in the same position for planned, active, and completed
  * workouts. Rendering it inside the editors made the whole layout jump when a

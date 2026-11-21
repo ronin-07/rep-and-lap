@@ -39,8 +39,8 @@ export default function AppShell(){
  },[app.view]);
  useEffect(()=>{
   if(!mobileMenuOpen)return;
-  const dismiss=(event:PointerEvent)=>{const target=event.target;if(target instanceof Element&&!target.closest('.mobile-extra-nav,.mobile-menu-trigger'))setMobileMenuOpen(false);};
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileMenuOpen(false);};
+  const dismiss=(event:PointerEvent)=>{const target=event.target;if(target instanceof Element&&!target.closest('.mobile-extra-nav,.mobile-menu-trigger'))setMobileMenu(prev=>({...prev,open:false}));};
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileMenu(prev=>({...prev,open:false}));};
   document.addEventListener('pointerdown',dismiss);document.addEventListener('keydown',escape);
   return ()=>{document.removeEventListener('pointerdown',dismiss);document.removeEventListener('keydown',escape);};
  },[mobileMenuOpen]);

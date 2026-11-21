@@ -38,9 +38,9 @@ export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>v
  useEffect(()=>{
   if(!open)return;
   const outside=(event:PointerEvent)=>{
-   if(event.target instanceof Node&&!ref.current?.contains(event.target))setOpen(false);
+   if(event.target instanceof Node&&!ref.current?.contains(event.target))setOpenContext(null);
   };
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false);};
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpenContext(null);};
   document.addEventListener('pointerdown',outside);
   document.addEventListener('keydown',escape);
   return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
