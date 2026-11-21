@@ -177,6 +177,11 @@ export function readBackup(text:string,current:TrackerData):BackupPreview {
    }
    base.swimTechniqueMastery=strokes as TrackerData['swimTechniqueMastery'];
   }
+  if(raw.waterGoalHistory!==undefined){
+   const goals=safeRecord(raw.waterGoalHistory,'water goals',500);
+   for(const [date,value] of Object.entries(goals))check(/^\d{4}-\d{2}-\d{2}$/.test(date)&&typeof value==='number'&&Number.isInteger(value)&&value>=500&&value<=6000,'Invalid daily water goal');
+   base.waterGoalHistory=goals as Record<string,number>;
+  }
   if(saneScalar(raw.targetWeight,400))base.targetWeight=raw.targetWeight as TrackerData['targetWeight'];
   if(typeof raw.restSeconds==='number'&&raw.restSeconds>=15&&raw.restSeconds<=600)base.restSeconds=raw.restSeconds;
   if(raw.effortMode==='off'||raw.effortMode==='rir'||raw.effortMode==='rpe')base.effortMode=raw.effortMode;
@@ -220,6 +225,7 @@ export function mergeBackup(current:TrackerData,source:TrackerData):{data:Tracke
    const existing=data.swimTechniqueMastery[stroke]??={};
    for(const [step,confirmed] of Object.entries(source.swimTechniqueMastery?.[stroke]||{}))if(confirmed&&!existing[step]){existing[step]=true;addedTemplate=true;}
   }
+  for(const [date,goal] of Object.entries(source.waterGoalHistory||{}))if(!(date in data.waterGoalHistory)){data.waterGoalHistory[date]=goal;addedTemplate=true;}
   if(addedTemplate)changedKeys.push('preferences');
   return {data:normalizeSets(data),changedKeys,duplicates,newRecords};
 }

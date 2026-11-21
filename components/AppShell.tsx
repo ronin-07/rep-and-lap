@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Activity,ArrowLeft,ArrowRight,Cloud,CloudOff,CloudUpload,Dumbbell,Droplets,House,Menu,Moon,CalendarDays,Settings2,Sun,Trophy,UserRound,WifiOff,X,ShieldAlert} from 'lucide-react';
+import {Activity,ArrowLeft,Cloud,CloudOff,CloudUpload,Dumbbell,House,Menu,Moon,CalendarDays,Settings2,Sun,Trophy,UserRound,WifiOff,X,ShieldAlert} from 'lucide-react';
 import {useTrainer} from '@/hooks/useTrainer';
 import Dashboard from './dashboard/Dashboard';
 import Workout from './workout/Workout';
@@ -13,6 +13,7 @@ import TrainingCalendar from './progress/TrainingCalendar';
 import Insights from './progress/Insights';
 import Achievements from './progress/Achievements';
 import NotificationBell from './NotificationBell';
+import CelebrationBanner from './CelebrationBanner';
 import CompletionDateDialog from './workout/CompletionDateDialog';
 import RecoveryCheckIn from './workout/RecoveryCheckIn';
 const NAV=[{key:'home',label:'Home',icon:House},{key:'workout',label:'Log',icon:Dumbbell},{key:'progress',label:'Progress',icon:Activity},{key:'profile',label:'Profile',icon:UserRound}] as const;
@@ -63,14 +64,7 @@ export default function AppShell(){
  <RecoveryCheckIn app={app}/>
  <CompletionDateDialog app={app}/>
  {totalConflicts>0&&conflictNotice&&app.view!=='conflicts'&&<div className="conflict-notice" role="alert"><ShieldAlert size={23}/><div><strong>Sync conflict detected</strong><small>{totalConflicts} {totalConflicts===1?'item needs':'items need'} your decision</small></div><button className="button-primary" onClick={()=>{dismissConflictNotice();app.goto('conflicts');}}>Review</button><button className="icon-btn" aria-label="Dismiss conflict notification" onClick={()=>dismissConflictNotice()}><X size={17}/></button></div>}
- {app.celebration&&!app.recoveryPrompt&&<div className="overlay" role="presentation" onClick={()=>app.dismissCelebration()}>
-  <div className={`celebration card ${app.celebration.kind==='hydration'?'celebration-water':''}`} role="dialog" aria-modal="true" aria-label={app.celebration.title} onClick={e=>e.stopPropagation()}>
-   {app.celebration.kind==='hydration'?<div className="water-celebration-art" aria-hidden="true"><span className="water-ripple ripple-one"/><span className="water-ripple ripple-two"/><span className="water-drop-core"><Droplets size={46}/></span><span className="water-spark spark-a"/><span className="water-spark spark-b"/><span className="water-spark spark-c"/><span className="water-spark spark-d"/></div>:<span className="celebration-trophy"><Trophy size={42}/></span>}
-   <div className="eyebrow">{app.celebration.kind==='hydration'?'DAILY WATER GOAL COMPLETE':'A MOMENT TO CELEBRATE'}</div>
-   <h2>{app.celebration.title}</h2><p>{app.celebration.body}</p>
-   <button className="button-primary" onClick={()=>app.dismissCelebration()}>{app.celebration.kind==='hydration'?'Stay hydrated':'Keep going'} <ArrowRight size={18}/></button>
-  </div>
- </div>}
+ <CelebrationBanner app={app}/>
  {app.toast&&<div className="toast" role="status">{app.toast}</div>}
  </div>;
 }

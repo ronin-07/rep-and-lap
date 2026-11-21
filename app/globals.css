@@ -996,3 +996,120 @@ body.keyboard-open .workout-control-bar{display:none}
 
 /* Option A: client-side timer safety warning without an extra overlay. */
 .workout-timer-warning{margin:8px 0 0;padding:8px 12px;border:1px solid rgba(243,187,88,.42);border-radius:10px;background:rgba(243,187,88,.08);color:var(--text);font-size:.78rem;line-height:1.5}
+
+/* Phase B — shared, adaptive training command center. Existing log/timer styles are unchanged. */
+.phaseb-home{gap:19px}
+.phaseb-welcome{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.phaseb-welcome h1{margin:6px 0 4px;font-size:clamp(1.8rem,3.5vw,3rem)}
+.phaseb-welcome p{color:var(--muted);font-size:.9rem}
+.phaseb-dot{color:var(--purple)}
+.phaseb-connection{padding:7px 12px;border:1px solid var(--border);border-radius:30px;font-size:.74rem;color:var(--aqua);background:var(--panel)}
+.phaseb-home-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.9fr);gap:17px;align-items:start}
+.phaseb-home-primary,.phaseb-home-aside{min-width:0}
+.phaseb-hero{position:relative;min-height:282px;display:flex;align-items:center;padding:30px;overflow:hidden;background:radial-gradient(ellipse at 90% 90%,rgba(45,208,194,.22),transparent 55%),linear-gradient(120deg,color-mix(in srgb,var(--purple) 11%,var(--panel)),var(--panel) 80%);border-color:color-mix(in srgb,var(--purple) 42%,var(--border))}
+.phaseb-swim-hero{background:radial-gradient(ellipse at 90% 75%,rgba(43,216,217,.26),transparent 55%),linear-gradient(120deg,color-mix(in srgb,var(--aqua) 11%,var(--panel)),var(--panel) 80%);border-color:color-mix(in srgb,var(--aqua) 40%,var(--border))}
+.phaseb-hero-art{pointer-events:none;position:absolute;right:-1%;top:12%;width:41%;height:78%;display:grid;place-items:center;color:var(--aqua);opacity:.32;transform:rotate(-10deg);border:1px solid color-mix(in srgb,var(--aqua) 20%,transparent);border-radius:55% 35% 50% 25%;box-shadow:inset 0 0 65px color-mix(in srgb,var(--aqua) 9%,transparent)}
+.phaseb-hero-content{z-index:1;position:relative;max-width:100%}
+.phaseb-kicker{display:inline-flex;gap:8px;align-items:center;font-size:.7rem;letter-spacing:.13em;font-weight:800;color:var(--purple)}
+.phaseb-live-dot{width:8px;height:8px;border-radius:50%;background:var(--aqua)}
+.phaseb-hero h2{font-size:clamp(1.65rem,3.4vw,2.55rem);margin:9px 0;max-width:540px}
+.phaseb-hero-content>p{color:var(--muted);max-width:480px;font-size:.9rem}
+.phaseb-hero-meta{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.8rem;margin:14px 0}
+.phaseb-hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:19px}
+.phaseb-card{padding:19px;min-width:0}
+.phaseb-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.phaseb-card-heading h2{font-size:1rem;display:flex;align-items:center;gap:9px}
+.phaseb-card-heading h2 svg{color:var(--purple)}
+.phaseb-week-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}
+.phaseb-week-day{min-width:0;display:flex;flex-direction:column;gap:8px;align-items:center;padding:11px 3px;background:var(--panel2);border:1px solid var(--border);border-radius:13px;color:var(--text);transition:transform .2s,border-color .2s}
+.phaseb-week-day:hover,.phaseb-week-day:focus-visible{border-color:var(--purple);transform:translateY(-2px)}
+.phaseb-week-day.is-selected{border:2px solid var(--purple);padding:10px 2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--purple) 13%,transparent)}
+.phaseb-week-day.is-today strong{color:var(--purple)}
+.phaseb-week-day small{font-size:.7rem;color:var(--muted)}
+.phaseb-week-day strong{font-size:.98rem}
+.phaseb-day-icons{min-height:14px;display:flex;align-items:center;justify-content:center;gap:3px;color:var(--muted)}
+.phaseb-status-dot,.phaseb-calendar-marker{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--purple);border:1px solid var(--purple)}
+.phaseb-status-dot.is-completed,.phaseb-calendar-marker.marker-completed{background:var(--green);border-color:var(--green)}
+.phaseb-status-dot.is-rest,.phaseb-calendar-marker.marker-rest{background:var(--muted);border-color:var(--muted)}
+.phaseb-status-dot.is-skipped,.phaseb-calendar-marker.marker-skipped{background:var(--coral);border-color:var(--coral)}
+.phaseb-week-day.phaseb-scheduled .phaseb-status-dot,.phaseb-calendar-marker.marker-scheduled{background:transparent}
+.phaseb-day-details{margin-top:15px;padding-top:13px;border-top:1px solid var(--border);scroll-margin-top:95px}
+.phaseb-plan-item{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.phaseb-plan-item:last-child{border:0;padding-bottom:0}
+.phaseb-plan-item>div:first-child{min-width:0;display:flex;flex-direction:column;gap:3px}
+.phaseb-plan-item strong{font-size:.88rem}.phaseb-plan-item small{font-size:.73rem;color:var(--muted)}
+.phaseb-plan-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.phaseb-plan-actions .button-secondary,.phaseb-plan-actions summary{padding:8px 11px;min-height:37px;font-size:.74rem;white-space:nowrap}
+.phaseb-plan-menu{position:relative}.phaseb-plan-menu summary{list-style:none;cursor:pointer}.phaseb-plan-menu summary::-webkit-details-marker{display:none}
+.phaseb-plan-popover{position:absolute;right:0;top:100%;z-index:10;min-width:min(285px,78vw);background:var(--panel);box-shadow:0 12px 36px rgba(0,0,0,.32);border:1px solid var(--border);border-radius:14px;padding:10px;display:grid;gap:6px}
+.phaseb-plan-popover>button{display:flex;align-items:center;gap:9px;border:0;color:var(--text);background:var(--panel2);padding:11px;border-radius:9px;text-align:left}
+.phaseb-plan-popover .field{margin:0}
+.phaseb-week-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.phaseb-week-stats>div{border:1px solid var(--border);border-radius:12px;background:var(--panel2);padding:12px 7px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.phaseb-week-stats svg{color:var(--purple)}.phaseb-week-stats>div:first-child svg{color:var(--green)}.phaseb-week-stats>div:last-child svg{color:var(--coral)}
+.phaseb-week-stats strong{font-size:clamp(.83rem,1.4vw,1.13rem);white-space:nowrap}.phaseb-week-stats small{color:var(--muted);font-size:.64rem}
+.phaseb-secondary-note{font-size:.72rem!important;color:var(--muted);margin-top:12px}
+.phaseb-icon-button{min-width:36px;min-height:36px;display:grid;place-items:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
+.phaseb-hydration-number{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:8px 0 11px}
+.phaseb-hydration-number strong{font-size:1.4rem;font-variant-numeric:tabular-nums}.phaseb-hydration-number strong small{font-size:.85rem;color:var(--muted);font-weight:500}.phaseb-hydration-number>span{font-weight:700;color:var(--aqua)}
+.phaseb-quick-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:13px}.phaseb-quick-actions button{flex:1 1 auto;min-width:0;padding:9px 6px;min-height:40px;font-size:.73rem}
+.phaseb-goal-editor{display:grid;gap:12px;padding-top:14px;margin-top:14px;border-top:1px solid var(--border)}
+.phaseb-weight{font-size:1.75rem;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.phaseb-weight small{font-size:.83rem;color:var(--muted)}
+.phaseb-progress-overview{gap:17px}.phaseb-overview-banner{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:22px;border:1px solid var(--border);border-radius:20px;background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--purple) 16%,transparent),transparent 64%),var(--panel)}
+.phaseb-overview-banner h2{margin:4px 0}.phaseb-overview-banner p{color:var(--muted)}
+.phaseb-progress-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.phaseb-progress-card{text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:9px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:18px;padding:22px;transition:transform .18s,border-color .18s}
+.phaseb-progress-card:hover{border-color:var(--purple);transform:translateY(-3px)}
+.phaseb-progress-card-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:color-mix(in srgb,var(--purple) 15%,var(--panel2));color:var(--purple)}
+.phaseb-category-swimming .phaseb-progress-card-icon,.phaseb-category-hydration .phaseb-progress-card-icon{color:var(--aqua);background:color-mix(in srgb,var(--aqua) 12%,var(--panel2))}
+.phaseb-progress-card strong{font-size:1.18rem}.phaseb-progress-card>span:not(.phaseb-progress-card-icon):not(.phaseb-progress-card-arrow){font-weight:750;font-size:.94rem}.phaseb-progress-card small{color:var(--muted);font-size:.77rem}.phaseb-progress-card-arrow{color:var(--purple);font-weight:800;font-size:.78rem;margin-top:5px}
+.phaseb-legacy-details{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--panel)}.phaseb-legacy-details>summary{cursor:pointer;font-weight:800;padding:8px}.phaseb-legacy-details>div{margin-top:18px}
+.phaseb-calendar-first .training-calendar-grid{min-height:390px}.phaseb-calendar-first .calendar-cell{min-height:52px}.phaseb-calendar-markers{display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:wrap;max-width:100%}
+.phaseb-hydration-history{display:grid;gap:13px}.phaseb-hydration-bars{display:flex;gap:6px;align-items:end;height:210px}
+.phaseb-hydration-day{display:flex;flex:1;min-width:0;min-height:100%;flex-direction:column;align-items:center;justify-content:end;gap:6px;color:var(--muted);background:none;border:0;padding:0 1px}
+.phaseb-hydration-bar-area{display:block;position:relative;width:100%;height:180px;background:var(--panel2);border-radius:6px 6px 2px 2px;overflow:hidden}
+.phaseb-hydration-target{position:absolute;left:0;right:0;border-top:1px dashed var(--muted);opacity:.85;z-index:1}
+.phaseb-hydration-fill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,var(--aqua),color-mix(in srgb,var(--aqua) 62%,var(--purple)));border-radius:6px 6px 0 0;min-height:0;transition:height .3s ease}
+.phaseb-hydration-day:hover .phaseb-hydration-fill,.phaseb-hydration-day.is-selected .phaseb-hydration-fill{filter:brightness(1.2)}
+.phaseb-hydration-day.is-selected small{color:var(--purple);font-weight:900}
+.phaseb-hydration-detail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;background:var(--panel2);border:1px solid var(--border);padding:13px;border-radius:13px;font-size:.82rem}.phaseb-hydration-detail>span:first-child{display:flex;align-items:center;gap:5px}.phaseb-hydration-detail strong{font-variant-numeric:tabular-nums}.phaseb-hydration-detail>span:last-child{color:var(--muted)}
+.phaseb-notification-filters{display:flex;gap:5px;padding:8px 12px;overflow-x:auto;max-width:100%}.phaseb-notification-filters button{white-space:nowrap;border:1px solid var(--border);border-radius:40px;padding:6px 9px;background:var(--panel2);color:var(--muted);font-weight:750;font-size:.7rem}.phaseb-notification-filters button.selected{background:color-mix(in srgb,var(--purple) 23%,var(--panel));color:var(--text);border-color:var(--purple)}
+.phaseb-achievement-summary{padding:22px;display:flex;align-items:center;gap:17px;border:1px solid color-mix(in srgb,var(--gold) 42%,var(--border));border-radius:17px;background:radial-gradient(ellipse at left top,color-mix(in srgb,var(--gold) 12%,transparent),transparent 70%),var(--panel2)}
+.phaseb-achievement-summary strong{font-size:1.12rem}.phaseb-achievement-summary p{color:var(--muted);font-size:.8rem}
+.phaseb-trophy{width:64px;height:64px;display:grid;place-items:center;flex-shrink:0;border-radius:16px;color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,var(--panel))}
+@media(min-width:1150px){.phaseb-calendar-first{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);align-items:start;gap:14px}.phaseb-calendar-first>.card{height:auto}}
+@media(max-width:1149px){.phaseb-home-layout{grid-template-columns:minmax(0,1fr)}.phaseb-home-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.phaseb-home-aside>.card:first-child{grid-column:1/-1}}
+@media(max-width:700px){.phaseb-home-aside{display:flex;flex-direction:column}.phaseb-home-aside>.card{width:100%}.phaseb-home{gap:15px}.phaseb-welcome h1{font-size:1.7rem}.phaseb-connection{display:none}.phaseb-hero{min-height:240px;padding:20px}.phaseb-hero-art{width:45%;right:-9%;opacity:.20}.phaseb-hero h2{font-size:1.6rem}.phaseb-hero-actions{flex-direction:column}.phaseb-hero-actions button{width:100%}.phaseb-card{padding:15px}.phaseb-week-days{gap:4px}.phaseb-week-day{border-radius:9px;padding:9px 1px}.phaseb-week-day.is-selected{padding:8px 0}.phaseb-plan-item{flex-wrap:wrap}.phaseb-plan-actions{width:100%}.phaseb-plan-actions>button{flex:1}.phaseb-progress-card{padding:15px}.phaseb-hydration-bars{gap:3px}.phaseb-hydration-detail{gap:6px}}
+@media(max-width:370px){.phaseb-week-day small{font-size:.61rem}.phaseb-progress-cards{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.phaseb-week-day,.phaseb-progress-card,.phaseb-hydration-fill{transition:none!important;transform:none!important}}
+/* Phase B — short non-blocking gym, pool, hydration and milestone celebrations. */
+.phaseb-celebration-banner{position:fixed;z-index:80;bottom:28px;right:24px;width:min(430px,calc(100vw - 28px));display:flex;align-items:center;gap:13px;padding:16px;border-radius:20px;border:1px solid color-mix(in srgb,var(--purple) 55%,var(--border));background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--purple) 19%,transparent),transparent 60%),var(--panel);box-shadow:0 16px 56px rgba(0,0,0,.38);animation:phaseb-celebrate-in .36s cubic-bezier(.2,.85,.2,1) both;overflow:hidden;pointer-events:auto}
+.phaseb-celebration-banner.is-swim,.phaseb-celebration-banner.is-water{border-color:color-mix(in srgb,var(--aqua) 53%,var(--border))}
+.phaseb-celebration-banner.is-achievement{border-color:color-mix(in srgb,var(--gold) 58%,var(--border))}
+.phaseb-celebration-graphic{position:relative;min-width:60px;height:60px;border-radius:18px;display:grid;place-items:center;color:var(--purple);background:color-mix(in srgb,var(--purple) 17%,var(--panel2));animation:phaseb-celebrate-pulse .9s ease-out}
+.is-swim .phaseb-celebration-graphic,.is-water .phaseb-celebration-graphic{color:var(--aqua);background:color-mix(in srgb,var(--aqua) 16%,var(--panel2))}
+.is-achievement .phaseb-celebration-graphic{color:var(--gold)}
+.phaseb-celebration-check{position:absolute;bottom:-6px;right:-5px;border-radius:50%;background:var(--green);color:#061a1a;width:22px;height:22px;display:grid;place-items:center}
+.phaseb-celebration-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.phaseb-celebration-copy>span{font-size:.63rem;letter-spacing:.10em;font-weight:900;color:var(--purple);display:flex;gap:5px;align-items:center}
+.is-swim .phaseb-celebration-copy>span{color:var(--aqua)}
+.phaseb-celebration-copy strong{font-size:1.05rem}.phaseb-celebration-copy p{font-size:.75rem;color:var(--muted)}
+.phaseb-celebration-close{border:0;background:transparent;color:var(--muted);padding:6px;align-self:flex-start}
+.phaseb-celebration-particles{position:absolute;pointer-events:none;inset:0}
+.phaseb-celebration-particles i{position:absolute;top:48%;left:15%;width:5px;height:8px;border-radius:3px;background:var(--aqua);opacity:0;animation:phaseb-confetti 1s ease-out .1s both;--a:0deg}
+.phaseb-celebration-particles i:nth-child(2){--a:40deg;background:var(--purple)}.phaseb-celebration-particles i:nth-child(3){--a:80deg}.phaseb-celebration-particles i:nth-child(4){--a:120deg;background:var(--gold)}.phaseb-celebration-particles i:nth-child(5){--a:160deg}.phaseb-celebration-particles i:nth-child(6){--a:200deg;background:var(--purple)}.phaseb-celebration-particles i:nth-child(7){--a:240deg}.phaseb-celebration-particles i:nth-child(8){--a:280deg;background:var(--gold)}.phaseb-celebration-particles i:nth-child(9){--a:320deg}
+@keyframes phaseb-celebrate-in{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes phaseb-celebrate-pulse{0%{transform:scale(.65)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes phaseb-confetti{0%{opacity:0;transform:rotate(var(--a)) translateY(0)}20%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-65px)}}
+@media(max-width:900px){.phaseb-celebration-banner{bottom:calc(90px + env(safe-area-inset-bottom));right:14px;left:14px;margin:auto}}
+@media(prefers-reduced-motion:reduce){.phaseb-celebration-banner,.phaseb-celebration-graphic,.phaseb-celebration-particles i{animation:none!important}.phaseb-celebration-particles{display:none}}
+.phaseb-calendar-marker.marker-overdue{background:var(--gold);border-color:var(--gold)}
+.phaseb-calendar-first .calendar-cell.status-cell-overdue{border-color:color-mix(in srgb,var(--gold) 48%,var(--border))}
+.achievement-tile.is-unlocked .achievement-icon{animation:phaseb-badge-shimmer .65s ease-out both}
+@keyframes phaseb-badge-shimmer{0%{transform:scale(.8);box-shadow:0 0 0 0 color-mix(in srgb,var(--gold) 42%,transparent)}70%{transform:scale(1.07);box-shadow:0 0 0 11px transparent}100%{transform:scale(1);box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.achievement-tile.is-unlocked .achievement-icon{animation:none!important}}
+.phaseb-insights-lead{display:grid;gap:15px}.phaseb-insights-columns{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(210px,.85fr);gap:19px;align-items:start}
+.phaseb-insights-columns h3{font-size:.9rem;margin-bottom:14px}.phaseb-insights-findings{display:grid;gap:9px}
+.phaseb-insights-findings>div{padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.phaseb-insights-findings strong{font-size:1.1rem;font-variant-numeric:tabular-nums}.phaseb-insights-findings span{font-size:.73rem;color:var(--muted);text-align:right}
+@media(max-width:740px){.phaseb-insights-columns{grid-template-columns:1fr}}

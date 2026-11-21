@@ -1,60 +1,63 @@
 'use client';
-import {ArrowRight,CheckCircle2,Droplets,Dumbbell,Flame,Medal,Scale,Target,Trophy,CalendarDays,CalendarClock,TrendingUp,Clock3,Moon,SkipForward,AlertCircle} from 'lucide-react';
+import {useState} from 'react';
+import {ArrowRight,CalendarDays,CalendarClock,CheckCircle2,Droplets,Dumbbell,Flame,Leaf,Moon,Scale,Settings2,SkipForward,Timer,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
-import {DAYS,type Day} from '@/lib/types';
-import {PLAN,isGym} from '@/lib/plan';
-import {activeDay,keyOf,weekOf,formatDate,shiftWeek} from '@/lib/dates';
-import {statusFor} from '@/lib/scheduling';
-import {waterGoal,waterTotal,weightEntries,milestones,activeStreak,plannedDate,sessionForDate,strengthInsights,formatDuration,calendarCompleted} from '@/lib/metrics';
-import {Rings} from '@/components/Rings';
+import type {Day} from '@/lib/types';
+import {isGym} from '@/lib/plan';
+import {dateFor,keyOf,weekOf,formatDate} from '@/lib/dates';
+import {entriesForDate,weeklyAdherence} from '@/lib/scheduling';
+import {homeFocus,dayIndicators} from '@/lib/home-overview';
+import {waterGoal,waterTotal,weightEntries,activeStreak,formatDuration} from '@/lib/metrics';
 import {weeklyTrainingTime} from '@/lib/training-intelligence';
 import {sessionDisplayName,sessionDisplaySubtitle} from '@/lib/swimming';
-
 import DateInput from '@/components/DateInput';
 
+const abbreviations=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 export default function Dashboard({app}:{app:Trainer}){
- const now=new Date(),today=keyOf(now),currentWeek=weekOf(now);
- const displayedWeek=currentWeek;
- const shifted=sessionForDate(app.data,today);
- const todayDay=activeDay(now);
- const defaultDay=DAYS.find(day=>plannedDate(app.data,currentWeek,day)===today&&statusFor(app.data,currentWeek,day)==='scheduled');
- const chosen=shifted??(defaultDay?{week:currentWeek,day:defaultDay}:null);
- const todayPlan=chosen?PLAN[chosen.day]:null,done=chosen?!!app.data.weeks[chosen.week]?.done?.[chosen.day]:false;
- const actual=calendarCompleted(app.data,currentWeek),water=waterTotal(app.data,today),target=waterGoal(today);
- const weights=weightEntries(app.data),latest=weights.at(-1),changes=weights.length>1?Number(latest?.[1]?.kg)-Number(weights.at(-2)?.[1]?.kg):null;
- const streak=activeStreak(app.data),events=milestones(app.data),insights=strengthInsights(app.data);
- const nextWeek=shiftWeek(currentWeek,1);
- const carryOver=Object.entries(app.data.weeks).flatMap(([fromWeek,record])=>
-  fromWeek===currentWeek?[]:DAYS.flatMap(day=>{
-   const date=record.schedule?.[day];
-   return !record.done?.[day]&&!record.scheduleStatus?.[day]&&date&&date>=currentWeek&&date<nextWeek?[{week:fromWeek,day,date}]:[];
-  })
- ).sort((a,b)=>a.date.localeCompare(b.date));
- const missed=DAYS.some(day=>statusFor(app.data,displayedWeek,day)==='scheduled'&&plannedDate(app.data,displayedWeek,day)<today);
- const openSession=(week:string,day:Day)=>{app.setWeek(week);if(isGym(day))app.setGymDay(day);else app.setSwimDay(day);app.goto('workout',isGym(day)?'gym':'swim');};
- return <div className="stack-xl">
- <div className="welcome"><div><div className="eyebrow">YOUR SPACE · {formatDate(today)}</div><h1>Strong habits, <em>steady progress.</em></h1><p>Everything you need for today — nothing you don’t.</p></div><div className="welcome-chip"><span className="chip-dot"/> {app.online?'Ready to train':'Offline ready'}</div></div>
- <section className="hero-session card"><div className="session-glow"/><div className="hero-copy"><span className="eyebrow">{shifted?'RESCHEDULED FOR TODAY':todayPlan?'TODAY’S SESSION':'YOUR RECOVERY DAY'}</span><h2>{todayPlan&&chosen?sessionDisplayName(app.data,chosen.week,chosen.day):'Recovery day'}</h2><p>{todayPlan&&chosen?sessionDisplaySubtitle(app.data,chosen.week,chosen.day):'Recharge today. Your next training session is on the schedule below.'}</p><div className="hero-mini"><CalendarDays size={16}/>{todayPlan?(isGym(chosen!.day)?'Gym · ':'Pool · '):'Recovery · '}{chosen?.day||todayDay||'Sunday'}</div><button className="button-primary hero-cta" onClick={()=>{if(chosen)openSession(chosen.week,chosen.day);else app.goto('progress');}}>{todayPlan?(done?'View completed session':'Open today’s workout'):'View your progress'} <ArrowRight size={18}/></button></div><div className="hero-deco"><div className="hero-shape"><Dumbbell size={66} strokeWidth={1.1}/></div></div></section>
- <Rings gym={{label:'Gym',value:`${actual.gym}/3`,progress:actual.gym/3,color:'#ad97ff'}} swim={{label:'Swimming',value:`${actual.swim}/3`,progress:actual.swim/3,color:'#5bdbc9'}} water={{label:'Hydration',value:`${(water/1000).toFixed(2)} / ${(target/1000).toFixed(1)} L`,progress:water/target,color:'#ff9b86'}}/>
- <div className="quick-grid"><article className="card quick-card"><div className="quick-top"><span className="icon-wrap coral"><Droplets size={21}/></span><span className="muted tiny">TODAY</span></div><h3>Hydration</h3><div className="quick-value">{(water/1000).toFixed(2)} <small>L</small></div><div className="progress-track"><span style={{width:`${Math.min(100,water/target*100)}%`,background:'linear-gradient(90deg,#fa9c7e,#ffb79c)'}}/></div><div className="quick-bottom"><span>{Math.max(0,target-water)} mL to goal</span><button className="small-action" onClick={()=>app.addWater(750)}>+750 mL</button></div></article>
- <article className="card quick-card"><div className="quick-top"><span className="icon-wrap aqua"><Scale size={21}/></span><span className="muted tiny">LAST RECORDED</span></div><h3>Body weight</h3><div className="quick-value">{latest?Number(latest[1].kg).toFixed(1):'—'} <small>kg</small></div><div className="quick-secondary">{changes===null?'Add a weigh-in to start':`${changes>0?'+':''}${changes.toFixed(1)} kg since last entry`}</div><div className="quick-bottom"><span>{latest?formatDate(latest[0]):'No entries yet'}</span><button className="small-action" onClick={()=>app.goto('workout','weight')}>Log weight <ArrowRight size={14}/></button></div></article></div>
- <div className="dashboard-insights"><div className="insight-tile card"><span className="icon-wrap violet"><TrendingUp size={19}/></span><div><span className="muted tiny">AVERAGE STRENGTH CHANGE</span><strong>{insights.overallPct===null?'—':`${insights.overallPct>=0?'+':''}${insights.overallPct.toFixed(1)}%`}</strong><small>{insights.matched.length?`${insights.matched.length} comparable lifts`:'Build a two-week baseline'}</small></div></div><div className="insight-tile card"><span className="icon-wrap aqua"><Clock3 size={19}/></span><div><span className="muted tiny">TRAINING TIME THIS WEEK</span><strong>{weeklyTrainingTime(app.data,currentWeek).sessions?formatDuration(weeklyTrainingTime(app.data,currentWeek).minutes):'—'}</strong><small>{weeklyTrainingTime(app.data,currentWeek).sessions?`${weeklyTrainingTime(app.data,currentWeek).sessions} timed session(s) this week`:'Start a session timer to track weekly training'}</small></div></div></div>
- <div className="dashboard-split"><section className="card pane-pad"><div className="section-title"><div><span className="eyebrow">FLEXIBLE WEEKLY PLAN</span><h2>Train at your pace.</h2></div><button className="button-secondary calendar-shortcut" onClick={()=>app.goto('calendar')}><CalendarDays size={16}/> Open calendar</button></div>
- <p className="muted small schedule-intro">An intentional rest day pauses your streak without counting as a workout. Skip records a missed session; Reschedule keeps your logged sets. Open Calendar to manage the month.</p>
- {missed&&<button className="catchup-action" onClick={()=>app.catchUpWeek(displayedWeek)}><CalendarClock size={17}/> Shift remaining sessions forward <ArrowRight size={15}/></button>}
- <div className="schedule-list">{DAYS.map(day=>{
- const plan=PLAN[day],displayName=sessionDisplayName(app.data,displayedWeek,day),displaySubtitle=sessionDisplaySubtitle(app.data,displayedWeek,day),status=statusFor(app.data,displayedWeek,day),checked=status==='completed',date=plannedDate(app.data,displayedWeek,day),late=status==='scheduled'&&date<today,isToday=date===today;
- const label=checked?'Completed':status==='rest'?'Recovery':status==='skipped'?'Skipped':late?'Missed':isToday?'Today':'Planned';
- const StatusIcon=checked?CheckCircle2:status==='rest'?Moon:status==='skipped'?SkipForward:late?AlertCircle:CalendarClock;
- return <div className={`schedule-item status-${status} ${late?'is-late':''} ${isToday?'today':''}`} key={day}>
-  <button className="schedule-main" onClick={()=>openSession(displayedWeek,day)} aria-label={`View ${displayName}: ${label}`}>
-   <span className="day-initial">{day.slice(0,3)}</span>
-   <span className="schedule-content"><strong>{status==='rest'?'Recovery Day':status==='skipped'?'Workout Skipped':displayName}</strong><small className="schedule-date">{formatDate(date)}</small><small>{status==='rest'?'Marked for recovery':status==='skipped'?'Intentionally skipped':displaySubtitle}</small>{(status==='rest'||status==='skipped')&&<small className="schedule-original">Originally {plan.name}</small>}</span>
-   <span className={`schedule-status-pill ${checked?'is-completed':status==='rest'?'is-rest':status==='skipped'?'is-skipped':late?'is-missed':'is-planned'}`}><StatusIcon size={16} aria-hidden="true"/>{label}</span>
-  </button>
-  {!checked&&<div className="schedule-actions"><button onClick={()=>app.setScheduleStatus(day,status==='rest'?null:'rest',displayedWeek)}>{status==='rest'?'Undo rest day':'Rest day'}</button><button onClick={()=>app.setScheduleStatus(day,status==='skipped'?null:'skipped',displayedWeek)}>{status==='skipped'?'Undo skip':'Skip'}</button><details className="reschedule-disclosure"><summary><CalendarClock size={14}/> Reschedule</summary><label className="field"><span>New session date</span><DateInput value={date} onChange={e=>{if(e.target.value)app.rescheduleSession(day,e.target.value,displayedWeek);}}/></label><p className="muted tiny">Existing workout logs and sets stay intact.</p></details></div>}
- </div>})}</div>{carryOver.length>0&&<div className="carryover-area"><strong className="carryover-label">CARRIED OVER TO THIS WEEK</strong>{carryOver.map(x=><button className="carryover-item" key={`${x.week}-${x.day}`} onClick={()=>openSession(x.week,x.day)}><span><strong>{sessionDisplayName(app.data,x.week,x.day)}</strong><small>{formatDate(x.date)} · from week of {formatDate(x.week)}</small></span><ArrowRight size={17}/></button>)}</div>}</section>
- <div className="stack"><section className="card pane-pad"><div className="section-title"><div><span className="eyebrow">CONSISTENCY</span><h2>Keep your streak alive.</h2></div><span className="icon-wrap violet"><Flame size={21}/></span></div><div className="streak-numbers"><div><strong>{streak.current}</strong><small>Current streak</small></div><div><strong>{streak.best}</strong><small>Best streak</small></div></div><p className="muted small">Scheduled training days count. Sunday is your usual rest day.</p></section>
- <section className="card pane-pad"><div className="section-title"><div><span className="eyebrow">RECENT MILESTONES</span><h2>Worth celebrating.</h2></div><Medal color="#f6ba8a" size={21}/></div><div className="milestone-list">{events.length?events.slice(0,3).map((e,i)=><div className="milestone-row" key={`${e.when}-${i}`}><span className="icon-wrap gold"><Trophy size={17}/></span><div><strong>{e.title}</strong><small>{e.detail}</small></div><span className="muted tiny">{e.when.slice(5)}</span></div>):<div className="empty-milestone"><Target size={25}/><strong>Your next milestone starts here.</strong><span>Log a few sessions to see your achievements.</span></div>}</div></section></div></div>
+ const now=new Date(),today=keyOf(now),week=weekOf(now),focus=homeFocus(app.data,today);
+ const [selected,setSelected]=useState(today);
+ const [goalEditing,setGoalEditing]=useState(false);
+ const [weightEditing,setWeightEditing]=useState(false);
+ const [weightDraft,setWeightDraft]=useState('');
+ const [goalDraft,setGoalDraft]=useState('');
+ const focusEntry=focus.entry, focusName=focusEntry?sessionDisplayName(app.data,focusEntry.week,focusEntry.day):focus.kind==='skipped'?'Workout skipped today':'Recovery day';
+ const focusKind=focusEntry&&isGym(focusEntry.day)?'gym':'swim';
+ const progress=weeklyAdherence(app.data,week),timed=weeklyTrainingTime(app.data,week),streak=activeStreak(app.data);
+ const water=waterTotal(app.data,today),goal=waterGoal(today,app.data),latest=weightEntries(app.data).at(-1);
+ const selectedItems=entriesForDate(app.data,selected);
+ const open=(sourceWeek:string,day:Day)=>{
+  const kind=isGym(day)?'gym':'swim';app.setWeek(sourceWeek);app.setTrackingTab(kind);
+  if(kind==='gym')app.setGymDay(day as 'Monday'|'Tuesday'|'Wednesday');else app.setSwimDay(day as 'Thursday'|'Friday'|'Saturday');
+  app.goto('workout',kind);
+ };
+ return <div className="phaseb-home stack-xl">
+  <header className="phaseb-welcome"><div><span className="eyebrow">{formatDate(today).toUpperCase()} · YOUR SPACE</span><h1>Your training space<span className="phaseb-dot">.</span></h1><p>One workout at a time. Consistency adds up.</p></div><span className="phaseb-connection">{app.syncMode==='synced'?'✓ Synced':app.syncMode==='needs-attention'?'Sync needs attention':app.online?'Saved & syncing':'Offline · saved locally'}</span></header>
+  <div className="phaseb-home-layout">
+   <div className="phaseb-home-primary stack">
+    <section className={`card phaseb-hero ${focusKind==='swim'?'phaseb-swim-hero':''}`} aria-label="Your next workout">
+     <div className="phaseb-hero-art" aria-hidden="true">{focusKind==='swim'?<Waves size={112} strokeWidth={.8}/>:<Dumbbell size={112} strokeWidth={.8}/>}</div>
+     <div className="phaseb-hero-content"><span className="phaseb-kicker"><span className="phaseb-live-dot"/>{focus.kind==='active'?'ACTIVE WORKOUT':focus.kind==='review'?'TIMER REVIEW REQUIRED':focus.kind==='scheduled'?"TODAY'S WORKOUT":focus.kind==='overdue'?'MISSED WORKOUT':focus.kind==='upcoming'?'NEXT WORKOUT':focus.kind==='skipped'?'WORKOUT SKIPPED':'RECOVERY DAY'}</span>
+      <h2>{focusName}</h2><p>{focusEntry?sessionDisplaySubtitle(app.data,focusEntry.week,focusEntry.day):focus.kind==='skipped'?'Today’s workout is marked skipped. You can undo or reschedule it below.':'No pending workouts need your attention. Rest is part of progress.'}</p>
+      <div className="phaseb-hero-meta"><CalendarDays size={15}/>{focusEntry?formatDate(focusEntry.date):'No workout today'} {focusEntry&&<>· {focusKind==='gym'?'Gym':'Swimming'}</>}</div>
+      {focus.otherTimers>0&&<p className="phaseb-secondary-note">+ {focus.otherTimers} more active or review-required timer(s) · accessible from the timer dock</p>}
+      <div className="phaseb-hero-actions"><button className="button-primary" onClick={()=>focusEntry?open(focusEntry.week,focusEntry.day):focus.kind==='skipped'?document.getElementById('phaseb-day-details')?.scrollIntoView({behavior:'smooth',block:'nearest'}):app.goto('calendar')}>{focus.kind==='active'?'Open active workout':focus.kind==='review'?'Review stopped timer':focus.kind==='recovery'?'View calendar':focus.kind==='skipped'?'Manage plan':'Open workout'} <ArrowRight size={17}/></button><button className="button-secondary" onClick={()=>{setSelected(today);document.getElementById('phaseb-day-details')?.scrollIntoView({behavior:'smooth',block:'nearest'});}}>Change today’s plan <CalendarClock size={16}/></button></div>
+     </div>
+    </section>
+    <section className="card phaseb-card phaseb-week-plan"><div className="phaseb-card-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>This week’s plan</h2></div><button className="text-btn" onClick={()=>app.goto('calendar')}>Full calendar <ArrowRight size={16}/></button></div>
+     <div className="phaseb-week-days">{Array.from({length:7},(_,i)=>{const d=dateFor(week);d.setDate(d.getDate()+i);const date=keyOf(d),entries=dayIndicators(app.data,date);const state=entries.some(x=>x.status==='completed')?'completed':entries.some(x=>x.status==='scheduled')?'scheduled':entries.some(x=>x.status==='skipped')?'skipped':entries.some(x=>x.status==='rest')?'rest':'free';return <button key={date} type="button" className={`phaseb-week-day phaseb-${state} ${date===selected?'is-selected':''} ${date===today?'is-today':''}`} aria-pressed={date===selected} title={`${formatDate(date)} · ${entries.length} sessions`} onClick={()=>setSelected(date)}><small>{abbreviations[i]}</small><strong>{d.getDate()}</strong><span className="phaseb-day-icons">{entries.length?entries.slice(0,3).map(e=><span key={e.key} className={`phaseb-status-dot is-${e.status}`} title={`${e.day}: ${e.status}`}/>):<Moon size={15}/>}</span></button>})}</div>
+     <div id="phaseb-day-details" className="phaseb-day-details"><div className="phaseb-card-heading"><strong>{selected===today?"Today's plan":formatDate(selected)}</strong><span className="muted tiny">{selectedItems.length?`${selectedItems.length} session${selectedItems.length>1?'s':''}`:'Rest / unscheduled'}</span></div>
+       {selectedItems.length?selectedItems.map(item=><div className="phaseb-plan-item" key={`${item.week}-${item.day}`}><div><strong>{sessionDisplayName(app.data,item.week,item.day)}</strong><small>{item.day} · {item.status==='completed'?'Completed':item.status==='rest'?'Recovery':item.status==='skipped'?'Skipped':item.date<today?'Overdue':'Planned'}</small></div><div className="phaseb-plan-actions"><button className="button-secondary" onClick={()=>open(item.week,item.day)}>Open</button>{item.status!=='completed'&&<details className="phaseb-plan-menu"><summary className="button-secondary">Change plan</summary><div className="phaseb-plan-popover"><button onClick={()=>app.setScheduleStatus(item.day,item.status==='rest'?null:'rest',item.week)}><Leaf size={15}/>{item.status==='rest'?'Undo recovery':'Recovery day'}</button><button onClick={()=>app.setScheduleStatus(item.day,item.status==='skipped'?null:'skipped',item.week)}><SkipForward size={15}/>{item.status==='skipped'?'Undo skip':'Skip workout'}</button><label className="field"><span>Reschedule this workout</span><DateInput value={item.date} onChange={e=>{if(e.target.value)app.rescheduleSession(item.day,e.target.value,item.week);}}/></label></div></details>}</div></div>):<p className="muted small">No workout scheduled for this date. Select another day or open Calendar to plan ahead.</p>}
+     </div>
+    </section>
+   </div>
+   <aside className="phaseb-home-aside stack">
+    <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><CalendarDays size={19}/> Your week</h2><small className="muted">Mon – Sun</small></div><div className="phaseb-week-stats"><div><CheckCircle2 size={22}/><strong>{progress.completed}/{progress.eligible}</strong><small>Plan completed</small></div><div><Timer size={22}/><strong>{timed.sessions?formatDuration(timed.minutes):'—'}</strong><small>Timed training</small></div><div><Flame size={22}/><strong>{streak.current} days</strong><small>Streak</small></div></div><p className="phaseb-secondary-note">Rest days are excluded from your planned-session target.</p></section>
+    <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><Droplets size={19}/> Hydration</h2><button className="phaseb-icon-button" aria-label="Change default daily water goal" onClick={()=>{setGoalDraft(String(goal));setGoalEditing(x=>!x)}}><Settings2 size={17}/></button></div><div className="phaseb-hydration-number"><strong>{(water/1000).toFixed(2)} <small>/ {(goal/1000).toFixed(2)} L</small></strong><span>{Math.round(water/goal*100)}%</span></div><div className="progress-track"><span style={{width:`${Math.min(100,water/goal*100)}%`,background:'var(--aqua)'}}/></div><div className="phaseb-quick-actions">{[250,500,750].map(ml=><button key={ml} className="button-secondary" onClick={()=>app.addWater(ml)}>+{ml} mL</button>)}</div>
+     {goalEditing&&<div className="phaseb-goal-editor"><label className="field"><span>Default daily water goal (mL)</span><input inputMode="numeric" type="number" min="500" max="6000" step="50" value={goalDraft} onChange={e=>setGoalDraft(e.target.value)}/></label><button className="button-primary" disabled={!Number.isInteger(Number(goalDraft))||Number(goalDraft)<500||Number(goalDraft)>6000} onClick={()=>{app.setDefaultWaterGoal(Number(goalDraft));setGoalEditing(false);}}>Save goal</button><p className="muted tiny">Your new default applies from today; older daily goals remain in history.</p></div>}
+    </section>
+    <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><Scale size={19}/> Body weight</h2><button className="text-btn" onClick={()=>{setWeightDraft(String(app.data.weights[today]?.kg||latest?.[1].kg||''));setWeightEditing(x=>!x)}}>{app.data.weights[today]?.kg?'Edit today':'Log weight'} <ArrowRight size={16}/></button></div><strong className="phaseb-weight">{latest?Number(latest[1].kg).toFixed(1):'—'} <small>kg</small></strong><p className="muted tiny">{latest?`Last recorded ${formatDate(latest[0])}`:'No weigh-ins recorded yet'}</p>
+     {weightEditing&&<div className="phaseb-goal-editor"><label className="field"><span>Weight for {formatDate(today)} (kg)</span><input type="number" inputMode="decimal" min="20" max="400" step="0.1" value={weightDraft} onChange={e=>setWeightDraft(e.target.value)}/></label><div className="row-actions"><button className="button-primary" disabled={!Number.isFinite(Number(weightDraft))||Number(weightDraft)<20||Number(weightDraft)>400} onClick={()=>{app.saveWeight(today,Number(weightDraft),app.data.weights[today]?.note||'');setWeightEditing(false)}}>Save weigh-in</button><button className="button-secondary" onClick={()=>setWeightEditing(false)}>Cancel</button></div><p className="muted tiny">Editing today’s entry updates that date instead of adding a duplicate.</p></div>}</section>
+   </aside>
+  </div>
  </div>;
 }

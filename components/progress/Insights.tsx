@@ -2,6 +2,8 @@
 import * as React from 'react';
 import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,Clock3,Droplets,Dumbbell,Flame,LockKeyhole,Sparkles,Trophy,Waves} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
+import {LineChart} from '@/components/Charts';
+import {trainingTimeWeeks} from '@/lib/training-intelligence';
 import {keyOf,shiftWeek,weekOf} from '@/lib/dates';
 import {formatDuration} from '@/lib/metrics';
 import {monthLabel,monthlyRecap,muscleCoverage,nextMonth,previousMonth} from '@/lib/insights';
@@ -33,7 +35,13 @@ export default function Insights({app}:{app:Trainer}){
  const compare=previous.completedSessions>0
   ?`${recap.completedSessions>previous.completedSessions?'+':''}${recap.completedSessions-previous.completedSessions} sessions compared with ${monthLabel(previous.month)}`
   : 'Your month takes shape as you log workouts and swims.';
- return <div className="stack insight-page">
+ const trainingWeeks=trainingTimeWeeks(app.data).slice(-8);
+ return <div className="stack insight-page phaseb-insights-page">
+  <section className="card pane-pad phaseb-insights-lead" aria-label="Training insights summary">
+   <div className="phaseb-card-heading"><div><span className="eyebrow">TRAINING INTELLIGENCE</span><h2>Understand your momentum.</h2></div><span className="muted tiny">Real recorded sessions, not estimates</span></div>
+   <div className="phaseb-insights-columns"><div><h3>Weekly training time</h3><LineChart points={trainingWeeks.map(x=>({date:x.week.slice(5),value:x.minutes}))} unit="min" stroke="#5bdbc9"/><p className="muted tiny">Only completed sessions with a valid clock are included.</p></div>
+    <div className="phaseb-insights-findings"><h3>{monthLabel(month)} at a glance</h3><div><strong>{recap.completedSessions}</strong><span>Completed sessions</span></div><div><strong>{recap.swimMeters.toLocaleString()} m</strong><span>Swimming distance logged</span></div><div><strong>{recap.hydrationGoalDays}</strong><span>Days meeting their saved water goals</span></div></div></div>
+  </section>
   <section className="card pane-pad insight-section" aria-labelledby="muscle-heading">
    <div className="section-title insight-title"><div><span className="eyebrow">MUSCLE COVERAGE</span><h2 id="muscle-heading">Where you put in the work.</h2><p className="muted small">Weekly estimated logged-set distribution, based on the muscles assigned to each logged exercise.</p></div></div>
    <div className="insight-week-picker" role="group" aria-label="Choose training week">

@@ -63,7 +63,7 @@ export interface WeekLog {
 }
 export interface WeighIn {kg?:InputNumber;note?:string;deleted?:boolean}
 export interface WaterEntry {date:string;ml:number;at:string;deleted?:boolean}
-export interface Preferences {swimTemplates:Partial<Record<SwimDay,SwimRoutine>>;swimPoolDefault:number;swimTargets:Partial<Record<SwimStroke,number>>;swimModes:Partial<Record<SwimStroke,SwimMode>>;swimTechniqueMastery:Partial<Record<SwimStroke,Record<string,boolean>>>;routineTemplates:Partial<Record<GymDay,RoutineExercise[]>>;setOverrides:Record<string,number>;targetWeight:InputNumber;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
+export interface Preferences {swimTemplates:Partial<Record<SwimDay,SwimRoutine>>;swimPoolDefault:number;swimTargets:Partial<Record<SwimStroke,number>>;swimModes:Partial<Record<SwimStroke,SwimMode>>;swimTechniqueMastery:Partial<Record<SwimStroke,Record<string,boolean>>>;routineTemplates:Partial<Record<GymDay,RoutineExercise[]>>;setOverrides:Record<string,number>;targetWeight:InputNumber;waterGoalHistory:Record<string,number>;restSeconds:number;effortMode:'off'|'rir'|'rpe';reminders:{enabled:boolean;time:string}}
 import type {SyncItemDocument,PendingSyncItem,SyncItemConflict} from './item-sync';
 export interface TrackerData extends Preferences {
   version:number;weeks:Record<string,WeekLog>;weights:Record<string,WeighIn>;

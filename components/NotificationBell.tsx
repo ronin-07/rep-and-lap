@@ -8,6 +8,7 @@ const iconFor={session:CheckCircle2,hydration:Droplets,achievement:Trophy,'swim-
 
 /** A lightweight activity inbox; no browser push permission is requested. */
 export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>void}){
+ const [filter,setFilter]=useState<'all'|'workouts'|'achievements'|'hydration'>('all');
  const accountId=app.accountId;
  const items=useMemo(()=>activityNotifications(app.data),[app.data]);
  const [openContext,setOpenContext]=useState<string|null>(null);
@@ -45,6 +46,7 @@ export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>v
   document.addEventListener('keydown',escape);
   return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
  },[open]);
+ const visible=items.filter(item=>filter==='all'||(filter==='workouts'&&item.kind==='session')||(filter==='achievements'&&(item.kind==='achievement'||item.kind==='swim-pr'))||(filter==='hydration'&&item.kind==='hydration'));
  const read=new Set(stored.account===accountId?stored.ids:[]);
  const unread=stored.account===accountId?items.filter(item=>!read.has(item.id)).length:0;
  const markRead=(ids:string[])=>{
@@ -75,9 +77,10 @@ export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>v
     <span>{unread>0?`${unread} unread`:'All caught up'}</span>
     <button type="button" disabled={!unread} onClick={()=>markRead(items.map(item=>item.id))}><CheckCheck size={15}/> Mark all read</button>
    </div>
+   <div className="phaseb-notification-filters" role="group" aria-label="Notification category">{(['all','workouts','achievements','hydration'] as const).map(category=><button type="button" key={category} className={filter===category?'selected':''} aria-pressed={filter===category} onClick={()=>setFilter(category)}>{category==='all'?'All':category==='workouts'?'Workouts':category==='achievements'?'Achievements':'Hydration'}</button>)}</div>
    <div className="activity-notification-list">
-    {items.length===0?<div className="activity-notification-empty"><Bell size={28}/><strong>Your highlights will appear here</strong><p>Complete a session, hit your water goal, or unlock an achievement to start your timeline.</p></div>:
-    items.map(item=>{
+    {visible.length===0?<div className="activity-notification-empty"><Bell size={28}/><strong>Your highlights will appear here</strong><p>Complete a session, hit your water goal, or unlock an achievement to start your timeline.</p></div>:
+    visible.map(item=>{
      const Icon=iconFor[item.kind];
      return <button type="button" key={item.id} className={`activity-notification-item${read.has(item.id)?' is-read':' is-unread'}`}
        onClick={()=>visit(item)} aria-label={`${item.title}. ${item.detail}. Open ${item.destination==='water'?'water log':item.destination}.`}>

@@ -179,7 +179,7 @@ export function monthlyRecap(data:TrackerData,month:string):MonthRecap {
   if(entry.deleted||!entry.date.startsWith(`${month}-`)||entry.ml<=0)continue;
   hydration.set(entry.date,(hydration.get(entry.date)||0)+entry.ml);
  }
- const hydrationGoalDays=[...hydration.entries()].filter(([date,ml])=>ml>=waterGoal(date)).length;
+ const hydrationGoalDays=[...hydration.entries()].filter(([date,ml])=>ml>=waterGoal(date,data)).length;
  const weighIns=Object.entries(data.weights)
   .filter(([date,entry])=>date.startsWith(`${month}-`)&&!entry.deleted&&num(entry.kg)>0)
   .sort(([a],[b])=>a.localeCompare(b));
@@ -205,7 +205,7 @@ export function achievements(data:TrackerData):Achievement[]{
   for(const day of SWIM_DAYS){const swim=log.swim?.[day];if(swim){const x=swimTotals(swim,data.swimPoolDefault);swimMeters+=x.meters;continuous=Math.max(continuous,x.bestContinuous);}}
  }
  for(const item of Object.values(data.waterLogs))if(!item.deleted&&item.ml>0)hydrated.set(item.date,(hydrated.get(item.date)||0)+item.ml);
- const waterDays=[...hydrated.entries()].filter(([date,ml])=>ml>=waterGoal(date)).length;
+ const waterDays=[...hydrated.entries()].filter(([date,ml])=>ml>=waterGoal(date,data)).length;
  const base:Omit<Achievement,'unlocked'>[]=[
   {id:'first',name:'First Step',description:'Finish your first training session',icon:'sparkles',value:sessions,target:1,unit:'session'},
   {id:'consistent',name:'Showing Up',description:'Complete 12 gym or swim sessions',icon:'calendar',value:sessions,target:12,unit:'sessions'},

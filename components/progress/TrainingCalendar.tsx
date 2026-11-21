@@ -17,22 +17,22 @@ export default function TrainingCalendar({app}:{app:Trainer}){
  const today=keyOf(new Date());const [month,setMonth]=useState(today.slice(0,7)),[selected,setSelected]=useState(today);
  const cells=monthGrid(month),items=entriesForDate(app.data,selected),historyAnchors=completedElsewhereForDate(app.data,selected),adherence=weeklyAdherence(app.data,weekOf(dateFor(selected)));
  const openSession=(week:string,day:Day)=>{app.setWeek(week);if(isGym(day))app.setGymDay(day);else app.setSwimDay(day);app.goto('workout',isGym(day)?'gym':'swim');};
- return <div className="stack calendar-page">
+ return <div className="stack calendar-page phaseb-calendar-first">
   <section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">TRAINING CALENDAR</span><h2>Plan around your life.</h2></div><span className="icon-wrap violet"><CalendarDays size={21}/></span></div>
    <p className="muted small">View completed workouts, recovery days and missed sessions. Select a day for its full details. Completed sessions appear on the date you actually trained. Their original planned dates remain in the details and adherence history.</p>
    <div className="calendar-toolbar"><button className="icon-btn" aria-label="Previous month" onClick={()=>setMonth(shiftMonth(month,-1))}><ChevronLeft size={19}/></button><strong>{monthTitle(month)}</strong><button className="icon-btn" aria-label="Next month" onClick={()=>setMonth(shiftMonth(month,1))}><ChevronRight size={19}/></button><button className="button-secondary calendar-today" onClick={()=>{setMonth(today.slice(0,7));setSelected(today);}}>Today</button></div>
    <div className="calendar-weekdays" aria-hidden="true">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=><span key={day}>{day}</span>)}</div>
    <div className="training-calendar-grid">{cells.map(date=>{
     const entries=entriesForDate(app.data,date);const completed=entries.some(x=>x.status==='completed'),skipped=entries.some(x=>x.status==='skipped'),planned=entries.some(x=>x.status==='scheduled'),rest=entries.some(x=>x.status==='rest'),trainedLater=completedElsewhereForDate(app.data,date).length>0;
-    const icon=completed?<CheckCircle2 size={14}/>:skipped?<SkipForward size={14}/>:rest?<Moon size={14}/>:planned||trainedLater?<CalendarClock size={14}/>:null;
-    const state=completed?'completed':skipped?'skipped':rest?'rest':planned||trainedLater?'planned':'free';
-    const label=completed?'completed workout':skipped?'skipped session':rest?'marked recovery day':trainedLater?'planned here; completed on another date':planned?'planned workout':'no scheduled session';
+    const icon=entries.length?entries.map(e=><span key={`${e.week}:${e.day}`} className={`phaseb-calendar-marker marker-${e.status==='scheduled'&&date<today?'overdue':e.status}`} title={`${e.day} · ${e.status==='scheduled'&&date<today?'overdue':e.status}`}/>):trainedLater?<CalendarClock size={14}/>:null;
+    const state=completed?'completed':skipped?'skipped':rest?'rest':planned&&date<today?'overdue':planned||trainedLater?'planned':'free';
+    const label=entries.length?entries.map(e=>`${e.day}: ${e.status==='scheduled'&&date<today?'overdue':e.status}`).join('; '):trainedLater?'planned here; completed on another date':'no scheduled session';
     const outside=date.slice(0,7)!==month;
     return <button type="button" title={`${formatDate(date)} — ${label}`} key={date} data-calendar-status={state} className={`calendar-cell ${selected===date?'selected':''} ${date===today?'is-today':''} ${outside?'outside':''} status-cell-${state}`} onClick={()=>{setSelected(date);if(outside)setMonth(date.slice(0,7));}} aria-pressed={date===selected} aria-label={`${formatDate(date)}: ${label}`}>
-     <span className="calendar-day-number">{Number(date.slice(-2))}</span><span className="calendar-cell-icon" aria-hidden="true">{icon}</span>
+     <span className="calendar-day-number">{Number(date.slice(-2))}</span><span className="calendar-cell-icon phaseb-calendar-markers" aria-hidden="true">{icon}</span>
     </button>;
    })}</div>
-   <div className="calendar-key" aria-label="Calendar legend"><span><CheckCircle2 className="legend-completed" size={17}/> Completed</span><span><CalendarClock className="legend-planned" size={17}/> Planned</span><span><Moon className="legend-rest" size={17}/> Recovery</span><span><SkipForward className="legend-skipped" size={17}/> Skipped</span></div>
+   <div className="calendar-key" aria-label="Calendar legend"><span><CheckCircle2 className="legend-completed" size={17}/> Completed</span><span><CalendarClock className="legend-planned" size={17}/> Planned</span><span><Moon className="legend-rest" size={17}/> Recovery</span><span><SkipForward className="legend-skipped" size={17}/> Skipped</span><span className="muted small">Amber = overdue · Multiple dots = multiple sessions</span></div>
   </section>
   <section className="card pane-pad stack"><div className="section-title calendar-selected-heading"><div><span className="eyebrow">SELECTED DAY</span><h2>{formatDate(selected)}</h2></div><span className="mini-label">{adherence.completed}/{adherence.eligible} completed this plan week</span></div>
    {items.length===0&&historyAnchors.length===0?<div className="calendar-empty"><Moon size={24}/><strong>Unscheduled day</strong><p>No workout is planned for this date. Rest can be part of training.</p></div>:

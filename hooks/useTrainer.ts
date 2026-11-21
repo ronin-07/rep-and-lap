@@ -5,20 +5,21 @@ import {PLAN} from '@/lib/plan';
 import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory,restoredSessionRoutine,freezeExistingRoutines,weeksToFreezeBeforeTemplateChange} from '@/lib/routines';
 import {isValidDate,scheduledDate,statusFor} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
+import {achievements} from '@/lib/insights';
 import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
 import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet,writeSyncItem} from '@/lib/firebase';
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
-import {history,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
+import {history,num,setCount,validSet,gymStats,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,needsManualCompletionDate,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {applySetCountChange,hasRemovableValues} from '@/lib/set-management';
 import {stableSetId} from '@/lib/set-sync';
 import {clockItemKey,queueSwimSegment,REST_ITEM_KEY,queueSyncItem,integrateServerItem,acknowledgeItem,flagItemConflict,resolveItemConflict,ItemVersionConflict} from '@/lib/item-sync';
-import {blankSegment,swimRoutine,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
+import {blankSegment,swimRoutine,swimTotals,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
 import {stoppedSwimTiming,completeStoppedSwim} from '@/lib/swim-session';
 import {elapsedSessionMs,sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming,autoStopSessionTiming} from '@/lib/session-timing';
 
-export type Celebration = {title:string;body:string;kind:'session'|'pr'|'hydration'}|null;
+export type Celebration = {title:string;body:string;kind:'pr'|'hydration'|'achievement'}|{title:string;body:string;kind:'session';discipline:'gym'|'swim'}|null;
 export function useTrainer(){
  const [hydrated,setHydrated]=useState(false);
  const [data,setData]=useState<TrackerData>(blankData);
@@ -627,10 +628,26 @@ export function useTrainer(){
     break;
    }
   }
-  // Routine completion already produces a saved-state toast and optional check-in.
-  // Only a genuine swimming personal best warrants a full-screen celebration.
-  setQueuedCelebration(null);
-  setCelebration(nextRecord);
+  // Compare against the same recorded session before its completion. The
+  // achievement must be earned by this action, never by a background sync.
+  if(!nextRecord){
+   const prior=structuredClone(dataRef.current);
+   if(prior.weeks[targetWeek])prior.weeks[targetWeek].done[day]=false;
+   const previouslyEarned=new Set(achievements(prior).filter(b=>b.unlocked).map(b=>b.id));
+   const newBadge=achievements(dataRef.current).find(b=>b.unlocked&&!previouslyEarned.has(b.id));
+   if(newBadge)nextRecord={kind:'achievement',title:`${newBadge.name} unlocked!`,body:newBadge.description};
+  }
+  // The completion effect is only enqueued by this device's successful user
+  // action, never by a Firestore snapshot, reload, timer cutoff or log edit.
+  const receipt=`replap-session-completed:v2:${uidRef.current}:${targetWeek}:${day}:${dataRef.current.weeks[targetWeek]?.completedAt?.[day]||''}`;
+  let fresh=true;
+  try{if(localStorage.getItem(receipt))fresh=false;else localStorage.setItem(receipt,'1');}catch{}
+  const isSwim=PLAN[day].kind==='swim';
+  const weekRecord=dataRef.current.weeks[targetWeek];
+  const body=isSwim?`${swimTotals(weekRecord?.swim?.[day as SwimDay],dataRef.current.swimPoolDefault).meters} m recorded in the pool. Great work!`:`${gymStats(dataRef.current,targetWeek,day as GymDay).logged} logged sets completed. Keep building momentum!`;
+  setQueuedCelebration(nextRecord);
+  setCelebration(fresh?{kind:'session',discipline:isSwim?'swim':'gym',title:isSwim?'Swimming complete!':'Workout complete!',body}:nextRecord);
+  if(!fresh)setQueuedCelebration(null);
   setRecoveryPrompt({week:targetWeek,day});
   notify('Workout completed and saved. Feedback is optional.');
  };
@@ -745,8 +762,8 @@ export function useTrainer(){
   // Celebrate only when THIS device's user action crosses today's goal.
   // Reopening the app, initial Firebase snapshots and a repeated daily goal
   // must not retrigger the animation. This key is account- and date-scoped.
-  const crossedToday=date===keyOf(new Date())&&waterTotal(dataRef.current,date)<waterGoal(date)
-    &&waterTotal(dataRef.current,date)+amount>=waterGoal(date);
+  const crossedToday=date===keyOf(new Date())&&waterTotal(dataRef.current,date)<waterGoal(date,dataRef.current)
+    &&waterTotal(dataRef.current,date)+amount>=waterGoal(date,dataRef.current);
   const id=crypto.randomUUID();const at=new Date().toISOString();
   update(d=>{d.waterLogs[id]={date,at,ml:amount};},`water:${id}`);
   if(crossedToday){
@@ -755,7 +772,7 @@ export function useTrainer(){
     try{if(localStorage.getItem(celebratedKey))shouldCelebrate=false;
       else localStorage.setItem(celebratedKey,'1');}catch{}
     if(shouldCelebrate)setCelebration({kind:'hydration',title:'Hydration hero! 💧',
-      body:`Bottle by bottle, you hit your ${(waterGoal(date)/1000).toFixed(1)} L goal. Your future self says cheers!`});
+      body:`Bottle by bottle, you hit your ${(waterGoal(date,dataRef.current)/1000).toFixed(1)} L goal. Your future self says cheers!`});
   }
  };
  const deleteWater=(id:string)=>update(d=>{if(d.waterLogs[id])d.waterLogs[id].deleted=true;},`water:${id}`);
@@ -765,6 +782,12 @@ export function useTrainer(){
   notify('Weigh-in recorded.');
  };
  const deleteWeight=(date:string)=>{if(!confirm('Remove this weigh-in?'))return;update(d=>{d.weights[date]={deleted:true};},`weight:${date}`);};
+ const setDefaultWaterGoal=(amount:number)=>{
+  if(!Number.isInteger(amount)||amount<500||amount>6000){notify('Choose a daily water goal between 500 and 6,000 mL.');return;}
+  const date=keyOf(new Date());
+  update(d=>{d.waterGoalHistory??={};d.waterGoalHistory[date]=amount;},'preferences');
+  notify(`Daily water goal set to ${(amount/1000).toFixed(2)} L.`);
+ };
  const updatePreferences=(change:Partial<Pick<TrackerData,'restSeconds'|'targetWeight'|'reminders'|'effortMode'>>)=>update(d=>{Object.assign(d,change);},'preferences');
  const backup=()=>downloadFile(`rep-and-lap-backup-${keyOf(new Date())}.json`,JSON.stringify({...dataRef.current,exportedAt:new Date().toISOString(),app:'Rep & Lap'},null,2));
  const restore=async(file:File)=>{
@@ -838,6 +861,6 @@ export function useTrainer(){
   if(choice==='mine')scheduleFlush();
  };
  const displaySync:SyncMode=!online?'saved-local':conflicts.length||itemConflicts.length||firebaseError?'needs-attention':user?(pending?'syncing':syncMode):'saved-local';
- return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveSyncedRest(null),extendRest:()=>saveSyncedRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,saveRecoveryFeedback,setEffort,installPrompt,firebaseError,pending,conflicts,itemConflicts,resolveConflict,resolveTrainingItemConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopWorkoutTimer,stopSwimSession,completeSwimSession,saveWorkout,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,setSwimTechniqueMastered,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
+ return {hydrated,data,user,accountId:uidRef.current,week,setWeek,view,goto,trackingTab,setTrackingTab,progressTab,setProgressTab,gymDay,setGymDay,swimDay,setSwimDay,theme,setTheme,syncMode:displaySync,online,toast,notify,celebration,setCelebration,dismissCelebration,restEnd,restState,restRemaining:secondsLeft(restState,clock),restReady:!!restState&&secondsLeft(restState,clock)===0,clock,startRest:(sec?:number)=>beginRest(sec||data.restSeconds),stopRest:()=>saveSyncedRest(null),extendRest:()=>saveSyncedRest(restRef.current?{...restRef.current,endsAt:Math.max(restRef.current.endsAt,Date.now())+30000}:null),goToNextSet,recoveryPrompt,closeRecoveryPrompt,saveRecoveryFeedback,setEffort,installPrompt,firebaseError,pending,conflicts,itemConflicts,resolveConflict,resolveTrainingItemConflict,signin,signout,flush:()=>void flush(),toggleDone,completionRequest,requestCompletion,confirmCompletion,cancelCompletion:()=>setCompletionRequest(null),startSession,pauseSession,resumeSession,restartSession,finishSession,stopWorkoutTimer,stopSwimSession,completeSwimSession,saveWorkout,rescheduleSession,setScheduleStatus,catchUpWeek,changeRoutine,saveRoutineDefault,resetSessionRoutine,resetDefaultRoutine,gymField,gymNotes,changeSetCount,logSet,deleteLoggedSet,usePrevious,swimField,changeLengths,toggleDrill,addInterval,deleteInterval,swimPlanEdit,beginSwimRoutine,addSwimSegment,updateSwimSegment,removeSwimSegment,toggleSwimTechnique,setSwimTechniqueMastered,addSwimInterval,removeSwimInterval,editSwimPreference,saveSwimDefault,restoreSwimDefault,noteField,addWater,setDefaultWaterGoal,deleteWater,saveWeight,deleteWeight,updatePreferences,backup,restore,restorePreview,confirmRestore,cancelRestore,exportCsv,resetLocal,enableReminders};
 }
 export type Trainer=ReturnType<typeof useTrainer>;

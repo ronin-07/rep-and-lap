@@ -29,7 +29,15 @@ export function summary(data:TrackerData,w:string){const item=weekLog(data,w);
  const meters=SWIM_DAYS.reduce((s,d)=>s+swimTotals(item.swim[d],data.swimPoolDefault).meters,0);
  return {gym,swim,completed:gym+swim,volume,meters};
 }
-export function waterGoal(date:string){const day=dateFor(date).getDay();return day===0?2000:day<=3?2500:2400;}
+export function waterGoal(date:string,data?:TrackerData){
+ // A new default applies from its effective day onwards. Never silently rewrite
+ // historical goal percentages when the user updates a preference later.
+ const history=data?.waterGoalHistory||{};
+ const effective=Object.keys(history).filter(key=>key<=date && /^\d{4}-\d{2}-\d{2}$/.test(key)).sort().at(-1);
+ const custom=effective?history[effective]:undefined;
+ if(Number.isInteger(custom)&&custom!>=500&&custom!<=6000)return custom!;
+ const day=dateFor(date).getDay();return day===0?2000:day<=3?2500:2400;
+}
 export function waterEntries(data:TrackerData,date:string){return Object.entries(data.waterLogs).filter(([,v])=>!v.deleted&&v.date===date&&v.ml>0).sort((a,b)=>b[1].at.localeCompare(a[1].at));}
 export function waterTotal(data:TrackerData,date:string){return waterEntries(data,date).reduce((n,[,v])=>n+v.ml,0);}
 export function weightEntries(data:TrackerData){return Object.entries(data.weights).filter(([,v])=>!v.deleted&&num(v.kg)>0).sort(([a],[b])=>a.localeCompare(b));}
@@ -57,7 +65,7 @@ export function milestones(data:TrackerData):Milestone[]{
  return items.sort((a,b)=>b.when.localeCompare(a.when)).slice(0,5);
 }
 export function weeklyChart(data:TrackerData,metric:'volume'|'meters'|'completed',count=8){const now=weekOf(new Date());return Array.from({length:count},(_,i)=>{const date=dateFor(now);date.setDate(date.getDate()+(i-count+1)*7);const w=keyOf(date);return {date:w,value:metric==='volume'?summary(data,w).volume:metric==='meters'?summary(data,w).meters:calendarCompleted(data,w).completed};});}
-export function hydrationChart(data:TrackerData,n=7){return Array.from({length:n},(_,i)=>{const date=daysAgo(n-i-1);return {date,value:waterTotal(data,date),target:waterGoal(date)};});}
+export function hydrationChart(data:TrackerData,n=7){return Array.from({length:n},(_,i)=>{const date=daysAgo(n-i-1);return {date,value:waterTotal(data,date),target:waterGoal(date,data)};});}
 
 // Session dates belong to the original training-plan week, even if a missed
 // session is subsequently moved to another calendar day. This preserves records.

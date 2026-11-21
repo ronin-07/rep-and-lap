@@ -110,11 +110,11 @@ export function activityNotifications(data:TrackerData,now=Date.now()):ActivityN
   let total=0;
   for(const entry of entries){
    const previous=total;total+=entry.ml;
-   if(previous<waterGoal(date)&&total>=waterGoal(date)){
+   if(previous<waterGoal(date,data)&&total>=waterGoal(date,data)){
     const id=`hydration:${date}:${entry.id}`;
     actions.push({id,at:entry.at,kind:'waterDays',value:1,
      event:{id,kind:'hydration',title:`${weekday(date)} hydration goal reached`,
-      detail:`${(waterGoal(date)/1000).toFixed(1)} L goal · ${shortDate(date)}`,occurredAt:entry.at,destination:'water'}});
+      detail:`${(waterGoal(date,data)/1000).toFixed(1)} L goal · ${shortDate(date)}`,occurredAt:entry.at,destination:'water'}});
     break;
    }
   }
