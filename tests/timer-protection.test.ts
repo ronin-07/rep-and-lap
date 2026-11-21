@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {autoStopSessionTiming,elapsedSessionMs,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,sessionClockState,stopSessionTiming,timerWarningRemainingMs,TIMER_AUTO_STOP_MS,TIMER_WARNING_MS} from '../lib/session-timing';
 import {blankData,weekBlank,recordPayload,applyRecord} from '../lib/storage';
-import {clockItemKey,queueSyncItem,overlaySyncItems} from '../lib/item-sync';
+import {clockItemKey,queueSyncItem} from '../lib/item-sync';
 import {readBackup} from '../lib/backup';
 const at=(m:number)=>new Date(Date.parse('2026-11-21T16:00:00Z')+m*60_000).toISOString();
 const time=(m:number)=>Date.parse(at(m));

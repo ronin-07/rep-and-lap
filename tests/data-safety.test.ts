@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {blankData,weekBlank,recordPayload,applyRecord} from '../lib/storage';
-import {stableSetId,setKey,normalizeSets,queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,acceptSetRevision} from '../lib/set-sync';
+import {stableSetId,normalizeSets,queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,acceptSetRevision} from '../lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,csvCell} from '../lib/backup';
 import type {SetDocument} from '../lib/types';
 const wk='2026-11-16',session=`session:${wk}:Monday`,exercise='Barbell bench press';

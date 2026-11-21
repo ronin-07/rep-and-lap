@@ -1,20 +1,20 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise,type SwimActivity,type SwimStroke,type SwimMode,type SwimDifficulty,type SwimRoutine,type SwimSegment,type SwimIntervalSet} from '@/lib/types';
+import {DAYS,type Day,type GymDay,type SwimDay,type GymSet,type TrackerData,type TrackingTab,type View,type UserInfo,type SyncMode,type ProgressTab,type SessionNotes,type SwimInterval,type ScheduleStatus,type RoutineExercise,type SwimActivity,type SwimStroke,type SwimRoutine,type SwimSegment,type SwimIntervalSet} from '@/lib/types';
 import {PLAN} from '@/lib/plan';
 import {exercisesFor,editRoutine,cloneExercises,resetDefaultPreservingHistory,restoredSessionRoutine,freezeExistingRoutines,weeksToFreezeBeforeTemplateChange} from '@/lib/routines';
-import {isValidDate,scheduledDate,entriesForDate,statusFor,moveDate} from '@/lib/scheduling';
+import {isValidDate,scheduledDate,statusFor} from '@/lib/scheduling';
 import {keyOf,weekOf,dateFor} from '@/lib/dates';
-import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,STORAGE_KEY,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
+import {blankData,loadData,saveData,weekBlank,recordPayload,applyRecord,downloadFile,LAST_ACCOUNT_KEY,THEME_KEY} from '@/lib/storage';
 import {firebaseConfigured,googleSignIn,googleSignOut,observeAuth,watchRecords,writeRecord,writeSet,writeSyncItem} from '@/lib/firebase';
 import {queueSetChange,integrateServerSet,acknowledgeSet,flagConflict,resolveSetConflict,SetVersionConflict} from '@/lib/set-sync';
 import {readBackup,mergeBackup,markRestoredWrites,replaceLocalBackup,csvCell,type BackupPreview,type RestoreMode} from '@/lib/backup';
-import {history,loggedSet,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
+import {history,num,setCount,validSet,waterGoal,waterTotal} from '@/lib/metrics';
 import {REST_KEY,makeRest,nextIncompleteSet,parseRest,previousCompletedSet,suggestedNextSet,secondsLeft,validEffort,needsManualCompletionDate,type RestState,type NextSetTarget} from '@/lib/workout-flow';
 import {applySetCountChange,hasRemovableValues} from '@/lib/set-management';
 import {stableSetId} from '@/lib/set-sync';
 import {clockItemKey,queueSwimSegment,REST_ITEM_KEY,queueSyncItem,integrateServerItem,acknowledgeItem,flagItemConflict,resolveItemConflict,ItemVersionConflict} from '@/lib/item-sync';
-import {blankSegment,swimRoutine,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_TARGET_DEFAULTS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
+import {blankSegment,swimRoutine,swimPersonalBests,swimTechniqueEvidence,SWIM_CHECKLIST,SWIM_ACTIVITY_LABELS,SWIM_MODE_DEFAULTS,validPool,isStroke,validSwimSegmentPatch} from '@/lib/swimming';
 import {stoppedSwimTiming,completeStoppedSwim} from '@/lib/swim-session';
 import {elapsedSessionMs,sessionClockState,pauseSessionTiming,resumeSessionTiming,restartSessionTiming,stopSessionTiming,autoStopSessionTiming} from '@/lib/session-timing';
 
@@ -151,19 +151,24 @@ export function useTrainer(){
   saveSyncedRest(makeRest(seconds,target,Date.now(),from));setClock(Date.now());
  },[saveSyncedRest]);
  useEffect(()=>{
-  mountedRef.current=true;setOnline(navigator.onLine);
-  let last:string|null=null;try{last=localStorage.getItem(LAST_ACCOUNT_KEY);}catch{}
+  mountedRef.current=true;
+  let active=true;
+  queueMicrotask(()=>{
+   if(!active)return;
+   setOnline(navigator.onLine);
+   let last:string|null=null;try{last=localStorage.getItem(LAST_ACCOUNT_KEY);}catch{}
   try {const user=last?JSON.parse(last) as {id?:string}:null;uidRef.current=user?.id||'guest';}catch{uidRef.current='guest';}
   const stored=loadData(uidRef.current);dataRef.current=stored;setData(stored);
   try{saveRest(parseRest(localStorage.getItem(`${REST_KEY}:${uidRef.current}`)));}catch{saveRest(null);}
   try{const oldTheme=localStorage.getItem(THEME_KEY);if(oldTheme==='dark'||oldTheme==='light')setTheme(oldTheme);}catch{}
-  setHydrated(true);
+   setHydrated(true);
+  });
   if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
     void navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{});
   }
   const beforeInstall=(e:Event)=>{e.preventDefault();setInstallPrompt(e);};
   window.addEventListener('beforeinstallprompt',beforeInstall);
-  return ()=>{mountedRef.current=false;window.removeEventListener('beforeinstallprompt',beforeInstall);};
+  return ()=>{active=false;mountedRef.current=false;window.removeEventListener('beforeinstallprompt',beforeInstall);};
  },[saveRest]);
  useEffect(()=>{
   document.documentElement.dataset.theme=theme;
@@ -172,7 +177,11 @@ export function useTrainer(){
  },[theme,hydrated]);
  useEffect(()=>{
   if(!hydrated)return;
-  if(!firebaseConfigured){setSyncMode('saved-local');return;}
+  if(!firebaseConfigured){
+   let active=true;
+   queueMicrotask(()=>{if(active)setSyncMode('saved-local');});
+   return ()=>{active=false;};
+  }
   const unsub=observeAuth(nextUser=>{
     const newId=nextUser?.uid||'guest';
     if(newId!==uidRef.current){
@@ -188,9 +197,10 @@ export function useTrainer(){
   },err=>{setFirebaseError(err.message);setSyncMode('needs-attention');});
   return ()=>unsub();
  },[hydrated]);
+ const userId=user?.uid;
  useEffect(()=>{
-  if(!user)return;
-  const id=user.uid;serverRef.current=false;readyRef.current=false;
+  if(!userId)return;
+  const id=userId;serverRef.current=false;readyRef.current=false;
   const stop=watchRecords(id,(key,payload,stamp,hasPending,fromCache)=>{
     if(id!==uidRef.current||hasPending||(!key.startsWith('session:')&&!key.startsWith('weight:')&&!key.startsWith('water:')&&key!=='preferences'))return;
     const current=dataRef.current;
@@ -198,11 +208,11 @@ export function useTrainer(){
     if(fromCache&&stamp<(current.recordUpdates[key]||0))return;
     if(stamp<(current.recordUpdates[key]||0))return; // Ignore older cloud snapshots even when online.
     const next=applyRecord(current,key,payload);next.recordUpdates[key]=stamp;persist(next);
-  },(record,hasPending,fromCache)=>{
+  },(record,hasPending)=>{
     if(id!==uidRef.current||hasPending)return;
     const next=structuredClone(dataRef.current);
     integrateServerSet(next,record);persist(next);
-  },(item,hasPending,fromCache)=>{
+  },(item,hasPending)=>{
     if(id!==uidRef.current||hasPending)return;
     const next=structuredClone(dataRef.current);
     integrateServerItem(next,item);persist(next);
@@ -217,7 +227,7 @@ export function useTrainer(){
   },err=>{setFirebaseError(err.message);setSyncMode('needs-attention');});
   void flush();
   return ()=>stop();
- },[user?.uid,flush,persist,saveRest]);
+ },[userId,flush,persist,saveRest]);
  useEffect(()=>{if(!hydrated)return;
   const handleOnline=()=>{setOnline(true);void flush();};
   const handleOffline=()=>{setOnline(false);setSyncMode('saved-local');};
@@ -234,6 +244,9 @@ export function useTrainer(){
  // is reconstructed and synchronized once any signed-in client comes online.
  useEffect(()=>{
   if(!hydrated)return;
+  let active=true;
+  queueMicrotask(()=>{
+  if(!active)return;
   const now=Date.now();
   const expired:{week:string;day:Day}[]=[];
   for(const [wk,record] of Object.entries(data.weeks)){
@@ -253,6 +266,8 @@ export function useTrainer(){
    }
   },expired.map(x=>`session:${x.week}:${x.day}`));
   notify(expired.length===1?'Timer automatically stopped at 2 hours. Review your workout before finishing.':`${expired.length} forgotten timers automatically stopped at 2 hours. Review them in Log.`);
+  });
+  return ()=>{active=false;};
  },[hydrated,data,clock,update,notify]);
  // Keep global active-clock shortcut ticking even when the user opens
  // Calendar/Progress or switches to a different workout tab.
@@ -260,7 +275,6 @@ export function useTrainer(){
  useEffect(()=>{if(!hydrated)return;const interval=setInterval(()=>setClock(Date.now()),liveClock?1000:15000);return ()=>clearInterval(interval);},[hydrated,liveClock]);
  useEffect(()=>{
    if(!restEnd)return;
-   setClock(Date.now());
    if(restEnd<=Date.now())return;
    const id=setInterval(()=>{const now=Date.now();setClock(now);if(now>=restEnd)clearInterval(id);},1000);
    return ()=>clearInterval(id);
@@ -701,7 +715,7 @@ export function useTrainer(){
  const restoreSwimDefault=(day:SwimDay)=>{
   if(!dataRef.current.swimTemplates[day])return;
   if(!confirm(`Restore the original RepLap ${day} swim plan for future sessions? Logged swims and the current plan will remain unchanged.`))return;
-  const freeze=Array.from(new Set([week,...Object.entries(dataRef.current.weeks).filter(([w,x])=>!!x.swim?.[day]||!!x.done?.[day]).map(([w])=>w)]));
+  const freeze=Array.from(new Set([week,...Object.entries(dataRef.current.weeks).filter(([,x])=>!!x.swim?.[day]||!!x.done?.[day]).map(([w])=>w)]));
   update(d=>{for(const w of freeze){const entry=d.weeks[w];entry.swimRoutineOverrides??={};entry.swimRoutineOverrides[day]??=swimRoutine(d,w,day);}
     delete d.swimTemplates[day];
   },['preferences',...freeze.map(w=>`session:${w}:${day}`)]);

@@ -1,7 +1,7 @@
 'use client';
 import {MessageSquareText} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
-import type {Day,SessionNotes as Note} from '@/lib/types';
+import type {Day} from '@/lib/types';
 export default function SessionNotes({app,day}:{app:Trainer;day:Day}){
  const existing=app.data.weeks[app.week]?.sessionNotes?.[day]||{};
  return <section className="card pane-pad stack"><div className="section-title"><div><span className="eyebrow">HOW DID IT FEEL?</span><h2>Session notes</h2></div><MessageSquareText color="var(--muted)" size={21}/></div>

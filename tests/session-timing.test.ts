@@ -31,7 +31,7 @@ describe('Session clock pause/resume, both gym and swim',()=>{
   expect(sessionMinutes(stopSessionTiming(resumed,at(45))!)).toBe(25);
  });
  it('supports multiple pauses without double-counting overlapping breaks',()=>{
-  let timing={startedAt:at(0)};
+  const timing={startedAt:at(0)};
   const once=resumeSessionTiming(pauseSessionTiming(timing,at(10)),at(20))!;
   const twice=resumeSessionTiming(pauseSessionTiming(once,at(30)),at(35))!;
   const stopped=stopSessionTiming(twice,at(50))!;

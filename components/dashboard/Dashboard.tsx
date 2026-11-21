@@ -1,11 +1,11 @@
 'use client';
-import {ArrowRight,CheckCircle2,Droplets,Dumbbell,Flame,Medal,Scale,Target,Trophy,CalendarDays,CalendarClock,MoveRight,TrendingUp,Clock3,Moon,SkipForward,AlertCircle} from 'lucide-react';
+import {ArrowRight,CheckCircle2,Droplets,Dumbbell,Flame,Medal,Scale,Target,Trophy,CalendarDays,CalendarClock,TrendingUp,Clock3,Moon,SkipForward,AlertCircle} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import {DAYS,type Day} from '@/lib/types';
 import {PLAN,isGym} from '@/lib/plan';
 import {activeDay,keyOf,weekOf,formatDate,shiftWeek} from '@/lib/dates';
-import {statusFor,weeklyAdherence} from '@/lib/scheduling';
-import {summary,waterGoal,waterTotal,weightEntries,milestones,activeStreak,plannedDate,sessionForDate,strengthInsights,formatDuration,calendarCompleted} from '@/lib/metrics';
+import {statusFor} from '@/lib/scheduling';
+import {waterGoal,waterTotal,weightEntries,milestones,activeStreak,plannedDate,sessionForDate,strengthInsights,formatDuration,calendarCompleted} from '@/lib/metrics';
 import {Rings} from '@/components/Rings';
 import {weeklyTrainingTime} from '@/lib/training-intelligence';
 import {sessionDisplayName,sessionDisplaySubtitle} from '@/lib/swimming';
@@ -14,7 +14,7 @@ import DateInput from '@/components/DateInput';
 
 export default function Dashboard({app}:{app:Trainer}){
  const now=new Date(),today=keyOf(now),currentWeek=weekOf(now);
- const displayedWeek=currentWeek,weekData=app.data.weeks[displayedWeek];
+ const displayedWeek=currentWeek;
  const shifted=sessionForDate(app.data,today);
  const todayDay=activeDay(now);
  const defaultDay=DAYS.find(day=>plannedDate(app.data,currentWeek,day)===today&&statusFor(app.data,currentWeek,day)==='scheduled');
@@ -31,7 +31,6 @@ export default function Dashboard({app}:{app:Trainer}){
   })
  ).sort((a,b)=>a.date.localeCompare(b.date));
  const missed=DAYS.some(day=>statusFor(app.data,displayedWeek,day)==='scheduled'&&plannedDate(app.data,displayedWeek,day)<today);
- const adherence=weeklyAdherence(app.data,displayedWeek);
  const openSession=(week:string,day:Day)=>{app.setWeek(week);if(isGym(day))app.setGymDay(day);else app.setSwimDay(day);app.goto('workout',isGym(day)?'gym':'swim');};
  return <div className="stack-xl">
  <div className="welcome"><div><div className="eyebrow">YOUR SPACE · {formatDate(today)}</div><h1>Strong habits, <em>steady progress.</em></h1><p>Everything you need for today — nothing you don’t.</p></div><div className="welcome-chip"><span className="chip-dot"/> {app.online?'Ready to train':'Offline ready'}</div></div>

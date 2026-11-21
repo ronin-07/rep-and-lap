@@ -62,8 +62,9 @@ export function resumeSessionTiming(timing:SessionTiming|null|undefined,at:strin
  if(when===null||from===null||oldTotal===null||when<from||elapsedSessionMs(timing,from)===null)return null;
  const nextPause=oldTotal+(when-from);
  if(!Number.isSafeInteger(nextPause))return null;
- const {pausedAt:_pausedAt,endedAt:_endedAt,autoStopped:_autoStopped,...rest}=timing;
- return {...rest,pausedDurationMs:nextPause};
+ const next={...timing};
+ delete next.pausedAt;delete next.endedAt;delete next.autoStopped;
+ return {...next,pausedDurationMs:nextPause};
 }
 
 /** Finalizing while paused excludes the remaining pause (including time
@@ -78,8 +79,9 @@ export function stopSessionTiming(timing:SessionTiming|null|undefined,at:string)
  if(state==='paused'&&(pauseStart===null||pauseStart>when))return null;
  const total=oldTotal+(pauseStart===null?0:when-pauseStart);
  if(!Number.isSafeInteger(total))return null;
- const {pausedAt:_pausedAt,...rest}=timing;
- return {...rest,...(total||timing.pausedDurationMs!==undefined?{pausedDurationMs:total}:{}),endedAt:at};
+ const next={...timing};
+ delete next.pausedAt;
+ return {...next,...(total||timing.pausedDurationMs!==undefined?{pausedDurationMs:total}:{}),endedAt:at};
 }
 
 /** Reset only clock fields; exercise sets, stroke segments and notes are separate. */

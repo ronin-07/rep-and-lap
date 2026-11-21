@@ -10,15 +10,31 @@ const iconFor={session:CheckCircle2,hydration:Droplets,achievement:Trophy,'swim-
 export default function NotificationBell({app,onOpen}:{app:Trainer;onOpen?:()=>void}){
  const accountId=app.accountId;
  const items=useMemo(()=>activityNotifications(app.data),[app.data]);
- const [open,setOpen]=useState(false);
+ const [openContext,setOpenContext]=useState<string|null>(null);
+ const context=`${accountId}:${app.view}`;
+ const open=openContext===context;
+ const setOpen=(next:boolean|((value:boolean)=>boolean))=>setOpenContext(prev=>{
+  const value=typeof next==='function'?next(prev===context):next;
+  return value?context:null;
+ });
  const [stored,setStored]=useState<{account:string;ids:string[]}>({account:'',ids:[]});
+ useEffect(()=>{
+  let active=true;
+  queueMicrotask(()=>{if(active)setOpenContext(null);});
+  return ()=>{active=false;};
+ },[context]);
  const ref=useRef<HTMLDivElement>(null);
  useEffect(()=>{
-  let ids:string[]=[];
-  try{ids=parseReadReceipts(localStorage.getItem(readReceiptKey(accountId)));}catch{}
-  setStored({account:accountId,ids});setOpen(false);
+  let active=true;
+  // The receipts live outside React; load them after commit rather than cascading synchronously.
+  queueMicrotask(()=>{
+   if(!active)return;
+   let ids:string[]=[];
+   try{ids=parseReadReceipts(localStorage.getItem(readReceiptKey(accountId)));}catch{}
+   setStored({account:accountId,ids});
+  });
+  return ()=>{active=false;};
  },[accountId]);
- useEffect(()=>{setOpen(false);},[app.view]);
  useEffect(()=>{
   if(!open)return;
   const outside=(event:PointerEvent)=>{

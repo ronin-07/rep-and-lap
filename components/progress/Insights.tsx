@@ -41,7 +41,7 @@ export default function Insights({app}:{app:Trainer}){
     <strong>{offset===0?'This week':offset===-1?'Last week':`Week of ${week}`}</strong>
     <button className="button-secondary" onClick={()=>setOffset(n=>Math.min(0,n+1))} disabled={offset===0} aria-label="Next training week"><ArrowRight size={16}/></button>
    </div>
-   {coverage.countedSets===0?<div className="insight-empty"><Dumbbell size={24}/><strong>No categorized sets for this week yet.</strong><span>Log your gym sets to reveal the muscles you've trained. Custom exercises need a muscle label to appear here.</span></div>
+   {coverage.countedSets===0?<div className="insight-empty"><Dumbbell size={24}/><strong>No categorized sets for this week yet.</strong><span>Log your gym sets to reveal the muscles you&apos;ve trained. Custom exercises need a muscle label to appear here.</span></div>
    :<><div className="muscle-summary-line"><span><strong>{coverage.countedSets}</strong> categorized sets logged</span><span>Primary sets = 1 · secondary = ½</span></div>
     <div className="muscle-grid" aria-label={`Muscle coverage for week of ${week}`}>
      {coverage.groups.map(group=>{
@@ -53,11 +53,11 @@ export default function Insights({app}:{app:Trainer}){
       </div>;
      })}
     </div></>}
-   {coverage.uncategorizedSets>0&&<p className="muted small">{coverage.uncategorizedSets} set(s) from custom exercises aren't mapped to a muscle group yet.</p>}
+   {coverage.uncategorizedSets>0&&<p className="muted small">{coverage.uncategorizedSets} set(s) from custom exercises aren&apos;t mapped to a muscle group yet.</p>}
    <p className="muted tiny">For illustration of workout distribution only. The weights describe exercise tags, not measured muscle activation, recovery, or a recommended training dose.</p>
   </section>
   <section className="card pane-pad insight-section" aria-labelledby="recap-heading">
-   <div className="section-title insight-title"><div><span className="eyebrow">MONTHLY RECAP</span><h2 id="recap-heading">Your month, in motion.</h2><p className="muted small">Completed workouts and the training you logged—not estimates of activity you didn't record.</p></div></div>
+   <div className="section-title insight-title"><div><span className="eyebrow">MONTHLY RECAP</span><h2 id="recap-heading">Your month, in motion.</h2><p className="muted small">Completed workouts and the training you logged—not estimates of activity you didn&apos;t record.</p></div></div>
    <div className="month-pager" role="group" aria-label="Choose recap month"><button className="button-secondary" onClick={()=>setMonth(previousMonth)} aria-label="Previous month"><ArrowLeft size={17}/></button><strong aria-live="polite">{monthLabel(month)}</strong><button className="button-secondary" onClick={()=>setMonth(nextMonth)} disabled={month>=currentMonth} aria-label="Next month"><ArrowRight size={17}/></button></div>
    {hasMonthlyData?<div className="recap-feature"><div className="recap-feature-icon"><Sparkles size={24} aria-hidden="true"/></div><div><strong>{recap.completedSessions} sessions completed this month</strong><p>{compare}</p></div></div>
     :<div className="insight-empty"><CalendarDays size={24}/><strong>No training logged in {monthLabel(month)}.</strong><span>Your recap will update automatically when you log sessions, water or sets for this month.</span></div>}

@@ -14,6 +14,10 @@ type Props={app:Trainer;editable:boolean};
 const activityChoices:SwimActivity[]=[...SWIM_STROKES,...SWIM_DRILLS.map(x=>x.id)];
 const n=(v:unknown)=>swimNumber(v);
 const meters=(m:number)=>m>=1000?`${(m/1000).toFixed(2)} km`:`${m} m`;
+function useRecordDraft(value:string,key:string):[string,(value:string)=>void]{
+ const [draft,setDraft]=useState<{key:string;value:string}>({key,value});
+ return [draft.key===key?draft.value:value,next=>setDraft({key,value:next})];
+}
 export default function SwimLogger({app,editable}:Props){
  const day=app.swimDay,record=weekLog(app.data,app.week),log=record.swim[day];
  const plan=swimRoutine(app.data,app.week,day),pool=effectivePool(log,app.data.swimPoolDefault);
@@ -27,23 +31,25 @@ export default function SwimLogger({app,editable}:Props){
  const [accordion,setAccordion]=useState<{scope:string;expanded:string|null;known:string[]}>({scope:'',expanded:null,known:[]});
  const expanded=accordion.scope===scope?accordion.expanded:(segments[0]?.id??null);
  useEffect(()=>{
-  setAccordion(prev=>{
+  let active=true;
+  queueMicrotask(()=>{
+   if(!active)return;
+   setAccordion(prev=>{
    if(prev.scope!==scope)return {scope,expanded:segments[0]?.id??null,known:ids};
    if(prev.known.join('|')===idsKey)return prev;
    // Automatically open locally added strokes, keeping edits in all others intact.
    const added=segments.find(segment=>!prev.known.includes(segment.id));
    const expanded=added?.id??(prev.expanded&&ids.includes(prev.expanded)?prev.expanded:segments[0]?.id??null);
    return {scope,expanded,known:ids};
+   });
   });
+  return ()=>{active=false;};
  // Depends on stable segment IDs, not autosaved individual field edits.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[scope,idsKey]);
- const [pickDate,setPickDate]=useState('');
- useEffect(()=>setPickDate(currentSchedule),[app.week,day,currentSchedule]);
- const [defaultPool,setDefaultPool]=useState(String(app.data.swimPoolDefault||50));
- const [currentPool,setCurrentPool]=useState(String(pool));
- useEffect(()=>setCurrentPool(String(pool)),[pool,day,app.week]);
- useEffect(()=>setDefaultPool(String(app.data.swimPoolDefault||50)),[app.data.swimPoolDefault]);
+ const [pickDate,setPickDate]=useRecordDraft(currentSchedule,`${scope}:${currentSchedule}`);
+ const [defaultPool,setDefaultPool]=useRecordDraft(String(app.data.swimPoolDefault||50),String(app.data.swimPoolDefault||50));
+ const [currentPool,setCurrentPool]=useRecordDraft(String(pool),`${scope}:${pool}`);
  const status=statusFor(app.data,app.week,day);
  return <div className="stack swim-log">
   <section className="card pane-pad swim-session-hero"><div><span className="eyebrow">{day.toUpperCase()} · SWIM SESSION</span><h2>{plan.name}</h2><p className="muted">{plan.description}</p></div><span className="icon-wrap aqua"><Waves/></span></section>
@@ -78,8 +84,7 @@ export default function SwimLogger({app,editable}:Props){
 }
 function SwimRoutineEditor({app,day,plan}:{app:Trainer;day:SwimDay;plan:SwimRoutine}){
  const [candidate,setCandidate]=useState<SwimActivity>('freestyle');
- const [nameDraft,setNameDraft]=useState(plan.name);
- useEffect(()=>setNameDraft(plan.name),[plan.name,day]);
+ const [nameDraft,setNameDraft]=useRecordDraft(plan.name,`${day}:${plan.name}`);
  const save=(next:SwimRoutine)=>app.swimPlanEdit(day,next);
  return <div className="swim-routine-editor stack"><label className="field"><span>Session name</span><input maxLength={80} value={nameDraft} onChange={e=>{setNameDraft(e.target.value);if(e.target.value.trim())save({...plan,name:e.target.value});}} onBlur={()=>{if(!nameDraft.trim())setNameDraft(plan.name);}}/></label><label className="field"><span>Focus</span><input maxLength={240} value={plan.description} onChange={e=>save({...plan,description:e.target.value})}/></label>
  <h3>Planned activities</h3>{plan.activities.map((item,i)=><div className="swim-plan-line" key={`${item.activity}-${i}`}><strong>{SWIM_ACTIVITY_LABELS[item.activity]}</strong><label className="field"><span>Minutes</span><input type="number" min="0" max="240" value={item.plannedMinutes??''} onChange={e=>{const next=structuredClone(plan);next.activities[i].plannedMinutes=Math.max(0,Math.min(240,Number(e.target.value)));save(next);}}/></label><button aria-label={`Move ${SWIM_ACTIVITY_LABELS[item.activity]} up`} className="icon-btn" disabled={i===0} onClick={()=>{const next=structuredClone(plan);[next.activities[i-1],next.activities[i]]=[next.activities[i],next.activities[i-1]];save(next);}}><ChevronUp/></button><button className="icon-btn" aria-label={`Move ${SWIM_ACTIVITY_LABELS[item.activity]} down`} disabled={i===plan.activities.length-1} onClick={()=>{const next=structuredClone(plan);[next.activities[i],next.activities[i+1]]=[next.activities[i+1],next.activities[i]];save(next);}}><ChevronDown/></button><button className="icon-btn" aria-label={`Remove ${SWIM_ACTIVITY_LABELS[item.activity]} from plan`} onClick={()=>save({...plan,activities:plan.activities.filter((_,j)=>j!==i)})}><Trash2 size={17}/></button></div>)}
@@ -106,7 +111,7 @@ function SwimSegmentEditor({app,day,segment,pool,open,onToggle}:{app:Trainer;day
     {stroke&&<label className="field"><span>Self-rated learning level</span><select value={segment.skillLevel??'Learning'} onChange={e=>update({skillLevel:e.target.value as SwimSegment['skillLevel']})}>{SWIM_SKILL_LEVELS.map(level=><option key={level} value={level}>{level}</option>)}</select></label>}
     {stroke&&<div className="swim-technique"><h4>Technique practiced today</h4><p className="muted tiny">Checked steps count toward technique progress only after this workout is completed.</p><div className="checklist">{SWIM_CHECKLIST[segment.activity as SwimStroke].map(step=><label className="check-row" key={step}><input type="checkbox" checked={!!segment.technique?.[step]} onChange={e=>app.toggleSwimTechnique(day,segment.id,step,e.target.checked)}/>{step}</label>)}</div></div>}
     {mode==='advanced'&&stroke&&<div className="swim-advanced stack">
-     <div className="swim-field-row"><label className="field"><span>Longest continuous distance (m)</span><input type="number" min="0" max={totalLengths*pool} step={pool} inputMode="numeric" value={segment.longestContinuous??''} onChange={e=>update({longestContinuous:e.target.value})} placeholder="e.g. 100"/></label><div className="swim-field-readout"><small>Longest validated</small><strong>{continuous} m</strong></div></div><p className="muted tiny">Continuous distance must be included in the lengths above. Interval breaks don't count toward uninterrupted distance.</p>{n(segment.longestContinuous)>0&&(n(segment.longestContinuous)>totalLengths*pool||!Number.isInteger(n(segment.longestContinuous)/pool))&&<p className="swim-validation-warning" role="alert">Continuous distance must be a whole number of pool lengths, within the lengths logged outside intervals. It will not count as a record until corrected.</p>}
+     <div className="swim-field-row"><label className="field"><span>Longest continuous distance (m)</span><input type="number" min="0" max={totalLengths*pool} step={pool} inputMode="numeric" value={segment.longestContinuous??''} onChange={e=>update({longestContinuous:e.target.value})} placeholder="e.g. 100"/></label><div className="swim-field-readout"><small>Longest validated</small><strong>{continuous} m</strong></div></div><p className="muted tiny">Continuous distance must be included in the lengths above. Interval breaks don&apos;t count toward uninterrupted distance.</p>{n(segment.longestContinuous)>0&&(n(segment.longestContinuous)>totalLengths*pool||!Number.isInteger(n(segment.longestContinuous)/pool))&&<p className="swim-validation-warning" role="alert">Continuous distance must be a whole number of pool lengths, within the lengths logged outside intervals. It will not count as a record until corrected.</p>}
      <h4>Timed effort / personal best</h4><div className="swim-field-row"><label className="field"><span>Timed distance (m)</span><input type="number" min="0" step={pool} inputMode="numeric" value={segment.timedMeters??''} onChange={e=>update({timedMeters:e.target.value})} placeholder="e.g. 50"/></label><label className="field"><span>Time (seconds)</span><input type="number" min="0" step="0.1" inputMode="decimal" value={segment.timedSeconds??''} onChange={e=>update({timedSeconds:e.target.value})} placeholder="e.g. 65.2"/></label></div><p className="muted tiny">This timed swim is part of the lengths above, not extra distance. Comparing the same stroke and distance gives a fair personal best.</p>{n(segment.timedMeters)>0&&(n(segment.timedMeters)>totalLengths*pool||!Number.isInteger(n(segment.timedMeters)/pool))&&<p className="swim-validation-warning" role="alert">Timed distance must be a whole number of pool lengths within the lengths logged outside intervals. It will not count as a record until corrected.</p>}
      <h4>Interval training</h4><form className="swim-interval-form" onSubmit={e=>{e.preventDefault();app.addSwimInterval(day,segment.id,{repeats:Number(repeats),lengths:Number(intervalLengths),restSeconds:Number(rest),...(seconds?{secondsPerRepeat:Number(seconds)}:{})});}}><label className="field"><span>Repeats</span><input type="number" min="1" max="50" value={repeats} onChange={e=>setRepeats(e.target.value)}/></label><label className="field"><span>Lengths/rep</span><input type="number" min="1" max="40" value={intervalLengths} onChange={e=>setIntervalLengths(e.target.value)}/></label><label className="field"><span>Rest (sec)</span><input type="number" min="0" max="1800" value={rest} onChange={e=>setRest(e.target.value)}/></label><label className="field"><span>Time/rep (optional sec)</span><input type="number" min="0" step="0.1" value={seconds} onChange={e=>setSeconds(e.target.value)}/></label><button className="button-secondary" type="submit"><Plus size={16}/> Add intervals</button></form>
      {segment.intervals?.map(x=><div key={x.id} className="swim-interval-line"><span>{x.repeats} × {x.lengths*pool} m · {x.restSeconds}s rest {n(x.secondsPerRepeat)>0?`· avg ${x.secondsPerRepeat}s/rep`:''}</span><button type="button" className="icon-btn" aria-label="Remove interval set" onClick={()=>app.removeSwimInterval(day,segment.id,x.id)}><Trash2 size={16}/></button></div>)}

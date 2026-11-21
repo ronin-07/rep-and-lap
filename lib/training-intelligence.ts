@@ -5,7 +5,7 @@ import {weekOf, dateFor, keyOf} from './dates';
 import {completedDate} from './scheduling';
 import {num, loggedSet, sessionMinutes} from './metrics';
 import {exercisesFor} from './routines';
-import {swimTotals,strokeInsights,segmentTimed,effectivePool} from './swimming';
+import {swimTotals,segmentTimed,effectivePool} from './swimming';
 
 export type TrainingWeek = {week:string; minutes:number; sessions:number; averageMinutes:number|null};
 export function weeklyTrainingTime(data:TrackerData, week:string):TrainingWeek {

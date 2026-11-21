@@ -38,7 +38,7 @@ export default function Conflicts({app}:{app:Trainer}){
     <div className="conflict-value"><div className="conflict-source"><Cloud size={16}/> Cloud version</div><strong>{remote?.value.kg??'—'} kg <span>×</span> {remote?.value.reps??'—'}</strong><small>{remote?.value.rir!==undefined?`RIR ${remote.value.rir} · `:''}{remote?.value.rpe!==undefined?`RPE ${remote.value.rpe} · `:''}{prettyDate(remote?.updatedMs)}</small></div>
    </div>
    <div className="conflict-actions"><button className="button-secondary" onClick={()=>app.resolveConflict(local.key,'cloud')}>Use cloud version</button><button className="button-primary" onClick={()=>app.resolveConflict(local.key,'mine')}>Keep my edit</button></div>
-   <p className="hint">Keep my edit queues a version-checked write. If another device edits the set again, you'll be asked to review it again.</p>
+   <p className="hint">Keep my edit queues a version-checked write. If another device edits the set again, you&apos;ll be asked to review it again.</p>
   </article>)}
  </>}
  </div>;

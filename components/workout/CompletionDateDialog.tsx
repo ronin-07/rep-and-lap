@@ -8,19 +8,16 @@ import {completedDate,scheduledDate,originalPlannedDate,statusFor} from '@/lib/s
 import DateInput from '@/components/DateInput';
 export default function CompletionDateDialog({app}:{app:Trainer}) {
  const request=app.completionRequest;
- const today=keyOf(new Date());
- const scheduled=request?scheduledDate(app.data,request.week,request.day):today;
- const existing=request?completedDate(app.data,request.week,request.day):today;
- const [choice,setChoice]=useState<'scheduled'|'today'|'other'>('scheduled');
- const [otherDate,setOtherDate]=useState(today);
- useEffect(()=>{if(!request)return;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')app.cancelCompletion();};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[request,app.cancelCompletion]);
- useEffect(()=>{if(!request)return;
-  const initial=request.mode==='edit'?existing:scheduled<=today?scheduled:today;
-  setChoice(request.mode==='edit'?'other':scheduled<=today?'scheduled':'today');setOtherDate(initial);
- // Only reset when opening for a different session, not on each background sync.
- // eslint-disable-next-line react-hooks/exhaustive-deps
- },[request?.week,request?.day,request?.mode]);
  if(!request)return null;
+ return <CompletionDateModal key={`${request.week}:${request.day}:${request.mode}`} app={app} request={request}/>;
+}
+function CompletionDateModal({app,request}:{app:Trainer;request:NonNullable<Trainer['completionRequest']>}) {
+ const today=keyOf(new Date());
+ const scheduled=scheduledDate(app.data,request.week,request.day);
+ const existing=completedDate(app.data,request.week,request.day);
+ const [choice,setChoice]=useState<'scheduled'|'today'|'other'>(request.mode==='edit'?'other':scheduled<=today?'scheduled':'today');
+ const [otherDate,setOtherDate]=useState(request.mode==='edit'?existing:scheduled<=today?scheduled:today);
+ useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')app.cancelCompletion();};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[app.cancelCompletion]);
  const actual=choice==='scheduled'?scheduled:choice==='today'?today:otherDate;
  const valid=/^\d{4}-\d{2}-\d{2}$/.test(actual)&&actual<=today;
  const isEditing=request.mode==='edit';

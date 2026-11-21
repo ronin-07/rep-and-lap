@@ -1,14 +1,14 @@
 'use client';
 import * as React from 'react';
-import {Activity,ArrowUpRight,CheckCircle2,Droplets,Dumbbell,Flame,Medal,Scale,Waves as Swim,Trophy} from 'lucide-react';
+import {Activity,CheckCircle2,Dumbbell,Flame,Medal,Waves as Swim,Trophy} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
-import {PLAN,GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
+import {GYM_DAYS,SWIM_DAYS} from '@/lib/plan';
 import {weekOf,keyOf,daysAgo} from '@/lib/dates';
-import {summary,weeklyChart,hydrationChart,weightTrend,history,bestSwim,weightEntries,waterTotal,milestones,activeStreak,strengthInsights,exerciseStrength,formatDuration,recentSessions,completionDate,calendarCompleted} from '@/lib/metrics';
+import {summary,weeklyChart,hydrationChart,weightTrend,history,bestSwim,milestones,activeStreak,strengthInsights,exerciseStrength,formatDuration,recentSessions,completionDate} from '@/lib/metrics';
 import {LineChart,MiniBars} from '@/components/Charts';
 import {weeklyTrainingTime,trainingTimeWeeks,swimmingInsights,paceLabel,progressionAdvice} from '@/lib/training-intelligence';
 import {weeklyAdherence} from '@/lib/scheduling';
-import {strokeInsights,SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,swimTotals,swimTechniqueEvidence,swimTechniqueStage} from '@/lib/swimming';
+import {strokeInsights,SWIM_STROKES,SWIM_ACTIVITY_LABELS,SWIM_CHECKLIST,SWIM_TARGET_DEFAULTS,swimTechniqueEvidence,swimTechniqueStage} from '@/lib/swimming';
 import type {SwimStroke} from '@/lib/types';
 import Insights from './Insights';
 import {exercisesFor} from '@/lib/routines';
@@ -55,7 +55,7 @@ function StrengthProgress({app}:{app:Trainer}){
  </div>;
 }
 function ActivityHeatmap({app}:{app:Trainer}){
- const active=new Set<string>();for(const [week,log] of Object.entries(app.data.weeks))for(const [idx,day] of ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].entries())if(log.done?.[day as keyof typeof log.done]){const d=new Date(`${completionDate(app.data,week,day as keyof typeof log.done)}T12:00:00`);active.add(keyOf(d));}
+ const active=new Set<string>();for(const [week,log] of Object.entries(app.data.weeks))for(const day of ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'])if(log.done?.[day as keyof typeof log.done]){const d=new Date(`${completionDate(app.data,week,day as keyof typeof log.done)}T12:00:00`);active.add(keyOf(d));}
  return <div className="heatmap" role="img" aria-label="Workout completion for the past 28 days">{Array.from({length:28},(_,i)=>{const k=daysAgo(27-i);return <div className={`heat-day ${active.has(k)?'on':''}`} key={k} title={`${k}${active.has(k)?' completed':''}`}/>})}</div>;
 }
 
@@ -64,8 +64,10 @@ function SwimmingProgress({app}:{app:Trainer}){
  const totals=swimmingInsights(app.data);
  const stroke=strokeInsights(app.data,selected);
  const target=app.data.swimTargets?.[selected]??SWIM_TARGET_DEFAULTS[selected];
- const [targetDraft,setTargetDraft]=React.useState(String(target));
- React.useEffect(()=>setTargetDraft(String(target)),[target,selected]);
+ const draftKey=`${selected}:${target}`;
+ const [draft,setDraft]=React.useState({key:draftKey,value:String(target)});
+ const targetDraft=draft.key===draftKey?draft.value:String(target);
+ const setTargetDraft=(value:string)=>setDraft({key:draftKey,value});
  const bestTimes=Object.entries(stroke.bestTimes).sort(([a],[b])=>Number(a)-Number(b));
  const technique=SWIM_CHECKLIST[selected];
  const evidence=swimTechniqueEvidence(app.data,selected);

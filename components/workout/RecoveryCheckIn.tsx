@@ -5,22 +5,19 @@ import type {Trainer} from '@/hooks/useTrainer';
 import type {SessionNotes} from '@/lib/types';
 export default function RecoveryCheckIn({app}:{app:Trainer}){
  const prompt=app.recoveryPrompt;
- const [draft,setDraft]=useState<SessionNotes>({});
- const promptKey=prompt?`${prompt.week}:${prompt.day}`:'';
- useEffect(()=>{
-  if(!prompt)return;
+ if(!prompt)return null;
+ return <RecoveryCheckInSheet key={`${prompt.week}:${prompt.day}`} app={app} prompt={prompt}/>;
+}
+function RecoveryCheckInSheet({app,prompt}:{app:Trainer;prompt:NonNullable<Trainer['recoveryPrompt']>}){
+ const [draft,setDraft]=useState<SessionNotes>(()=>{
   const saved=app.data.weeks[prompt.week]?.sessionNotes?.[prompt.day];
-  setDraft({sessionRpe:saved?.sessionRpe,soreness:saved?.soreness||'',general:saved?.general||''});
-  // Reset only when opening a different check-in, never when other workout data syncs.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[promptKey]);
+  return {sessionRpe:saved?.sessionRpe,soreness:saved?.soreness||'',general:saved?.general||''};
+ });
  useEffect(()=>{
-  if(!prompt)return;
   const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')app.closeRecoveryPrompt();};
   document.addEventListener('keydown',escape);
   return ()=>document.removeEventListener('keydown',escape);
- },[app.closeRecoveryPrompt,promptKey]);
- if(!prompt)return null;
+ },[app.closeRecoveryPrompt]);
  return <div className="overlay" role="presentation" onClick={app.closeRecoveryPrompt}>
   <section className="card recovery-sheet" role="dialog" aria-modal="true" aria-labelledby="recovery-heading" onClick={e=>e.stopPropagation()}>
    <button type="button" className="icon-btn recovery-close" aria-label="Skip optional feedback" onClick={app.closeRecoveryPrompt}><X size={19}/></button>

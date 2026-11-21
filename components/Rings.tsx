@@ -8,7 +8,7 @@ export function Rings({gym,swim,water}:{gym:Ring;swim:Ring;water:Ring}){
   {...swim,r:76,id:'swim',Icon:Waves,colors:['#79efe0','#26b8bb']},
   {...water,r:52,id:'water',Icon:Droplets,colors:['#ffd3a6','#fb817c']}];
  const total=Math.min(6,Math.max(0,Number(gym.value.split('/')[0])+Number(swim.value.split('/')[0])));
- return <section className="rings-card card"><div className="section-title activity-head"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Small efforts. Big momentum.</h2><p className="muted small">A picture of your training week and today's hydration.</p></div><span className="activity-period">THIS WEEK <span>+</span> TODAY</span></div>
+ return <section className="rings-card card"><div className="section-title activity-head"><div><span className="eyebrow">YOUR ACTIVITY</span><h2>Small efforts. Big momentum.</h2><p className="muted small">A picture of your training week and today&apos;s hydration.</p></div><span className="activity-period">THIS WEEK <span>+</span> TODAY</span></div>
   <div className="activity-body">
    <div className="ring-stage"><div className="ring-halo" aria-hidden="true"/><div className="ring-visual"><svg viewBox="0 0 252 252" role="img" aria-label={`${total} of 6 sessions. ${gym.label}: ${gym.value}. ${swim.label}: ${swim.value}. ${water.label}: ${water.value}.`}>
     <defs>{rings.map(r=><linearGradient key={r.id} id={`${uid}-${r.id}`} x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor={r.colors[0]}/><stop offset="1" stopColor={r.colors[1]}/></linearGradient>)}</defs>

@@ -3,7 +3,7 @@ import {useState} from 'react';
 import {CalendarDays,ChevronLeft,ChevronRight,ArrowRight,Moon,CheckCircle2,SkipForward,CalendarClock} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {Day} from '@/lib/types';
-import {PLAN,isGym} from '@/lib/plan';
+import {isGym} from '@/lib/plan';
 import {keyOf,dateFor,formatDate,weekOf} from '@/lib/dates';
 import {monthGrid,entriesForDate,weeklyAdherence,scheduledDate,originalPlannedDate,completedDate,completedElsewhereForDate} from '@/lib/scheduling';
 import type {CalendarItem} from '@/lib/scheduling';

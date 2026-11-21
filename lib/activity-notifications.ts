@@ -4,11 +4,11 @@
  * Read/unread state is a separate per-device, per-account UI preference.
  */
 import {DAYS, type GymDay, type SwimDay, type TrackerData} from './types';
-import {PLAN, GYM_DAYS, SWIM_DAYS} from './plan';
+import {GYM_DAYS} from './plan';
 import {dateFor} from './dates';
 import {completedDate, scheduledDate} from './scheduling';
 import {achievements} from './insights';
-import {loggedSet, num, waterGoal} from './metrics';
+import {loggedSet, waterGoal} from './metrics';
 import {swimTotals,swimPersonalBests,SWIM_ACTIVITY_LABELS,sessionDisplayName} from './swimming';
 
 export type ActivityKind = 'session' | 'hydration' | 'achievement' | 'swim-pr';
