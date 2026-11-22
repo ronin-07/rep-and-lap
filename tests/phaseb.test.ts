@@ -1,8 +1,9 @@
 import {describe,it,expect} from 'vitest';
 import {blankData,recordPayload,applyRecord,weekBlank} from '../lib/storage';
 import {waterGoal,hydrationChart} from '../lib/metrics';
-import {homeFocus,dayIndicators} from '../lib/home-overview';
+import {homeFocus,homeQueue,todayFocus,dayIndicators} from '../lib/home-overview';
 import {activityNotifications} from '../lib/activity-notifications';
+import {weeklyTrainingTime} from '../lib/training-intelligence';
 
 describe('Phase B hydration goal safety',()=>{
  it('keeps original day-specific targets until a user sets their default',()=>{
@@ -74,5 +75,61 @@ describe('Phase B home priority and calendar statuses',()=>{
   data.weeks[week].scheduleStatus!.Saturday='skipped';
   expect(homeFocus(data,today).kind).toBe('skipped');
   expect(homeFocus(data,today).entry).toBeUndefined();
+ });
+});
+
+describe('Phase B Home today-first selector regression',()=>{
+ const sunday='2026-11-22',friday='2026-11-20',week='2026-11-16';
+ it('does not replace an unscheduled Sunday with an older missed swim',()=>{
+  const data=blankData();
+  expect(homeFocus(data,sunday).kind).toBe('idle');
+  const missed=homeQueue(data,sunday,3,3).missed;
+  expect(missed.some(item=>item.day==='Friday'&&item.date===friday)).toBe(true);
+ });
+ it('keeps original week/day for missed-workout recovery or skip',()=>{
+  const data=blankData();
+  const missed=homeQueue(data,sunday,3,3).missed.find(item=>item.day==='Friday');
+  expect(missed).toMatchObject({week,day:'Friday',date:friday,status:'scheduled'});
+  data.weeks[week]=weekBlank();
+  data.weeks[week].scheduleStatus!.Friday='rest';
+  expect(homeQueue(data,sunday,3,3).missed.some(item=>item.day==='Friday')).toBe(false);
+  expect(homeFocus(data,sunday).kind).toBe('idle');
+ });
+ it('shows an intentional today recovery entry for Undo without marking completed',()=>{
+  const data=blankData();data.weeks[week]=weekBlank();
+  data.weeks[week].scheduleStatus!.Saturday='rest';
+  const detail=todayFocus(data,'2026-11-21');
+  expect(detail.kind).toBe('recovery');
+  expect(detail.entry).toMatchObject({day:'Saturday',status:'rest'});
+  expect(data.weeks[week].done.Saturday).not.toBe(true);
+ });
+ it('puts an upcoming workout in a separate navigable queue',()=>{
+  const data=blankData();
+  const future=homeQueue(data,sunday,3,3).upcoming;
+  expect(future.find(item=>item.day==='Monday')).toMatchObject({date:'2026-11-23',status:'scheduled'});
+  expect(homeFocus(data,sunday).kind).toBe('idle');
+ });
+ it('preserves active workout priority and still exposes today',()=>{
+  const data=blankData();data.weeks[week]=weekBlank();
+  data.weeks[week].timing!.Friday={startedAt:'2026-11-21T09:00:00.000Z'};
+  expect(homeFocus(data,sunday).kind).toBe('active');
+  expect(todayFocus(data,sunday).kind).toBe('idle');
+ });
+ it('does not count missing timer metadata as recorded training time',()=>{
+  const data=blankData();data.weeks[week]=weekBlank();data.weeks[week].done.Monday=true;
+  const result=weeklyTrainingTime(data,week);
+  expect(result.sessions).toBe(0);
+  expect(result.minutes).toBe(0);
+  expect(result.averageMinutes).toBeNull();
+ });
+});
+
+describe('Phase B actual-date completion on Home',()=>{
+ it('shows a workout completed on Sunday even if originally scheduled for Friday',()=>{
+  const week='2026-11-16',today='2026-11-22';
+  const data=blankData();data.weeks[week]=weekBlank();
+  data.weeks[week].done.Friday=true;
+  data.weeks[week].completedOn!.Friday=today;
+  expect(todayFocus(data,today)).toMatchObject({kind:'completed',entry:{week,day:'Friday',date:today,status:'completed'}});
  });
 });

@@ -1181,3 +1181,57 @@ body.keyboard-open .workout-control-bar{display:none}
  .phaseb-hero--gym{background-image:linear-gradient(90deg,rgba(13,9,27,.98),rgba(13,9,27,.87) 70%,rgba(13,9,27,.64)),url('/images/cards/gym-hero.webp')}
  .phaseb-hero--recovery{background-image:linear-gradient(90deg,rgba(6,20,30,.98),rgba(6,20,30,.85) 70%,rgba(6,20,30,.62)),url('/images/cards/recovery.webp')}
 }
+
+/* Milestone 9 Phase B polish: Today-first manual hero switcher and airy desktop layout. */
+.phaseb-hero-section{display:grid;gap:12px;min-width:0}
+.phaseb-hero-switcher{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.phaseb-hero-switcher button{display:inline-flex;align-items:center;gap:7px;min-height:39px;padding:7px 13px;border:1px solid var(--border);border-radius:99px;color:var(--muted);background:var(--panel);font-size:.76rem;font-weight:800;transition:background .18s,border-color .18s}
+.phaseb-hero-switcher button:hover,.phaseb-hero-switcher button:focus-visible{border-color:var(--purple);color:var(--text)}
+.phaseb-hero-switcher button.is-current{background:color-mix(in srgb,var(--purple) 24%,var(--panel));border-color:color-mix(in srgb,var(--purple) 75%,var(--border));color:var(--text)}
+.phaseb-hero-switcher button span{font-size:.68rem;font-weight:600;opacity:.75}
+.phaseb-hero-switcher button b{background:var(--panel2);border-radius:7px;padding:1px 6px;font-size:.7rem}
+.phaseb-hero-management{display:grid;gap:13px;width:min(480px,100%);margin-top:20px;padding:17px;border:1px solid rgba(217,229,255,.25);border-radius:15px;background:rgba(4,12,27,.88);box-shadow:0 14px 34px rgba(0,0,0,.18);backdrop-filter:blur(10px);color:#f9fbff}
+.phaseb-hero-management-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.phaseb-hero-management-title strong{font-size:.89rem}
+.phaseb-hero-management-title small{font-size:.73rem;color:#cbd6e6}
+.phaseb-hero-management-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.phaseb-hero-management-actions button{display:flex;align-items:center;gap:9px;padding:11px 12px;min-height:44px;text-align:left;border:1px solid rgba(195,209,240,.28);border-radius:11px;color:#f7f9ff;background:rgba(24,37,57,.82);font-weight:700;font-size:.79rem}
+.phaseb-hero-management-actions button:hover{border-color:#b3a2ff;background:rgba(41,48,83,.92)}
+.phaseb-hero-management .field span{color:#dae4f0}
+.phaseb-hero-management-footer{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.phaseb-hero-management-footer button{min-height:40px}
+.phaseb-hero-pager{position:absolute;right:17px;bottom:15px;display:flex;align-items:center;gap:7px;z-index:2;padding:4px 6px;border:1px solid rgba(215,225,250,.16);border-radius:30px;background:rgba(6,13,28,.78);backdrop-filter:blur(8px);color:#eef5ff}
+.phaseb-hero-pager button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.1);color:inherit}
+.phaseb-hero-pager button:disabled{opacity:.3;cursor:not-allowed}
+.phaseb-hero-pager span{font-size:.69rem;font-weight:800;white-space:nowrap}
+.phaseb-hero--overdue{border-color:color-mix(in srgb,var(--gold) 47%,var(--border))}
+.phaseb-hero--overdue .phaseb-kicker{color:#ffcf88}
+.phaseb-hero--overdue .phaseb-live-dot{background:var(--gold)}
+.phaseb-card-heading>div:has(>.eyebrow){display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.phaseb-card-heading>div>.eyebrow{line-height:1.3}
+.phaseb-week-day{min-height:93px;justify-content:center}
+.phaseb-week-plan .phaseb-day-details{padding-top:17px;margin-top:18px}
+@media(min-width:1150px){
+ .app-main:has(.phaseb-home){width:min(1560px,100%);max-width:none;padding:36px clamp(24px,3vw,50px) 105px}
+ .phaseb-home-layout{grid-template-columns:minmax(0,1.86fr) minmax(290px,.94fr);gap:22px}
+ .phaseb-home-primary,.phaseb-home-aside{gap:20px}
+ .phaseb-hero{min-height:360px;padding:35px 36px 52px;align-items:center}
+ .phaseb-hero h2{font-size:clamp(2.05rem,2.6vw,2.9rem);max-width:670px}
+ .phaseb-hero-content>p{font-size:.96rem;max-width:550px}
+ .phaseb-week-day{min-height:108px;padding:14px 6px}
+ .phaseb-week-day.is-selected{padding:13px 5px}
+ .phaseb-week-days{gap:10px}
+ .phaseb-card{padding:23px}
+ .phaseb-home .phaseb-week-stats>div{padding:17px 9px}
+}
+@media(max-width:700px){
+ .phaseb-hero-switcher{gap:6px}
+ .phaseb-hero-switcher button{min-height:37px;padding:7px 10px;font-size:.72rem}
+ .phaseb-hero-switcher button span{display:none}
+ .phaseb-hero{padding-bottom:55px}
+ .phaseb-hero-management{padding:13px;margin-top:14px}
+ .phaseb-hero-management-actions{grid-template-columns:1fr}
+ .phaseb-hero-pager{right:11px;bottom:9px}
+ .phaseb-week-day{min-height:76px}
+}
+@media(prefers-reduced-motion:reduce){.phaseb-hero-switcher button{transition:none}}
