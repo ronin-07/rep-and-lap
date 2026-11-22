@@ -1,14 +1,14 @@
 'use client';
-import {useEffect,useRef} from 'react';
+import {useEffect,useEffectEvent} from 'react';
 import {Check,Dumbbell,Droplets,Sparkles,Trophy,Waves,X} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 /** A genuine locally completed workout may celebrate without interrupting logging. */
 export default function CelebrationBanner({app}:{app:Trainer}){
  const celebration=app.celebration,prompt=app.recoveryPrompt;
- const close=useRef(app.dismissCelebration);close.current=app.dismissCelebration;
+ const close=useEffectEvent(()=>app.dismissCelebration());
  useEffect(()=>{
   if(!celebration||prompt)return;
-  const id=setTimeout(()=>close.current(),celebration.kind==='session'?2600:4200);
+  const id=setTimeout(()=>close(),celebration.kind==='session'?2600:4200);
   return ()=>clearTimeout(id);
  },[celebration,prompt]);
  if(!celebration||prompt)return null;

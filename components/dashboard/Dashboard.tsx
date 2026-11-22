@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-import {ArrowRight,CalendarDays,CalendarClock,CheckCircle2,Droplets,Dumbbell,Flame,Leaf,Moon,Scale,Settings2,SkipForward,Timer,Waves} from 'lucide-react';
+import {ArrowRight,CalendarDays,CalendarClock,CheckCircle2,Droplets,Flame,Leaf,Moon,Scale,Settings2,SkipForward,Timer} from 'lucide-react';
 import type {Trainer} from '@/hooks/useTrainer';
 import type {Day} from '@/lib/types';
 import {isGym} from '@/lib/plan';
@@ -22,6 +22,7 @@ export default function Dashboard({app}:{app:Trainer}){
  const [goalDraft,setGoalDraft]=useState('');
  const focusEntry=focus.entry, focusName=focusEntry?sessionDisplayName(app.data,focusEntry.week,focusEntry.day):focus.kind==='skipped'?'Workout skipped today':'Recovery day';
  const focusKind=focusEntry&&isGym(focusEntry.day)?'gym':'swim';
+ const heroArt=focus.kind==='recovery'?'recovery':focus.kind==='scheduled'||focus.kind==='upcoming'||focus.kind==='active'?focusKind:null;
  const progress=weeklyAdherence(app.data,week),timed=weeklyTrainingTime(app.data,week),streak=activeStreak(app.data);
  const water=waterTotal(app.data,today),goal=waterGoal(today,app.data),latest=weightEntries(app.data).at(-1);
  const selectedItems=entriesForDate(app.data,selected);
@@ -34,8 +35,7 @@ export default function Dashboard({app}:{app:Trainer}){
   <header className="phaseb-welcome"><div><span className="eyebrow">{formatDate(today).toUpperCase()} · YOUR SPACE</span><h1>Your training space<span className="phaseb-dot">.</span></h1><p>One workout at a time. Consistency adds up.</p></div><span className="phaseb-connection">{app.syncMode==='synced'?'✓ Synced':app.syncMode==='needs-attention'?'Sync needs attention':app.online?'Saved & syncing':'Offline · saved locally'}</span></header>
   <div className="phaseb-home-layout">
    <div className="phaseb-home-primary stack">
-    <section className={`card phaseb-hero ${focusKind==='swim'?'phaseb-swim-hero':''}`} aria-label="Your next workout">
-     <div className="phaseb-hero-art" aria-hidden="true">{focusKind==='swim'?<Waves size={112} strokeWidth={.8}/>:<Dumbbell size={112} strokeWidth={.8}/>}</div>
+    <section className={`card phaseb-hero ${heroArt?`phaseb-hero--${heroArt}`:''}`} aria-label="Your next workout">
      <div className="phaseb-hero-content"><span className="phaseb-kicker"><span className="phaseb-live-dot"/>{focus.kind==='active'?'ACTIVE WORKOUT':focus.kind==='review'?'TIMER REVIEW REQUIRED':focus.kind==='scheduled'?"TODAY'S WORKOUT":focus.kind==='overdue'?'MISSED WORKOUT':focus.kind==='upcoming'?'NEXT WORKOUT':focus.kind==='skipped'?'WORKOUT SKIPPED':'RECOVERY DAY'}</span>
       <h2>{focusName}</h2><p>{focusEntry?sessionDisplaySubtitle(app.data,focusEntry.week,focusEntry.day):focus.kind==='skipped'?'Today’s workout is marked skipped. You can undo or reschedule it below.':'No pending workouts need your attention. Rest is part of progress.'}</p>
       <div className="phaseb-hero-meta"><CalendarDays size={15}/>{focusEntry?formatDate(focusEntry.date):'No workout today'} {focusEntry&&<>· {focusKind==='gym'?'Gym':'Swimming'}</>}</div>
@@ -52,7 +52,7 @@ export default function Dashboard({app}:{app:Trainer}){
    </div>
    <aside className="phaseb-home-aside stack">
     <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><CalendarDays size={19}/> Your week</h2><small className="muted">Mon – Sun</small></div><div className="phaseb-week-stats"><div><CheckCircle2 size={22}/><strong>{progress.completed}/{progress.eligible}</strong><small>Plan completed</small></div><div><Timer size={22}/><strong>{timed.sessions?formatDuration(timed.minutes):'—'}</strong><small>Timed training</small></div><div><Flame size={22}/><strong>{streak.current} days</strong><small>Streak</small></div></div><p className="phaseb-secondary-note">Rest days are excluded from your planned-session target.</p></section>
-    <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><Droplets size={19}/> Hydration</h2><button className="phaseb-icon-button" aria-label="Change default daily water goal" onClick={()=>{setGoalDraft(String(goal));setGoalEditing(x=>!x)}}><Settings2 size={17}/></button></div><div className="phaseb-hydration-number"><strong>{(water/1000).toFixed(2)} <small>/ {(goal/1000).toFixed(2)} L</small></strong><span>{Math.round(water/goal*100)}%</span></div><div className="progress-track"><span style={{width:`${Math.min(100,water/goal*100)}%`,background:'var(--aqua)'}}/></div><div className="phaseb-quick-actions">{[250,500,750].map(ml=><button key={ml} className="button-secondary" onClick={()=>app.addWater(ml)}>+{ml} mL</button>)}</div>
+    <section className="card phaseb-card phaseb-hydration-card"><div className="phaseb-card-heading"><h2><Droplets size={19}/> Hydration</h2><button className="phaseb-icon-button" aria-label="Change default daily water goal" onClick={()=>{setGoalDraft(String(goal));setGoalEditing(x=>!x)}}><Settings2 size={17}/></button></div><div className="phaseb-hydration-number"><strong>{(water/1000).toFixed(2)} <small>/ {(goal/1000).toFixed(2)} L</small></strong><span>{Math.round(water/goal*100)}%</span></div><div className="progress-track"><span style={{width:`${Math.min(100,water/goal*100)}%`,background:'var(--aqua)'}}/></div><div className="phaseb-quick-actions">{[250,500,750].map(ml=><button key={ml} className="button-secondary" onClick={()=>app.addWater(ml)}>+{ml} mL</button>)}</div>
      {goalEditing&&<div className="phaseb-goal-editor"><label className="field"><span>Default daily water goal (mL)</span><input inputMode="numeric" type="number" min="500" max="6000" step="50" value={goalDraft} onChange={e=>setGoalDraft(e.target.value)}/></label><button className="button-primary" disabled={!Number.isInteger(Number(goalDraft))||Number(goalDraft)<500||Number(goalDraft)>6000} onClick={()=>{app.setDefaultWaterGoal(Number(goalDraft));setGoalEditing(false);}}>Save goal</button><p className="muted tiny">Your new default applies from today; older daily goals remain in history.</p></div>}
     </section>
     <section className="card phaseb-card"><div className="phaseb-card-heading"><h2><Scale size={19}/> Body weight</h2><button className="text-btn" onClick={()=>{setWeightDraft(String(app.data.weights[today]?.kg||latest?.[1].kg||''));setWeightEditing(x=>!x)}}>{app.data.weights[today]?.kg?'Edit today':'Log weight'} <ArrowRight size={16}/></button></div><strong className="phaseb-weight">{latest?Number(latest[1].kg).toFixed(1):'—'} <small>kg</small></strong><p className="muted tiny">{latest?`Last recorded ${formatDate(latest[0])}`:'No weigh-ins recorded yet'}</p>

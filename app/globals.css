@@ -1113,3 +1113,71 @@ body.keyboard-open .workout-control-bar{display:none}
 .phaseb-insights-findings>div{padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);display:flex;align-items:center;justify-content:space-between;gap:10px}
 .phaseb-insights-findings strong{font-size:1.1rem;font-variant-numeric:tabular-nums}.phaseb-insights-findings span{font-size:.73rem;color:var(--muted);text-align:right}
 @media(max-width:740px){.phaseb-insights-columns{grid-template-columns:1fr}}
+
+
+/* Phase B visual assets — locally stored, optimized, and decorative only.
+   Strong overlays keep UI copy readable in dark and light themes. */
+.phaseb-hero--swim,.phaseb-hero--gym,.phaseb-hero--recovery{
+ color:#f5f8ff;
+ background-size:cover;
+ background-repeat:no-repeat;
+ background-position:center center;
+}
+.phaseb-hero--swim{
+ background-image:linear-gradient(90deg,rgba(5,15,31,.98) 0%,rgba(5,16,31,.92) 42%,rgba(5,19,34,.48) 77%,rgba(5,17,31,.36) 100%),url('/images/cards/swim-hero.webp');
+ border-color:rgba(79,216,211,.45);
+}
+.phaseb-hero--gym{
+ background-image:linear-gradient(90deg,rgba(13,9,27,.98) 0%,rgba(15,10,31,.93) 42%,rgba(16,10,31,.49) 78%,rgba(16,10,31,.35) 100%),url('/images/cards/gym-hero.webp');
+ border-color:rgba(167,129,240,.48);
+}
+.phaseb-hero--recovery{
+ background-image:linear-gradient(90deg,rgba(6,20,30,.98) 0%,rgba(8,25,33,.91) 50%,rgba(8,28,32,.54) 100%),url('/images/cards/recovery.webp');
+ border-color:rgba(113,192,155,.42);
+}
+.phaseb-hero--swim h2,.phaseb-hero--gym h2,.phaseb-hero--recovery h2{color:#f7f9ff}
+.phaseb-hero--swim .phaseb-hero-content>p,.phaseb-hero--gym .phaseb-hero-content>p,.phaseb-hero--recovery .phaseb-hero-content>p,
+.phaseb-hero--swim .phaseb-hero-meta,.phaseb-hero--gym .phaseb-hero-meta,.phaseb-hero--recovery .phaseb-hero-meta{color:#d5e2f1}
+.phaseb-hero--swim .phaseb-secondary-note,.phaseb-hero--gym .phaseb-secondary-note,.phaseb-hero--recovery .phaseb-secondary-note{color:#d0d8ec}
+.phaseb-hero--swim .phaseb-kicker,.phaseb-hero--recovery .phaseb-kicker{color:#74ece1}
+.phaseb-hero--gym .phaseb-kicker{color:#c6acff}
+.phaseb-hero--swim .button-secondary,.phaseb-hero--gym .button-secondary,.phaseb-hero--recovery .button-secondary{
+ color:#f4f6ff;background:rgba(11,20,35,.72);border-color:rgba(203,217,245,.42);
+}
+/* Image-backed Progress categories retain the existing button and focus semantics. */
+.phaseb-progress-card.phaseb-category-strength,.phaseb-progress-card.phaseb-category-swimming,.phaseb-progress-card.phaseb-category-hydration{
+ position:relative;isolation:isolate;overflow:hidden;color:#f6f8ff;background:#101728;
+}
+.phaseb-progress-card.phaseb-category-strength::before,.phaseb-progress-card.phaseb-category-swimming::before,.phaseb-progress-card.phaseb-category-hydration::before{
+ content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background-size:cover;background-repeat:no-repeat;background-position:center center;
+}
+.phaseb-progress-card.phaseb-category-strength::before{background-image:linear-gradient(90deg,rgba(10,12,30,.96),rgba(10,12,30,.64)),url('/images/cards/gym-hero.webp')}
+.phaseb-progress-card.phaseb-category-swimming::before{background-image:linear-gradient(90deg,rgba(4,21,34,.96),rgba(4,21,34,.64)),url('/images/cards/swim-hero.webp')}
+.phaseb-progress-card.phaseb-category-hydration::before{background-image:linear-gradient(90deg,rgba(5,24,36,.96),rgba(5,24,36,.74)),url('/images/cards/hydration.webp')}
+.phaseb-progress-card.phaseb-category-strength>*,.phaseb-progress-card.phaseb-category-swimming>*,.phaseb-progress-card.phaseb-category-hydration>*{position:relative;z-index:1}
+.phaseb-progress-card.phaseb-category-strength small,.phaseb-progress-card.phaseb-category-swimming small,.phaseb-progress-card.phaseb-category-hydration small{color:#d3ddeb}
+.phaseb-progress-card.phaseb-category-strength .phaseb-progress-card-arrow,.phaseb-progress-card.phaseb-category-swimming .phaseb-progress-card-arrow,.phaseb-progress-card.phaseb-category-hydration .phaseb-progress-card-arrow{color:#b9e9ed}
+/* Hydration: low-contrast art, not a distracting full-photo utility panel. */
+.phaseb-hydration-card{position:relative;isolation:isolate;overflow:hidden;background:#0d2030;color:#f6faff}
+.phaseb-hydration-card::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(4,19,31,.96),rgba(5,27,39,.79)),url('/images/cards/hydration.webp') center center/cover no-repeat}
+.phaseb-hydration-card>*{position:relative;z-index:1}
+.phaseb-hydration-card .phaseb-hydration-number small{color:#cfdfef}
+.phaseb-hydration-card .phaseb-icon-button,.phaseb-hydration-card .phaseb-quick-actions .button-secondary{background:rgba(11,29,42,.78);color:#f4f9ff;border-color:rgba(178,221,231,.32)}
+.phaseb-hydration-card .phaseb-goal-editor{background:rgba(5,20,32,.42);border-radius:12px;padding:14px;margin-top:12px}
+.phaseb-hydration-card .phaseb-goal-editor .field span,.phaseb-hydration-card .phaseb-goal-editor p{color:#c5d6e7}
+/* Achievement cabinet and genuine milestone toasts use the generated trophy art. */
+.phaseb-achievement-summary{
+ color:#f5f8ff;background:linear-gradient(90deg,rgba(9,13,31,.84),rgba(8,14,30,.92)),url('/images/cards/achievement.webp') 27% center/cover no-repeat;
+}
+.phaseb-achievement-summary p{color:#ced8e9}
+.phaseb-celebration-banner.is-achievement{
+ background:linear-gradient(90deg,rgba(9,13,31,.95),rgba(13,13,34,.84)),url('/images/cards/achievement.webp') center center/cover no-repeat;
+ color:#f5f8ff;
+}
+.phaseb-celebration-banner.is-achievement .phaseb-celebration-copy p{color:#ced8e9}
+@media(max-width:700px){
+ .phaseb-hero--swim,.phaseb-hero--gym,.phaseb-hero--recovery{background-position:65% center}
+ .phaseb-hero--swim{background-image:linear-gradient(90deg,rgba(5,15,31,.98),rgba(5,15,31,.86) 70%,rgba(5,15,31,.65)),url('/images/cards/swim-hero.webp')}
+ .phaseb-hero--gym{background-image:linear-gradient(90deg,rgba(13,9,27,.98),rgba(13,9,27,.87) 70%,rgba(13,9,27,.64)),url('/images/cards/gym-hero.webp')}
+ .phaseb-hero--recovery{background-image:linear-gradient(90deg,rgba(6,20,30,.98),rgba(6,20,30,.85) 70%,rgba(6,20,30,.62)),url('/images/cards/recovery.webp')}
+}
